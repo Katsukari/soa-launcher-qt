@@ -83,9 +83,11 @@ void DownloadWidget::paintEvent(QPaintEvent* event)
 
 bool DownloadWidget::eventFilter(QObject* obj, QEvent* event)
 {
-    if (obj == download_button) {
+    if (obj == download_button)
+    {
         const auto& btn = assets::buttons[assets::Button::DownloadGame];
-        switch (event->type()) {
+        switch (event->type())
+        {
             case QEvent::Enter:              download_button->setIcon(QIcon(btn.hover));   break;
             case QEvent::Leave:              download_button->setIcon(QIcon(btn.normal));  break;
             case QEvent::MouseButtonPress:   download_button->setIcon(QIcon(btn.clicked)); break;
