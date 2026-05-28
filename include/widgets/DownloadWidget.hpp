@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QEvent>
 #include <QWidget>
 #include <QLabel>
 #include <QPushButton>
@@ -13,9 +14,8 @@ class DownloadWidget : public QWidget
 
     public:
         explicit DownloadWidget(QWidget* parent = nullptr);
-
-    protected:
         void paintEvent(QPaintEvent* event) override;
+        bool eventFilter(QObject* obj, QEvent* event) override;
 
     private:
         void setup_title();
