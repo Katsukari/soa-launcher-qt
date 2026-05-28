@@ -44,18 +44,22 @@ FetchContent_MakeAvailable(spdlog)
 
 set(LAUNCHER_SOURCES
         src/main.cpp
+        src/MainWindow.cpp
+        src/widgets/LoginWidget.cpp
+        src/util/Assets.cpp
+        src/widgets/DownloadWidget.cpp
 )
 
 set(LAUNCHER_HEADERS
-
-)
-
-# UI files (Qt Designer).
-set(LAUNCHER_UI
+        include/MainWindow.hpp
+        include/widgets/LoginWidget.hpp
+        include/util/Assets.hpp
+        include/widgets/DownloadWidget.hpp
 )
 
 # Resources (.qrc files).
 set(LAUNCHER_RESOURCES
+        src/res/resources.qrc
 )
 
 # --- Executable ---
@@ -157,6 +161,8 @@ if(BUILD_TESTS)
 
     target_link_libraries(launcher_tests PRIVATE
             Qt6::Core
+            Qt6::Gui
+            Qt6::Widgets
             Qt6::Test
             spdlog::spdlog
     )
