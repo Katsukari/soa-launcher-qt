@@ -9,16 +9,14 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Qt auto-generators for MOC, RCC, and UIC.
+# Qt auto-generators for MOC and RCC
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
-set(CMAKE_AUTOUIC ON)
-set(CMAKE_AUTOUIC_SEARCH_PATHS src/res)
 
-# --- Options ---
+# Options
 option(BUILD_TESTS "Build tests" ON)
 
-# --- Dependencies ---
+# Dependencies
 
 # Qt6
 find_package(Qt6 REQUIRED COMPONENTS
@@ -29,7 +27,7 @@ find_package(Qt6 REQUIRED COMPONENTS
         Concurrent
 )
 
-# spdlog — fetched automatically, no submodule needed.
+# spdlog — fetched automatically, no submodule needed
 include(FetchContent)
 FetchContent_Declare(
         spdlog
@@ -40,36 +38,45 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(spdlog)
 
-# --- Sources ---
+# Sources
 
 set(LAUNCHER_SOURCES
         src/main.cpp
         src/MainWindow.cpp
-        src/widgets/LoginWidget.cpp
+        src/widgets/Login.cpp
         src/util/Assets.cpp
-        src/widgets/DownloadWidget.cpp
+        src/widgets/DownloadBox.cpp
+        src/widgets/Settings.cpp
+        src/util/Layout.cpp
+        src/widgets/LauncherSettings.cpp
+        src/widgets/WineSettings.cpp
+        src/widgets/ImageDropdown.cpp
 )
 
 set(LAUNCHER_HEADERS
         include/MainWindow.hpp
-        include/widgets/LoginWidget.hpp
+        include/widgets/Login.hpp
         include/util/Assets.hpp
-        include/widgets/DownloadWidget.hpp
+        include/widgets/DownloadBox.hpp
+        include/widgets/Settings.hpp
+        include/util/Layout.hpp
+        include/widgets/LauncherSettings.hpp
+        include/widgets/WineSettings.hpp
+        include/widgets/ImageDropdown.hpp
 )
 
-# Resources (.qrc files).
+# Resources (.qrc files)
 set(LAUNCHER_RESOURCES
         src/res/resources.qrc
 )
 
-# --- Executable ---
+# Executable
 
 qt_standard_project_setup()
 
 qt_add_executable(${PROJECT_NAME}
         ${LAUNCHER_SOURCES}
         ${LAUNCHER_HEADERS}
-        ${LAUNCHER_UI}
         ${LAUNCHER_RESOURCES}
 )
 
@@ -87,7 +94,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
         spdlog::spdlog
 )
 
-# --- Platform-specific configuration ---
+# Platform-specific configuration
 
 # macOS: build as a proper .app bundle.
 if(APPLE)
@@ -112,7 +119,7 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND NOT APPLE)
     target_link_options(${PROJECT_NAME} PRIVATE -static-libstdc++)
 endif()
 
-# --- Install + Qt deploy ---
+# Install + Qt deploy
 
 install(TARGETS ${PROJECT_NAME}
         BUNDLE DESTINATION .
@@ -127,7 +134,7 @@ qt_generate_deploy_app_script(
 )
 install(SCRIPT ${deploy_script})
 
-# --- Packaging (generates .dmg on macOS, .tar.gz on Linux) ---
+# Packaging (generates .dmg on macOS, .tar.gz on Linux)
 
 set(CPACK_PACKAGE_NAME "Story Of Alicia Launcher")
 set(CPACK_PACKAGE_VENDOR "Story Of Alicia")
@@ -143,7 +150,7 @@ endif()
 
 include(CPack)
 
-# --- Tests ---
+# Tests
 
 if(BUILD_TESTS)
     enable_testing()

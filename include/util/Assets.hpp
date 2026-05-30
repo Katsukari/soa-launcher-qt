@@ -46,7 +46,7 @@ namespace assets
         RulesFrame,
         SignedInAs,
         Logo,
-        IconMain,
+        IconLock,
         IconPT,
         SettingsButton,
     };

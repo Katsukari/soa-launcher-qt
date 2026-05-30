@@ -46,15 +46,14 @@ namespace assets
             {Image::RulesFrame,          "rules-frame.png"},
             {Image::SignedInAs,          "signed-in-as.png"},
             {Image::Logo,                "soa-logo.png"},
-            {Image::IconMain,            "2.0 ICON.png"},
+            {Image::IconLock,            "2.0 ICON.png"},
             {Image::IconPT,              "PT ICON.png"},
             {Image::SettingsButton, "Settings Button.png"},
         };
 
         for (const auto& [key, path] : defs)
         {
-            auto px = load_pixmap(path);
-            if (!px.isNull()) images[key] = px;
+            if (auto px = load_pixmap(path); !px.isNull()) images[key] = px;
         }
     }
 
@@ -86,12 +85,7 @@ namespace assets
             {Button::SliderOff,      "slider-toggle-off.png",          "",                              "",                                ""},
         };
 
-        for (const auto &
-            [key,
-            normal,
-            hover,
-            clicked,
-            loading] : defs)
+        for (const auto & [key, normal, hover, clicked, loading] : defs)
         {
             ButtonAsset asset;
             asset.normal  = normal.isEmpty()  ? QPixmap{} : load_pixmap(normal);
