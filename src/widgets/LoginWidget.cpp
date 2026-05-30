@@ -16,7 +16,6 @@ void LoginWidget::setup_logo()
     auto* logo = new QLabel(this);
     logo->setPixmap(scaled);
     logo->setAlignment(Qt::AlignHCenter);
-    // React: top 62px from window, centered between left:30 and right:20
     logo->setGeometry(30, 59, 1350, scaled.height());
 }
 
@@ -58,8 +57,6 @@ void LoginWidget::setup_close_buttons()
 
 void LoginWidget::setup_version_label()
 {
-    // React: bottom 55px, right 55px, Eurostile weight 850, 16px,
-    // color #E4E8EA, letter-spacing 0.08em, uppercase.
     version_label = new QLabel("VERSION 0.1.0", this);
 
     QFont version_font = assets::fonts[assets::Font::EurostileExtraBlack];
@@ -75,7 +72,6 @@ void LoginWidget::setup_version_label()
 
 void LoginWidget::setup_download_widget()
 {
-    // React: top 365px, left 388px, 640x320.
     download_widget = new DownloadWidget(this);
     download_widget->move(388, 365);
 }
@@ -108,5 +104,5 @@ void LoginWidget::paintEvent(QPaintEvent* event)
     // Sidebar icons, on top of the frame.
     // TOP = camel "PT" icon (PT ICON.png), BOTTOM = lock (2.0 ICON.png).
     painter.drawPixmap(56, 495, assets::images[assets::Image::IconPT]);
-    painter.drawPixmap(58, 613, assets::images[assets::Image::IconMain]); // <-- the LOCK enum, not IconMain
+    painter.drawPixmap(58, 613, assets::images[assets::Image::IconMain]);
 }
