@@ -1,0 +1,51 @@
+name: Build (macOS & Linux)
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            cpp_compiler: g++
+          - os: ubuntu-latest
+            cpp_compiler: clang++
+          - os: macos-latest
+            cpp_compiler: clang++   # AppleClang
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install CMake + Ninja
+      uses: lukka/get-cmake@latest
+
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v4
+      with:
+        version: '6.8.3'        # LTS
+        target: 'desktop'
+        cache: true
+        install-deps: true      # pulls libxcb/xkb deps on Linux
+
+    - name: Configure
+      run: >
+        cmake -B ${{ github.workspace }}/build
+        -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
+        -DCMAKE_BUILD_TYPE=Release
+        -S ${{ github.workspace }}
+
+    - name: Build
+      run: cmake --build ${{ github.workspace }}/build --config Release
+
+    - name: Test
+      working-directory: ${{ github.workspace }}/build
+      # offscreen platform so QApplication-based tests don't need a display
+      env:
+        QT_QPA_PLATFORM: offscreen
+      run: ctest --output-on-failure --build-config Release
