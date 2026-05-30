@@ -126,14 +126,6 @@ install(TARGETS ${PROJECT_NAME}
         RUNTIME DESTINATION bin
 )
 
-qt_generate_deploy_app_script(
-        TARGET ${PROJECT_NAME}
-        OUTPUT_SCRIPT deploy_script
-        NO_UNSUPPORTED_PLATFORM_ERROR
-        NO_TRANSLATIONS
-)
-install(SCRIPT ${deploy_script})
-
 # Packaging (generates .dmg on macOS, .tar.gz on Linux)
 
 set(CPACK_PACKAGE_NAME "Story Of Alicia Launcher")
