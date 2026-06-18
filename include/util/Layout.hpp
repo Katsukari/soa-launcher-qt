@@ -164,6 +164,8 @@ namespace layout
     }
 
     // SettingsWidget (full-window overlay + centered box)
+    // Both tabs (Launcher + Wine) use the SAME box. The wine terminal is a
+    // separate top-level window
     namespace settings
     {
         inline constexpr QSize k_box {630, 555};
@@ -198,11 +200,10 @@ namespace layout
         inline constexpr int   k_desc_h    = 40;
         inline constexpr int   k_title_h   = 26;
 
-        // Row top-y for each of the four rows
-        inline constexpr int   k_row1_y = 90;
-        inline constexpr int   k_row2_y = 188;
-        inline constexpr int   k_row3_y = 306;
-        inline constexpr int   k_row4_y = 416;
+        inline constexpr int   k_row1_y = 78;
+        inline constexpr int   k_row2_y = 182;
+        inline constexpr int   k_row3_y = 286;
+        inline constexpr int   k_row4_y = 390;
 
         QRect box_rect(QSize win);
         QSize box(QSize win);

@@ -16,7 +16,7 @@ void DownloadBox::setup_title()
 {
     const QSize w = window()->size();
 
-    auto title_label = new QLabel("PLAYTEST", this);
+    const auto title_label = new QLabel("PLAYTEST", this);
     title_label->setAlignment(Qt::AlignCenter);
 
     QFont title_font = assets::fonts[assets::Font::EurostileExtraBlack];
@@ -35,7 +35,7 @@ void DownloadBox::setup_settings_button()
     auto settings_button = new QPushButton(this);
     settings_button->setFlat(true);
     settings_button->setCursor(Qt::PointingHandCursor);
-    settings_button->setStyleSheet("border: none; background: transparent;");
+    settings_button->setStyleSheet("outline:none; border: none; background: transparent;");
 
     const QPixmap scaled = assets::images[assets::Image::SettingsButton]
         .scaled(btn.size(), Qt::KeepAspectRatio, Qt::SmoothTransformation);
@@ -43,14 +43,14 @@ void DownloadBox::setup_settings_button()
     settings_button->setIconSize(btn.size());
     settings_button->setGeometry(btn);
 
-    connect(settings_button, &QPushButton::clicked, this, [this]() { emit settings_requested(); });
+    connect(settings_button, &QPushButton::clicked, this, [this] { emit settings_requested(); });
 }
 
 void DownloadBox::setup_message()
 {
     const QSize w = window()->size();
 
-    auto message_label = new QLabel(this);
+    const auto message_label = new QLabel(this);
     message_label->setText(
         "Welcome to Story of Alicia. To participate in the playtest, you\n"
         "have to first download the game.");
@@ -100,9 +100,7 @@ void DownloadBox::paintEvent(QPaintEvent* event)
     painter.setRenderHint(QPainter::SmoothPixmapTransform);
 
     painter.drawPixmap(rect(), assets::images[assets::Image::BoxCard]);
-    // Note box behind the message — same rect as the message label.
-    painter.drawPixmap(layout::scaled(layout::download::k_note, w),
-                       assets::images[assets::Image::BoxNote2]);
+    painter.drawPixmap(layout::scaled(layout::download::k_note, w), assets::images[assets::Image::BoxNote2]);
 }
 
 bool DownloadBox::eventFilter(QObject* obj, QEvent* event)

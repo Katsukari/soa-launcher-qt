@@ -1,24 +1,22 @@
 #pragma once
 #include <QWidget>
 #include "util/Assets.hpp"
+#include "util/ModalOverlay.hpp"
 
 class QPushButton;
 class QStackedWidget;
 class LauncherSettings;
 class WineSettings;
+class AdvancedSettings;
 
-class Settings : public QWidget
+class Settings : public ModalOverlay
 {
     Q_OBJECT
     public:
         explicit Settings(QWidget* parent = nullptr);
-        void show_over(QWidget* background);
 
     protected:
-        void paintEvent(QPaintEvent* event) override;
-
-    signals:
-        void closed();
+        void paint_content(QPainter& painter) override;
 
     private:
         void setup_close_button();
@@ -27,9 +25,6 @@ class Settings : public QWidget
         void set_tab(int index);
         int  active_tab {};
 
-        QPixmap blurred_bg;
         QPushButton * close_button {};
         QStackedWidget * stack {};
-        LauncherSettings * launcher_page {};
-        WineSettings * wine_page {};
 };

@@ -11,6 +11,7 @@
 #include <QMouseEvent>
 #include <QWindow>
 
+#include "util/ModalOverlay.hpp"
 #include "widgets/GameInstall.hpp"
 
 MainWindow::MainWindow(QWidget* parent) : QWidget(parent)
@@ -34,7 +35,7 @@ void MainWindow::setup_window_buttons()
     close_button = new QPushButton(this);
     close_button->setFlat(true);
     close_button->setCursor(Qt::PointingHandCursor);
-    close_button->setStyleSheet("border: none; background: transparent;");
+    close_button->setStyleSheet("outline:none; border: none; background: transparent;");
     close_button->setIcon(QIcon(assets::images[assets::Image::CloseIcon]));
     close_button->setIconSize(layout::chrome::close_icon(w));
     close_button->setGeometry(layout::chrome::close(w));
@@ -43,7 +44,7 @@ void MainWindow::setup_window_buttons()
     minimize_button = new QPushButton(this);
     minimize_button->setFlat(true);
     minimize_button->setCursor(Qt::PointingHandCursor);
-    minimize_button->setStyleSheet("border:none; background:transparent; padding:0; margin:0;");
+    minimize_button->setStyleSheet("outline:none; border:none; background:transparent; padding:0; margin:0;");
     minimize_button->setIcon(QIcon(assets::images[assets::Image::Minimize]));
     minimize_button->setIconSize(layout::chrome::minimize_icon(w));
     minimize_button->setGeometry(layout::chrome::minimize(w));
@@ -96,28 +97,20 @@ void MainWindow::setup_download_box()
 
     connect(download_box, &DownloadBox::settings_requested, this, [this]()
     {
-        settings_open = true;
-        close_button->hide();
-        minimize_button->hide();
-        repaint();
-        settings->hide();
+        on_overlay_opened(settings);       // keeps_chrome()==false -> frames hidden, chrome hidden
         settings->show_over(this);
     });
 
     connect(download_box, &DownloadBox::download_triggered, this, [this]()
     {
         game_install->show_over(this);
-        game_install->raise();
-        close_button->raise();
-        minimize_button->raise();
+        on_overlay_opened(game_install);
     });
+
 
     connect(settings, &Settings::closed, this, [this]()
     {
-        settings_open = false;
-        close_button->show();
-        minimize_button->show();
-        update();
+        on_overlay_closed(settings);
     });
 }
 
@@ -128,19 +121,35 @@ void MainWindow::setup_game_install()
 
     connect(game_install, &GameInstall::closed, this, [this]()
     {
-        // Maybe re-enable download button if needed
+        on_overlay_closed(game_install);
     });
+}
 
-    connect(game_install, &GameInstall::closed, this, [this]()
+void MainWindow::on_overlay_opened(ModalOverlay* m)
+{
+    if (m->keeps_chrome())
     {
-        game_install->hide();
-        if (!settings_open)
-        {
-            close_button->show();
-            minimize_button->show();
-            update();
-        }
-    });
+        // GameInstall: keep frames painting, keep chrome buttons but raise them above the modal
+        chrome_hidden = false;
+        close_button->raise();
+        minimize_button->raise();
+    }
+    else
+    {
+        // Settings: hide everything
+        chrome_hidden = true;
+        close_button->hide();
+        minimize_button->hide();
+    }
+    update();   // repaint frames per the new gate
+}
+
+void MainWindow::on_overlay_closed(ModalOverlay *)
+{
+    chrome_hidden = false;
+    close_button->show();
+    minimize_button->show();
+    update();
 }
 
 void MainWindow::paintEvent(QPaintEvent*)
@@ -159,8 +168,10 @@ void MainWindow::paintEvent(QPaintEvent*)
     painter.drawPixmap(bg, assets::images[assets::Image::Background]);
     painter.setClipping(false);
 
-    // Frames + sidebar icons hidden while settings is open
-    if (!settings_open)
+    // Frames + sidebar icons drawn unless a chrome-hiding overlay (Settings) is open.
+    // GameInstall keeps chrome, so these stay painted under its blur and show through sharp
+    // (GameInstall re-draws them on top via ModalOverlay::paint_frames).
+    if (!chrome_hidden)
     {
         const QPixmap left = assets::images[assets::Image::LeftFrame]
             .scaledToHeight(height(), Qt::SmoothTransformation);

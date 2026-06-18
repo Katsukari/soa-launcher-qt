@@ -10,40 +10,14 @@
 
 #include "widgets/LauncherSettings.hpp"
 #include "widgets/WineSettings.hpp"
+#include "widgets/AdvancedSettings.hpp"
 #include "util/Layout.hpp"
+#include "spdlog/spdlog.h"
 
-namespace
+
+Settings::Settings(QWidget* parent) : ModalOverlay(parent)
 {
-    QPixmap blur_pixmap(const QPixmap& src, qreal radius)
-    {
-        QGraphicsScene scene;
-        auto* item = new QGraphicsPixmapItem(src);
-        auto* blur = new QGraphicsBlurEffect;
-        blur->setBlurRadius(radius);
-        item->setGraphicsEffect(blur);
-        scene.addItem(item);
-
-        QPixmap out(src.size());
-        out.fill(QColor(0xEA, 0xF2, 0xF7));
-        QPainter p(&out);
-        p.setRenderHint(QPainter::SmoothPixmapTransform);
-        scene.render(&p, QRectF(), QRectF(src.rect()));
-        return out;
-    }
-}
-
-void Settings::show_over(QWidget* background)
-{
-    // Snapshot everything currently drawn in the background widget
-    const QPixmap snap = background->grab();
-    blurred_bg = blur_pixmap(snap, layout::scaled(10, size()));
-    show();
-    raise();
-}
-
-Settings::Settings(QWidget* parent) : QWidget(parent)
-{
-    setFixedSize(window()->size());
+    set_keeps_chrome(false);
     setup_pages();
     setup_close_button();
     setup_tabs();
@@ -53,14 +27,12 @@ void Settings::setup_pages()
 {
     const QSize w = size();
     stack = new QStackedWidget(this);
-
-    QRect box = layout::settings::box_rect(w);
-    box.setHeight(box.height() + layout::scaled(160, w));
-    stack->setGeometry(box);
+    stack->setGeometry(layout::settings::box_rect(w));
     stack->setStyleSheet("background: transparent;");
 
     stack->addWidget(new LauncherSettings(stack));
     stack->addWidget(new WineSettings(stack));
+    stack->addWidget(new AdvancedSettings(stack));
     stack->setCurrentIndex(0);
 }
 
@@ -97,46 +69,44 @@ void Settings::setup_tabs()
         return b;
     };
 
-    auto tab_general = make_tab(0);
-    auto tab_wine    = make_tab(1);
+    auto tab_general  = make_tab(0);
+    auto tab_wine     = make_tab(1);
+    auto tab_advanced = make_tab(2);
 
-    connect(tab_general, &QPushButton::clicked, this, [this]() { set_tab(0); });
-    connect(tab_wine,    &QPushButton::clicked, this, [this]() { set_tab(1); });
+    connect(tab_general,  &QPushButton::clicked, this, [this]() { set_tab(0); });
+    connect(tab_wine,     &QPushButton::clicked, this, [this]() { set_tab(1); });
+    connect(tab_advanced, &QPushButton::clicked, this, [this]() { set_tab(2); });
 
     tab_general->raise();
     tab_wine->raise();
+    tab_advanced->raise();
     close_button->raise();
 }
 
-void Settings::set_tab(int index)
+void Settings::set_tab(const int index)
 {
     active_tab = index;
     stack->setCurrentIndex(index);
     update();
 }
 
-void Settings::paintEvent(QPaintEvent* event)
+void Settings::paint_content(QPainter& painter)
 {
-    Q_UNUSED(event);
     const QSize w = size();
-    QPainter painter(this);
-    painter.setRenderHint(QPainter::Antialiasing);
-    painter.setRenderHint(QPainter::SmoothPixmapTransform);
+    const QRect box = layout::settings::box_rect(w);
+    painter.drawPixmap(box, assets::images[assets::Image::BoxSettings]);
 
-    // Clip to the same rounded region MainWindow uses, so the black gutter
-    // in the corners stays black instead of getting the frost wash.
-    const QRect bg = layout::region::rect(w);
-    const int bg_radius = layout::scaled(layout::region::k_radius, w);
-    QPainterPath clip;
-    clip.addRoundedRect(QRectF(bg), bg_radius, bg_radius);
-    painter.setClipPath(clip);
-
-    if (!blurred_bg.isNull()) painter.drawPixmap(rect(), blurred_bg);
-    painter.fillRect(rect(), QColor(255, 255, 255, 70));
-    painter.setClipping(false);
-
-    // Settings box
-    painter.drawPixmap(layout::settings::box_rect(w), assets::images[assets::Image::BoxSettings]);
+    // Title (text per tab)
+    {
+        QFont tf = assets::fonts[assets::Font::EurostileExtraBlack];
+        tf.setPixelSize(layout::scaled(layout::text::k_modal_header, w));
+        tf.setWeight(QFont::Black);
+        painter.setFont(tf);
+        painter.setPen(QColor(0x4F, 0x17, 0x17));
+        const char* title = (active_tab == 1) ? "WINE SETTINGS" : (active_tab == 2) ? "ADVANCED SETTINGS": "LAUNCHER SETTINGS";
+        const QRect title_rect(box.left(), box.top() + layout::scaled(30, w), box.width(), layout::scaled(30, w));
+        painter.drawText(title_rect, Qt::AlignCenter, title);
+    }
 
     // Tabs
     constexpr QColor active   {0xFB, 0xF6, 0xF0};
@@ -149,9 +119,9 @@ void Settings::paintEvent(QPaintEvent* event)
     painter.setFont(f);
     const int radius = layout::scaled(8, w);
 
-    for (int i = 0; i < 2; ++i)
+    for (int i = 0; i < 3; ++i)
     {
-        const char* labels[] = { "LAUNCHER", "WINE" };
+        const char* labels[] = { "LAUNCHER", "WINE", "ADVANCED" };
         const QRect r = layout::settings::tab_rect(w, i);
         const bool  on = i == active_tab;
         QPainterPath p;

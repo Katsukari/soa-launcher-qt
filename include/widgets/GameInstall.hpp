@@ -1,22 +1,16 @@
 #pragma once
-#include <QWidget>
 #include <QPushButton>
-#include "MainWindow.hpp"
+#include "util/ModalOverlay.hpp"
 
-class GameInstall : public QWidget
+class GameInstall : public ModalOverlay
 {
     Q_OBJECT
-
-public:
+    public:
         explicit GameInstall(QWidget* parent = nullptr);
-        void show_over(QWidget* background);
 
     protected:
-        void paintEvent(QPaintEvent* event) override;
-        bool eventFilter(QObject * obj, QEvent* event) override;
-
-        signals:
-            void closed();
+        void paint_content(QPainter& painter) override;
+        bool eventFilter(QObject* obj, QEvent* event) override;
 
     private:
         void setup_close_button();
@@ -25,7 +19,5 @@ public:
         QPushButton* close_button {};
         QPushButton* install_button {};
         QPushButton* cancel_button {};
-        QPushButton * change_path_button {};
-        QPixmap blurred_bg;
-        bool open_state{false}; // For potential expand/collapse if needed later, currently just close
+        QPushButton* change_path_button {};
 };

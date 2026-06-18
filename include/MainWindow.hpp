@@ -1,6 +1,7 @@
 #pragma once
 #include <QMainWindow>
 
+class ModalOverlay;
 class QPushButton;
 class QLabel;
 class DownloadBox;
@@ -25,9 +26,11 @@ class MainWindow : public QWidget
         void setup_settings();
         void setup_download_box();
         void setup_game_install();
+        void on_overlay_opened(ModalOverlay* m);
+        void on_overlay_closed(ModalOverlay *);
 
         QPoint drag_offset;
-        bool settings_open {};
+        bool chrome_hidden {};
         QPushButton * close_button = nullptr;
         QPushButton * minimize_button = nullptr;
         DownloadBox * download_box = nullptr;
