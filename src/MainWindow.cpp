@@ -15,6 +15,7 @@ MainWindow::MainWindow(QWidget* parent) : QWidget(parent)
 {
     setWindowFlags(Qt::FramelessWindowHint);
     setFixedSize(layout::win::k_default);
+    setAttribute(Qt::WA_TranslucentBackground);
 
     setup_window_buttons();
     setup_logo();
@@ -115,8 +116,6 @@ void MainWindow::paintEvent(QPaintEvent*)
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
     painter.setRenderHint(QPainter::SmoothPixmapTransform);
-
-    painter.fillRect(rect(), Qt::black);
 
     // Background always drawn.
     const QRect bg = layout::region::rect(w);
