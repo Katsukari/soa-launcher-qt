@@ -51,6 +51,7 @@ set(LAUNCHER_SOURCES
         src/widgets/LauncherSettings.cpp
         src/widgets/WineSettings.cpp
         src/widgets/ImageDropdown.cpp
+        src/widgets/GameInstall.cpp
 )
 
 set(LAUNCHER_HEADERS
@@ -63,6 +64,7 @@ set(LAUNCHER_HEADERS
         include/widgets/LauncherSettings.hpp
         include/widgets/WineSettings.hpp
         include/widgets/ImageDropdown.hpp
+        include/widgets/GameInstall.hpp
 )
 
 # Resources (.qrc files)

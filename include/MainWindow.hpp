@@ -5,6 +5,7 @@ class QPushButton;
 class QLabel;
 class DownloadBox;
 class Settings;
+class GameInstall;
 
 class MainWindow : public QWidget
 {
@@ -23,6 +24,7 @@ class MainWindow : public QWidget
         void setup_version_label();
         void setup_settings();
         void setup_download_box();
+        void setup_game_install();
 
         QPoint drag_offset;
         bool settings_open {};
@@ -30,4 +32,5 @@ class MainWindow : public QWidget
         QPushButton * minimize_button = nullptr;
         DownloadBox * download_box = nullptr;
         Settings * settings = nullptr;
+        GameInstall * game_install = nullptr;
 };

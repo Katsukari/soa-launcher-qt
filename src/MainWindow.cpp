@@ -11,6 +11,8 @@
 #include <QMouseEvent>
 #include <QWindow>
 
+#include "widgets/GameInstall.hpp"
+
 MainWindow::MainWindow(QWidget* parent) : QWidget(parent)
 {
     setWindowFlags(Qt::FramelessWindowHint);
@@ -22,6 +24,7 @@ MainWindow::MainWindow(QWidget* parent) : QWidget(parent)
     setup_version_label();
     setup_settings();
     setup_download_box();
+    setup_game_install();
 }
 
 void MainWindow::setup_window_buttons()
@@ -66,7 +69,7 @@ void MainWindow::setup_logo()
 void MainWindow::setup_version_label()
 {
     const QSize w = size();
-    auto version_label = new QLabel("VERSION 0.1.0", this);
+    const auto version_label = new QLabel("VERSION 0.1.0", this);
 
     QFont f = assets::fonts[assets::Font::EurostileExtraBlack];
     f.setPixelSize(layout::scaled(layout::text::k_version, w));
@@ -101,12 +104,42 @@ void MainWindow::setup_download_box()
         settings->show_over(this);
     });
 
+    connect(download_box, &DownloadBox::download_triggered, this, [this]()
+    {
+        game_install->show_over(this);
+        game_install->raise();
+        close_button->raise();
+        minimize_button->raise();
+    });
+
     connect(settings, &Settings::closed, this, [this]()
     {
         settings_open = false;
         close_button->show();
         minimize_button->show();
         update();
+    });
+}
+
+void MainWindow::setup_game_install()
+{
+    game_install = new GameInstall(this);
+    game_install->hide();
+
+    connect(game_install, &GameInstall::closed, this, [this]()
+    {
+        // Maybe re-enable download button if needed
+    });
+
+    connect(game_install, &GameInstall::closed, this, [this]()
+    {
+        game_install->hide();
+        if (!settings_open)
+        {
+            close_button->show();
+            minimize_button->show();
+            update();
+        }
     });
 }
 

@@ -148,18 +148,18 @@ namespace layout
 
     namespace install_modal
     {
-        QRect box_rect(const QSize win)   { return scaled(k_rect, win); }
-        QSize box(const QSize win)        { return scaled(k_box, win); }
-        QRect close(const QSize win)      { return scaled(k_close, win); }
-        QSize close_icon(const QSize win) { return scaled(k_close_icon, win); }
-        int   path_h(const QSize win)     { return scaled(k_path_h, win); }
-    }
+        QRect  box_rect(const QSize win)         { return scaled(k_rect, win); }
+        QSize  box(const QSize win)              { return scaled(k_box, win); }
+        QRect  rect(const QSize win)             { return scaled(k_rect, win); }
 
-    namespace progress_modal
-    {
-        QRect box_rect(const QSize win)   { return scaled(k_rect, win); }
-        QSize box(const QSize win)        { return scaled(k_box, win); }
-        QRect close(const QSize win)      { return scaled(k_close, win); }
-        QSize close_icon(const QSize win) { return scaled(k_close_icon, win); }
+        // child rects: box-local constants shifted into window space by k_rect origin, then scaled
+        QRect  close(const QSize win)            { return scaled(k_close.translated(k_rect.topLeft()), win); }
+        QRect  title(const QSize win)            { return scaled(k_title.translated(k_rect.topLeft()), win); }
+        QRect  body(const QSize win)             { return scaled(k_body.translated(k_rect.topLeft()), win); }
+        QRect  path_field(const QSize win)       { return scaled(k_path.translated(k_rect.topLeft()), win); }
+        QRect  changepath_line(const QSize win)  { return scaled(k_changepath.translated(k_rect.topLeft()), win); }
+        QRect  cancel_button(const QSize win)    { return scaled(k_cancel.translated(k_rect.topLeft()), win); }
+        QRect  install_button(const QSize win)   { return scaled(k_install.translated(k_rect.topLeft()), win); }
+        QSize  close_icon(const QSize win)       { return scaled(k_close_icon, win); }
     }
 }

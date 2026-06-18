@@ -117,6 +117,7 @@ bool DownloadBox::eventFilter(QObject* obj, QEvent* event)
             case QEvent::MouseButtonPress:   download_button->setIcon(QIcon(btn.clicked)); break;
             case QEvent::MouseButtonRelease:
                 download_button->setIcon(QIcon(download_button->underMouse() ? btn.hover : btn.normal));
+                if (download_button->underMouse()) emit download_triggered();
                 break;
             default: break;
         }

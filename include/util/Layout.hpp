@@ -243,42 +243,57 @@ namespace layout
         int   option_overlap(QSize win);
     }
 
-    // Game-install modal
+    // GameInstall modal overlay
     namespace install_modal
     {
+        // Box dimensions & placement
         inline constexpr QSize k_box        {580, 382};
-        inline constexpr int   k_margin_top = 157;
-        inline constexpr QSize k_close_icon {18, 18};
-        inline constexpr QSize k_close_hit  {22, 22};
-        inline constexpr int   k_padding    = 36;
-        inline constexpr int   k_path_h     = 69;
+        inline constexpr int   k_margin_top = 66;  // dy offset from vertical center
 
+        // Box-local positioning
+        inline constexpr int   k_title_y      = 40;
+        inline constexpr int   k_title_h      = 30;
+        inline constexpr int   k_body_y       = 100;  // title_y + title_h + 30
+        inline constexpr int   k_body_h       = 40;
+        inline constexpr int   k_text_x       = 33;
+        inline constexpr int   k_path_inset   = 33;
+        inline constexpr int   k_path_h       = 69;
+        inline constexpr int   k_path_y       = 150;  // body_y + body_h + 30
+        inline constexpr int   k_changepath_y = 234;   // path_y + path_h + 15
+        inline constexpr int   k_changepath_h = 20;
+        inline constexpr int   k_button_row_y = 287;   // changepath_y + changepath_h + 40
+        inline constexpr int   k_button_h     = 40;
+        inline constexpr int   k_bottom_pad   = 55;
+        inline constexpr int   k_button_outer = 70;
+        inline constexpr int   k_button_gap   = 35;
+
+        // Computed layout
         inline constexpr QRect k_rect  = center_in_region(k_box, 0, k_margin_top);
-        inline constexpr QRect k_close = anchor_top_right(k_rect, 22, 17, k_close_hit);
-
-        QRect box_rect(QSize win);
-        QSize box(QSize win);
-        QRect close(QSize win);
-        QSize close_icon(QSize win);
-        int   path_h(QSize win);
-    }
-
-    // Download-progress moda
-    namespace progress_modal
-    {
-        inline constexpr QSize k_box        {490, 190};
-        inline constexpr int   k_margin_top = 40;
-        inline constexpr QSize k_close_icon {18, 18};
+        inline constexpr QSize k_close_icon {13, 13};
         inline constexpr QSize k_close_hit  {22, 22};
-        inline constexpr int   k_fill_inset_x = 9;
-        inline constexpr int   k_fill_inset_y = 1;
+        inline constexpr QRect k_close = anchor_top_right({0, 0, k_box.width(), k_box.height()}, 19, 17, k_close_hit);
 
-        inline constexpr QRect k_rect  = center_in_region(k_box, 0, k_margin_top);
-        inline constexpr QRect k_close = anchor_top_right(k_rect, 22, 17, k_close_hit);
+        inline constexpr QRect k_title {0, k_title_y, k_box.width(), k_title_h};
+        inline constexpr QRect k_body  {k_text_x, k_body_y, k_box.width() - 2 * k_text_x, k_body_h};
+        inline constexpr QRect k_path  {k_path_inset, k_path_y, k_box.width() - 2 * k_path_inset, k_path_h};
+        inline constexpr QRect k_changepath {k_path_inset, k_changepath_y, k_box.width() - 2 * k_path_inset, k_changepath_h};
 
-        QRect box_rect(QSize win);
-        QSize box(QSize win);
-        QRect close(QSize win);
-        QSize close_icon(QSize win);
+        inline constexpr int   k_btn_w   = (k_box.width() - 2 * k_button_outer - k_button_gap) / 2;
+        inline constexpr QRect k_cancel  {k_button_outer, k_button_row_y, k_btn_w, k_button_h};
+        inline constexpr QRect k_install {k_button_outer + k_btn_w + k_button_gap, k_button_row_y,
+                                          k_box.width() - k_button_outer - (k_button_outer + k_btn_w + k_button_gap), k_button_h};
+
+        // Accessor functions
+        QRect  box_rect(QSize win);
+        QSize  box(QSize win);
+        QRect  rect(QSize win);
+        QRect  close(QSize win);
+        QRect  title(QSize win);
+        QRect  body(QSize win);
+        QRect  path_field(QSize win);
+        QRect  changepath_line(QSize win);
+        QRect  cancel_button(QSize win);
+        QRect  install_button(QSize win);
+        QSize  close_icon(QSize win);
     }
 }

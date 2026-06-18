@@ -20,6 +20,7 @@ class DownloadBox : public QWidget
 
     signals:
         void settings_requested();
+        void download_triggered();
 
     private:
         void setup_title();
