@@ -27,7 +27,7 @@ void Settings::setup_pages()
 {
     const QSize w = size();
     stack = new QStackedWidget(this);
-    stack->setGeometry(layout::settings::box_rect(w));
+    stack->setGeometry(util::layout::settings::box_rect(w));
     stack->setStyleSheet("background: transparent;");
 
     stack->addWidget(new LauncherSettings(stack));
@@ -46,10 +46,10 @@ void Settings::setup_close_button()
     close_button->setText("");
     close_button->setStyleSheet("border: none; background: transparent;");
 
-    const auto & close_px = assets::images[assets::Image::CloseSettings];
+    const auto & close_px = util::assets::images[util::assets::Image::CloseSettings];
     close_button->setIcon(QIcon(close_px));
-    close_button->setIconSize(layout::settings::close_icon(w));
-    close_button->setGeometry(layout::settings::close(w));
+    close_button->setIconSize(util::layout::settings::close_icon(w));
+    close_button->setGeometry(util::layout::settings::close(w));
     close_button->raise();
 
     connect(close_button, &QPushButton::clicked, this, [this]() { hide(); emit closed(); });
@@ -65,7 +65,7 @@ void Settings::setup_tabs()
         b->setFlat(true);
         b->setCursor(Qt::PointingHandCursor);
         b->setStyleSheet("border:none; background:transparent;");
-        b->setGeometry(layout::settings::tab_rect(w, i));
+        b->setGeometry(util::layout::settings::tab_rect(w, i));
         return b;
     };
 
@@ -93,18 +93,18 @@ void Settings::set_tab(const int index)
 void Settings::paint_content(QPainter& painter)
 {
     const QSize w = size();
-    const QRect box = layout::settings::box_rect(w);
-    painter.drawPixmap(box, assets::images[assets::Image::BoxSettings]);
+    const QRect box = util::layout::settings::box_rect(w);
+    painter.drawPixmap(box, util::assets::images[util::assets::Image::BoxSettings]);
 
     // Title (text per tab)
     {
-        QFont tf = assets::fonts[assets::Font::EurostileExtraBlack];
-        tf.setPixelSize(layout::scaled(layout::text::k_modal_header, w));
+        QFont tf = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
+        tf.setPixelSize(util::layout::scaled(util::layout::text::k_modal_header, w));
         tf.setWeight(QFont::Black);
         painter.setFont(tf);
         painter.setPen(QColor(0x4F, 0x17, 0x17));
         const char* title = (active_tab == 1) ? "WINE SETTINGS" : (active_tab == 2) ? "ADVANCED SETTINGS": "LAUNCHER SETTINGS";
-        const QRect title_rect(box.left(), box.top() + layout::scaled(30, w), box.width(), layout::scaled(30, w));
+        const QRect title_rect(box.left(), box.top() + util::layout::scaled(30, w), box.width(), util::layout::scaled(30, w));
         painter.drawText(title_rect, Qt::AlignCenter, title);
     }
 
@@ -113,16 +113,16 @@ void Settings::paint_content(QPainter& painter)
     constexpr QColor inactive {0xD8, 0xCD, 0xC0};
     constexpr QColor textCol  {0x4F, 0x17, 0x17};
 
-    QFont f = assets::fonts[assets::Font::EurostileBlack];
-    f.setPixelSize(layout::scaled(layout::text::k_label, w));
+    QFont f = util::assets::fonts[util::assets::Font::EurostileBlack];
+    f.setPixelSize(util::layout::scaled(util::layout::text::k_label, w));
     f.setWeight(QFont::Black);
     painter.setFont(f);
-    const int radius = layout::scaled(8, w);
+    const int radius = util::layout::scaled(8, w);
 
     for (int i = 0; i < 3; ++i)
     {
         const char* labels[] = { "LAUNCHER", "WINE", "ADVANCED" };
-        const QRect r = layout::settings::tab_rect(w, i);
+        const QRect r = util::layout::settings::tab_rect(w, i);
         const bool  on = i == active_tab;
         QPainterPath p;
 

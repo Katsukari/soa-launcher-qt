@@ -7,9 +7,9 @@
 ImageDropdown::ImageDropdown(QStringList options, QWidget* parent) : QWidget(parent), items(std::move(options))
 {
     const QSize w = window()->size();
-    const QSize box = layout::select::box(w);
-    const int   oh  = layout::select::option_h(w);
-    const int   ov  = layout::select::option_overlap(w);
+    const QSize box = util::layout::select::box(w);
+    const int   oh  = util::layout::select::option_h(w);
+    const int   ov  = util::layout::select::option_overlap(w);
     const int   max_h = box.height() + (items.size() - 1) * (oh - ov);
     setFixedSize(box.width(), max_h);
 }
@@ -17,9 +17,9 @@ ImageDropdown::ImageDropdown(QStringList options, QWidget* parent) : QWidget(par
 QRect ImageDropdown::option_rect(int slot) const
 {
     const QSize w = window()->size();
-    const int oh  = layout::select::option_h(w);
-    const int ov  = layout::select::option_overlap(w);
-    const int y   = layout::select::box(w).height() - ov + slot * (oh - ov);
+    const int oh  = util::layout::select::option_h(w);
+    const int ov  = util::layout::select::option_overlap(w);
+    const int y   = util::layout::select::box(w).height() - ov + slot * (oh - ov);
     return { 0, y, width(), oh };
 }
 
@@ -34,7 +34,7 @@ void ImageDropdown::set_index(int i)
 void ImageDropdown::mousePressEvent(QMouseEvent* event)
 {
     const QSize w = window()->size();
-    const QRect closed { 0, 0, width(), layout::select::box(w).height() };
+    const QRect closed { 0, 0, width(), util::layout::select::box(w).height() };
 
     if (closed.contains(event->pos()))
     {
@@ -71,13 +71,13 @@ void ImageDropdown::paintEvent(QPaintEvent*)
     painter.setRenderHint(QPainter::Antialiasing);
     painter.setRenderHint(QPainter::SmoothPixmapTransform);
 
-    const QPixmap& dropdown_px = assets::images[assets::Image::MenuDropdown];
-    const QSize box = layout::select::box(w);
-    const int   lip = layout::scaled(layout::select::k_pad_bottom, w);
-    const int   pad = layout::scaled(20, w);
+    const QPixmap& dropdown_px = util::assets::images[util::assets::Image::MenuDropdown];
+    const QSize box = util::layout::select::box(w);
+    const int   lip = util::layout::scaled(util::layout::select::k_pad_bottom, w);
+    const int   pad = util::layout::scaled(20, w);
 
-    QFont f = assets::fonts[assets::Font::Inter];
-    f.setPixelSize(layout::scaled(layout::text::k_label, w));
+    QFont f = util::assets::fonts[util::assets::Font::Inter];
+    f.setPixelSize(util::layout::scaled(util::layout::text::k_label, w));
     f.setWeight(QFont::Medium);
     painter.setFont(f);
     const QColor text_col {0x4F, 0x17, 0x17};
@@ -105,10 +105,10 @@ void ImageDropdown::paintEvent(QPaintEvent*)
                      Qt::AlignVCenter | Qt::AlignLeft, items[current]);
 
     // Chevron
-    painter.setPen(QPen(QColor(0xA8, 0x90, 0x78), layout::scaled(2, w)));
-    const int cx = closed.right() - layout::scaled(28, w);
+    painter.setPen(QPen(QColor(0xA8, 0x90, 0x78), util::layout::scaled(2, w)));
+    const int cx = closed.right() - util::layout::scaled(28, w);
     const int cy = closed.center().y();
-    const int s  = layout::scaled(5, w);
+    const int s  = util::layout::scaled(5, w);
     if (open)
     {
         painter.drawLine(cx - s, cy + s / 2, cx, cy - s / 2);

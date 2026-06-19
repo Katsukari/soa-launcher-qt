@@ -4,7 +4,7 @@
 #include <QPoint>
 #include <QtGlobal>
 
-namespace layout
+namespace util::layout
 {
     // Preset window sizes
     namespace win

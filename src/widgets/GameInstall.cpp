@@ -2,8 +2,8 @@
 #include "util/Assets.hpp"
 #include "util/Layout.hpp"
 #include <QPainter>
-#include <QMouseEvent>
 #include <QApplication>
+#include <QFileDialog>
 #include <QGraphicsBlurEffect>
 
 GameInstall::GameInstall(QWidget* parent) : ModalOverlay(parent)
@@ -24,9 +24,9 @@ void GameInstall::setup_close_button()
     close_button->setCursor(Qt::PointingHandCursor);
     close_button->setStyleSheet("border:none; background:transparent;");
 
-    close_button->setIcon(QIcon(assets::images[assets::Image::CloseSettings])); 
-    close_button->setIconSize(layout::install_modal::close_icon(w));
-    close_button->setGeometry(layout::install_modal::close(w));
+    close_button->setIcon(QIcon(util::assets::images[util::assets::Image::CloseSettings])); 
+    close_button->setIconSize(util::layout::install_modal::close_icon(w));
+    close_button->setGeometry(util::layout::install_modal::close(w));
     
     connect(close_button, &QPushButton::clicked, this, [this]()
     {
@@ -46,8 +46,8 @@ void GameInstall::setup_buttons()
     cancel_button->setFlat(true);
     cancel_button->setCursor(Qt::PointingHandCursor);
     cancel_button->setStyleSheet("border:none; background:transparent;");
-    cancel_button->setIcon(QIcon(assets::buttons[assets::Button::Cancel].normal));
-    const QRect cancel_rect = layout::install_modal::cancel_button(w);
+    cancel_button->setIcon(QIcon(util::assets::buttons[util::assets::Button::Cancel].normal));
+    const QRect cancel_rect = util::layout::install_modal::cancel_button(w);
     cancel_button->setIconSize(cancel_rect.size());
     cancel_button->setGeometry(cancel_rect);
 
@@ -62,8 +62,8 @@ void GameInstall::setup_buttons()
     install_button->setFlat(true);
     install_button->setCursor(Qt::PointingHandCursor);
     install_button->setStyleSheet("border:none; background:transparent;");
-    install_button->setIcon(QIcon(assets::buttons[assets::Button::Install].normal));
-    const QRect install_rect = layout::install_modal::install_button(w);
+    install_button->setIcon(QIcon(util::assets::buttons[util::assets::Button::Install].normal));
+    const QRect install_rect = util::layout::install_modal::install_button(w);
     install_button->setIconSize(install_rect.size());
     install_button->setGeometry(install_rect);
 
@@ -90,13 +90,14 @@ void GameInstall::setup_buttons()
         "}"
         "QPushButton:hover { color: #6FD4EF; outline: none; border: none; }"
     );
-    const QRect cp_row = layout::install_modal::changepath_line(w);
+    const QRect cp_row = util::layout::install_modal::changepath_line(w);
     const int cp_hit_w = qMin(cp_row.width() / 3, 150);
     change_path_button->setGeometry(cp_row.left(), cp_row.top(), cp_hit_w, cp_row.height() + 4);
 
-    connect(change_path_button, &QPushButton::clicked, this, []
+    connect(change_path_button, &QPushButton::clicked, this, [this]
     {
-        // TODO: Open path picker
+        if (const QString dir = QFileDialog::getExistingDirectory(this, "Select Where To Install The Game");
+        !dir.isEmpty()) game_path = dir; update();
     });
 
     change_path_button->raise();
@@ -107,62 +108,61 @@ void GameInstall::paint_content(QPainter& painter)
     const QSize w = window()->size();
 
     // Box
-    const QRect box = layout::install_modal::box_rect(w);
-    painter.drawPixmap(box, assets::images[assets::Image::BoxGameInstall]);
+    const QRect box = util::layout::install_modal::box_rect(w);
+    painter.drawPixmap(box, util::assets::images[util::assets::Image::BoxGameInstall]);
 
     // Title
-    QFont title_font = assets::fonts[assets::Font::EurostileBlack];
-    title_font.setPixelSize(layout::scaled(layout::text::k_modal_header, w));
+    QFont title_font = util::assets::fonts[util::assets::Font::EurostileBlack];
+    title_font.setPixelSize(util::layout::scaled(util::layout::text::k_modal_header, w));
     title_font.setWeight(QFont::Black);
     painter.setFont(title_font);
     painter.setPen(QColor(0x4F, 0x17, 0x17));
-    painter.drawText(layout::install_modal::title(w), Qt::AlignCenter, "GAME INSTALLATION");
+    painter.drawText(util::layout::install_modal::title(w), Qt::AlignCenter, "GAME INSTALLATION");
 
     // Body
-    QFont body_font = assets::fonts[assets::Font::Inter];
-    body_font.setPixelSize(layout::scaled(layout::text::k_body, w));
+    QFont body_font = util::assets::fonts[util::assets::Font::Inter];
+    body_font.setPixelSize(util::layout::scaled(util::layout::text::k_body, w));
     body_font.setWeight(QFont::Medium);
     painter.setFont(body_font);
     painter.setPen(QColor(0x39, 0x25, 0x18));
-    painter.drawText(layout::install_modal::body(w),
-                     Qt::AlignHCenter | Qt::AlignTop | Qt::TextWordWrap,
-                     "The game will be installed in the selected directory. You can keep the default path or choose a custom one.");
+    painter.drawText(util::layout::install_modal::body(w), Qt::AlignHCenter | Qt::AlignTop | Qt::TextWordWrap,
+    "The game will be installed in the selected directory. You can keep the default path or choose a custom one.");
 
     // Path field box
-    const QRect path_rect = layout::install_modal::path_field(w);
-    painter.drawPixmap(path_rect, assets::images[assets::Image::InstallPath]);
+    const QRect path_rect = util::layout::install_modal::path_field(w);
+    painter.drawPixmap(path_rect, util::assets::images[util::assets::Image::InstallPath]);
 
     // Caption
-    QFont caption_font = assets::fonts[assets::Font::Inter];
-    caption_font.setPixelSize(layout::scaled(layout::text::k_desc, w));
+    QFont caption_font = util::assets::fonts[util::assets::Font::Inter];
+    caption_font.setPixelSize(util::layout::scaled(util::layout::text::k_desc, w));
     caption_font.setWeight(QFont::Normal);
     painter.setFont(caption_font);
     painter.setPen(QColor(0x98, 0x87, 0x76));
     painter.drawText(path_rect.adjusted(10, 8, -10, 0), Qt::AlignTop | Qt::AlignLeft, "DEFAULT INSTALLATION PATH");
 
     // Path value
-    QFont path_font = assets::fonts[assets::Font::EurostileBold];
-    path_font.setPixelSize(layout::scaled(16, w));
+    QFont path_font = util::assets::fonts[util::assets::Font::EurostileBold];
+    path_font.setPixelSize(util::layout::scaled(16, w));
     path_font.setWeight(QFont::ExtraBold);
     painter.setFont(path_font);
     painter.setPen(QColor(0x4F, 0x17, 0x17));
-    painter.drawText(path_rect.adjusted(14, 34, -14, 0), Qt::AlignTop | Qt::AlignLeft, "/home/user/games/soa");
+    painter.drawText(path_rect.adjusted(14, 34, -14, 0), Qt::AlignTop | Qt::AlignLeft, game_path);
 
     // Disk note
-    QFont note_font = assets::fonts[assets::Font::Inter];
-    note_font.setPixelSize(layout::scaled(layout::text::k_label, w));
+    QFont note_font = util::assets::fonts[util::assets::Font::Inter];
+    note_font.setPixelSize(util::layout::scaled(util::layout::text::k_label, w));
     note_font.setWeight(QFont::Medium);
     painter.setFont(note_font);
     painter.setPen(QColor(0x98, 0x87, 0x76));
-    painter.drawText(layout::install_modal::changepath_line(w), Qt::AlignRight | Qt::AlignVCenter, "~ 2 GB of free disk space required.");
+    painter.drawText(util::layout::install_modal::changepath_line(w), Qt::AlignRight | Qt::AlignVCenter, "~ 2 GB of free disk space required.");
 }
 
 bool GameInstall::eventFilter(QObject* obj, QEvent* event)
 {
-    if (obj == cancel_button || obj == install_button || obj == change_path_button) // Removed close_button here
+    if (obj == cancel_button || obj == install_button || obj == change_path_button)
     {
-        const auto& cancel   = assets::buttons[assets::Button::Cancel];
-        const auto& install  = assets::buttons[assets::Button::Install];
+        const auto& cancel   = util::assets::buttons[util::assets::Button::Cancel];
+        const auto& install  = util::assets::buttons[util::assets::Button::Install];
 
         switch (event->type())
         {
@@ -188,10 +188,10 @@ bool GameInstall::eventFilter(QObject* obj, QEvent* event)
                 if (obj == cancel_button || obj == install_button)
                 {
                     const auto& b = (obj == cancel_button) ? cancel : install;
-                    if (auto* btn = dynamic_cast<QPushButton*>(obj); btn->underMouse())
-                        btn->setIcon(QIcon(b.hover));
+                    if (auto* button = dynamic_cast<QPushButton*>(obj); button->underMouse())
+                        button->setIcon(QIcon(b.hover));
                     else
-                        btn->setIcon(QIcon(b.normal));
+                        button->setIcon(QIcon(b.normal));
                 }
                 break;
 

@@ -1,10 +1,12 @@
 #pragma once
 #include <QWidget>
 
-class ModalOverlay : public QWidget
+namespace util::modal_overlay
 {
-    Q_OBJECT
-    public:
+    class ModalOverlay : public QWidget
+    {
+        Q_OBJECT
+        public:
         explicit ModalOverlay(QWidget * parent = nullptr);
 
         void show_over(QWidget* background);   // grab -> blur -> show -> raise
@@ -21,8 +23,9 @@ class ModalOverlay : public QWidget
         void paintEvent(QPaintEvent* event) override;   // paints backdrop, then calls paint_content
 
     private:
-        void paint_frames(QPainter& painter);   // left/right frame + PT/lock, sharp
+        void paint_frames(QPainter& painter) const;   // left/right frame + PT/lock, sharp
 
         QPixmap blurred_bg;
         bool    keep_chrome {true};   // default = modal over live launcher (keeps frames/icons/chrome)
-};
+    };
+}

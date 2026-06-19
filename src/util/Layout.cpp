@@ -1,6 +1,6 @@
 #include "util/Layout.hpp"
 
-namespace layout
+namespace util::layout
 {
     double scale(const QSize win)
     {

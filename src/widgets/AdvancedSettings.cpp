@@ -1,4 +1,3 @@
-// AdvancedSettings.cpp
 #include "widgets/AdvancedSettings.hpp"
 #include "util/Assets.hpp"
 #include "util/Layout.hpp"
@@ -27,13 +26,13 @@ AdvancedSettings::AdvancedSettings(QWidget* parent) : QWidget(parent)
 void AdvancedSettings::setup_game_args_option()
 {
     const QSize w = window()->size();
-    utils::make_label_block(this, w, layout::settings::k_row1_y,
+    util::simple_utils::make_label_block(this, w, util::layout::settings::k_row1_y,
                             "GAME LAUNCH ARGUMENTS",
                             "Passed to Alicia.exe. Optional for most players.");
 
-    const QPoint cp = layout::settings::ctrl_pos(w, layout::settings::k_row1_y);
+    const QPoint cp = util::layout::settings::ctrl_pos(w, util::layout::settings::k_row1_y);
     auto* field = new QLineEdit(this);
     field->setPlaceholderText("Alicia.exe (default)");
     field->setStyleSheet(k_field_style);
-    field->setGeometry(cp.x(), cp.y(), layout::settings::ctrl_w(w), layout::scaled(34, w));
+    field->setGeometry(cp.x(), cp.y(), util::layout::settings::ctrl_w(w), util::layout::scaled(34, w));
 }

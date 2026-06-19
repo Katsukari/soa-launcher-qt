@@ -9,7 +9,7 @@
 #include <unordered_map>
 #include "spdlog/spdlog.h"
 
-namespace assets
+namespace util::assets
 {
     enum class Image
     {

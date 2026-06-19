@@ -1,7 +1,10 @@
 #pragma once
 #include <QMainWindow>
 
-class ModalOverlay;
+namespace util::modal_overlay
+{
+    class ModalOverlay;
+}
 class QPushButton;
 class QLabel;
 class DownloadBox;
@@ -26,8 +29,8 @@ class MainWindow : public QWidget
         void setup_settings();
         void setup_download_box();
         void setup_game_install();
-        void on_overlay_opened(ModalOverlay* m);
-        void on_overlay_closed(ModalOverlay *);
+        void on_overlay_opened(util::modal_overlay::ModalOverlay * m);
+        void on_overlay_closed(util::modal_overlay::ModalOverlay *);
 
         QPoint drag_offset;
         bool chrome_hidden {};

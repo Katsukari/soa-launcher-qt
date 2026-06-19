@@ -43,7 +43,6 @@ FetchContent_MakeAvailable(spdlog)
 set(LAUNCHER_SOURCES
         src/main.cpp
         src/MainWindow.cpp
-        src/widgets/Login.cpp
         src/util/Assets.cpp
         src/widgets/DownloadBox.cpp
         src/widgets/Settings.cpp
@@ -60,7 +59,6 @@ set(LAUNCHER_SOURCES
 
 set(LAUNCHER_HEADERS
         include/MainWindow.hpp
-        include/widgets/Login.hpp
         include/util/Assets.hpp
         include/widgets/DownloadBox.hpp
         include/widgets/Settings.hpp
@@ -73,6 +71,7 @@ set(LAUNCHER_HEADERS
         include/util/SimpleUtils.hpp
         include/widgets/WineTerminal.hpp
         include/widgets/AdvancedSettings.hpp
+        include/core/wine/Shell.hpp
 )
 
 # Resources (.qrc files)

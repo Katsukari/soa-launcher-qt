@@ -2,7 +2,7 @@
 #include <QPushButton>
 #include "util/ModalOverlay.hpp"
 
-class GameInstall : public ModalOverlay
+class GameInstall : public util::modal_overlay::ModalOverlay
 {
     Q_OBJECT
     public:
@@ -16,6 +16,7 @@ class GameInstall : public ModalOverlay
         void setup_close_button();
         void setup_buttons();
 
+        QString game_path {"/home/<user>/soa-launcher/drive_c/Users/<user>/AppData/Roaming/Story Of Alicia/game"};
         QPushButton* close_button {};
         QPushButton* install_button {};
         QPushButton* cancel_button {};

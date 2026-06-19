@@ -9,7 +9,7 @@ class LauncherSettings;
 class WineSettings;
 class AdvancedSettings;
 
-class Settings : public ModalOverlay
+class Settings : public util::modal_overlay::ModalOverlay
 {
     Q_OBJECT
     public:

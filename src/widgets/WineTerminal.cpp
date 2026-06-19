@@ -1,7 +1,6 @@
 #include "widgets/WineTerminal.hpp"
 #include <QPlainTextEdit>
 #include <QPushButton>
-#include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QClipboard>
 #include <QApplication>
@@ -32,8 +31,7 @@ WineTerminal::WineTerminal(QWidget* parent) : QDialog(parent)
     {
         autoscroll = !autoscroll;
         lock->setText(autoscroll ? "Autoscroll: On" : "Autoscroll: Off");
-        if (autoscroll)
-            output->verticalScrollBar()->setValue(output->verticalScrollBar()->maximum());
+        if (autoscroll) output->verticalScrollBar()->setValue(output->verticalScrollBar()->maximum());
     });
 
     auto* bar = new QHBoxLayout;
@@ -50,6 +48,5 @@ WineTerminal::WineTerminal(QWidget* parent) : QDialog(parent)
 void WineTerminal::append_line(const QString& text)
 {
     output->appendPlainText(text);
-    if (autoscroll)
-        output->verticalScrollBar()->setValue(output->verticalScrollBar()->maximum());
+    if (autoscroll) output->verticalScrollBar()->setValue(output->verticalScrollBar()->maximum());
 }

@@ -17,7 +17,7 @@ int main(int argc, char *argv[])
 
     QApplication app(argc, argv);
 
-    assets::load_all();
+    util::assets::load_all();
 
     MainWindow window;
     window.show();

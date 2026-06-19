@@ -1,6 +1,6 @@
 #include "util/Assets.hpp"
 
-namespace assets
+namespace util::assets
 {
     QPixmap load_pixmap(const QString& path)
     {
@@ -101,7 +101,7 @@ namespace assets
         const std::initializer_list<std::pair<Font, QString>> defs =
         {
             {Font::EurostileRegular,    "fonts/Eurostile-Regular.otf"},
-            {Font::EurostileBold,       "fonts/Eurostile-Bold.otf"},
+            {Font::EurostileBold,  "fonts/Eurostile-Bold.otf"},
             {Font::EurostileBlack,      "fonts/Eurostile-Black.otf"},
             {Font::EurostileExtraBlack, "fonts/Eurostile-ExtraBlack.otf"},
             {Font::Inter,               "fonts/InterVariable.ttf"},
