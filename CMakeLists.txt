@@ -55,7 +55,7 @@ add_library(soa_network STATIC
 
 # Swift needs the module map to import the C bridge header (soa_log, etc.).
 target_compile_options(soa_network PRIVATE
-        -Xcc -fmodule-map-file=${CMAKE_SOURCE_DIR}/src/core/network/module.modulemap
+        "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xcc -fmodule-map-file=${CMAKE_SOURCE_DIR}/src/core/network/module.modulemap>"
 )
 
 # The bridge header lives under include/.
