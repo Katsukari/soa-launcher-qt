@@ -8,6 +8,9 @@ project(soa_launcher
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# Swift is only used for the networking library (core/network). Enabling it as
+# its own language lets that library build with Swift while the rest stays C++.
 enable_language(Swift)
 
 # Qt auto-generators for MOC and RCC
@@ -39,7 +42,28 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(spdlog)
 
-# Sources
+# ---------------------------------------------------------------------------
+# Swift networking library (isolated)
+#
+# Swift lives in its own static library so the C++ executable's compile/link
+# flags (-fPIC, -static-libstdc++, etc.) never leak into swiftc, and so Swift
+# doesn't synthesise its own main(). The executable just links this.
+# ---------------------------------------------------------------------------
+add_library(soa_network STATIC
+        src/core/network/soa_bridge.swift
+)
+
+# Swift needs the module map to import the C bridge header (soa_log, etc.).
+target_compile_options(soa_network PRIVATE
+        -Xcc -fmodule-map-file=${CMAKE_SOURCE_DIR}/src/core/network/module.modulemap
+)
+
+# The bridge header lives under include/.
+target_include_directories(soa_network PRIVATE
+        include
+)
+
+# Sources (C++ only - the Swift file is in soa_network above)
 
 set(LAUNCHER_SOURCES
         src/main.cpp
@@ -59,7 +83,6 @@ set(LAUNCHER_SOURCES
         src/core/Log.cpp
         src/core/wine/Shell.cpp
         src/core/network/soa_bridge.cpp
-        src/core/network/soa_bridge.swift
 )
 
 set(LAUNCHER_HEADERS
@@ -110,15 +133,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
         Qt6::Network
         Qt6::Concurrent
         spdlog::spdlog
-)
-
-target_compile_options(${PROJECT_NAME} PRIVATE
-        $<$<COMPILE_LANGUAGE:Swift>:-Xcc -fmodule-map-file=${CMAKE_SOURCE_DIR}/src/core/network/module.modulemap>
-        $<$<COMPILE_LANGUAGE:Swift>:-parse-as-library>
-)
-
-set_target_properties(${PROJECT_NAME} PROPERTIES
-        POSITION_INDEPENDENT_CODE OFF
+        soa_network            # the Swift networking library
 )
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE)
@@ -136,17 +151,19 @@ if(APPLE)
     )
 endif()
 
-# Statically link the C++ runtime so the binary doesn't depend
-# on the user's installed libstdc++/libgcc version.
+# Statically link the C++ runtime so the binary doesn't depend on the user's
+# installed libstdc++/libgcc version. Now that the executable is a pure C++
+# link target (Swift is in soa_network), g++ does the linking and these flags
+# are valid again.
 # On macOS with AppleClang, libc++ is part of the OS - no static linking needed.
-#if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-#    target_link_options(${PROJECT_NAME} PRIVATE
-#            -static-libstdc++
-#            -static-libgcc
-#    )
-#elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND NOT APPLE)
-#    target_link_options(${PROJECT_NAME} PRIVATE -static-libstdc++)
-#endif()
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_link_options(${PROJECT_NAME} PRIVATE
+            -static-libstdc++
+            -static-libgcc
+    )
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND NOT APPLE)
+    target_link_options(${PROJECT_NAME} PRIVATE -static-libstdc++)
+endif()
 
 # Install + Qt deploy
 
