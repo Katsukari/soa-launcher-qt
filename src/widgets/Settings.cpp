@@ -13,9 +13,10 @@
 #include "widgets/AdvancedSettings.hpp"
 #include "util/Layout.hpp"
 #include "spdlog/spdlog.h"
+#include "core/wine/Shell.hpp"
 
 
-Settings::Settings(QWidget* parent) : ModalOverlay(parent)
+Settings::Settings(core::wine::Shell * shell, QWidget* parent) : ModalOverlay(parent), shell(shell)
 {
     set_keeps_chrome(false);
     setup_pages();
@@ -31,7 +32,7 @@ void Settings::setup_pages()
     stack->setStyleSheet("background: transparent;");
 
     stack->addWidget(new LauncherSettings(stack));
-    stack->addWidget(new WineSettings(stack));
+    stack->addWidget(new WineSettings(shell, stack));
     stack->addWidget(new AdvancedSettings(stack));
     stack->setCurrentIndex(0);
 }

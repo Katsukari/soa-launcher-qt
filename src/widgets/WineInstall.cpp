@@ -1,4 +1,4 @@
-#include "widgets/GameInstall.hpp"
+#include "widgets/WineInstall.hpp"
 #include "util/Assets.hpp"
 #include "util/Layout.hpp"
 #include <QPainter>
@@ -6,8 +6,12 @@
 #include <QFileDialog>
 #include <QGraphicsBlurEffect>
 
-GameInstall::GameInstall(QWidget* parent) : ModalOverlay(parent)
+#include "core/wine/Shell.hpp"
+
+WineInstall::WineInstall(core::wine::Shell* shell_, QWidget* parent) : ModalOverlay(parent), shell(shell_)
 {
+    game_path = shell->wine_prefix();
+
     setup_close_button();
     setup_buttons();
 
@@ -16,7 +20,7 @@ GameInstall::GameInstall(QWidget* parent) : ModalOverlay(parent)
     install_button->installEventFilter(this);
 }
 
-void GameInstall::setup_close_button()
+void WineInstall::setup_close_button()
 {
     const QSize w = window()->size();
     close_button = new QPushButton(this);
@@ -37,7 +41,7 @@ void GameInstall::setup_close_button()
     close_button->raise();
 }
 
-void GameInstall::setup_buttons()
+void WineInstall::setup_buttons()
 {
     const QSize w = window()->size();
 
@@ -96,14 +100,19 @@ void GameInstall::setup_buttons()
 
     connect(change_path_button, &QPushButton::clicked, this, [this]
     {
-        if (const QString dir = QFileDialog::getExistingDirectory(this, "Select Where To Install The Game");
-        !dir.isEmpty()) game_path = dir; update();
+        const QString dir = QFileDialog::getExistingDirectory(this, "Select Wine Prefix Location");
+        if (!dir.isEmpty())
+        {
+            shell->set_root_path(dir);
+            game_path = shell->wine_prefix();
+            update();
+        }
     });
 
     change_path_button->raise();
 }
 
-void GameInstall::paint_content(QPainter& painter)
+void WineInstall::paint_content(QPainter& painter)
 {
     const QSize w = window()->size();
 
@@ -117,7 +126,7 @@ void GameInstall::paint_content(QPainter& painter)
     title_font.setWeight(QFont::Black);
     painter.setFont(title_font);
     painter.setPen(QColor(0x4F, 0x17, 0x17));
-    painter.drawText(util::layout::install_modal::title(w), Qt::AlignCenter, "GAME INSTALLATION");
+    painter.drawText(util::layout::install_modal::title(w), Qt::AlignCenter, "WINE PREFIX INSTALLATION");
 
     // Body
     QFont body_font = util::assets::fonts[util::assets::Font::Inter];
@@ -126,7 +135,7 @@ void GameInstall::paint_content(QPainter& painter)
     painter.setFont(body_font);
     painter.setPen(QColor(0x39, 0x25, 0x18));
     painter.drawText(util::layout::install_modal::body(w), Qt::AlignHCenter | Qt::AlignTop | Qt::TextWordWrap,
-    "The game will be installed in the selected directory. You can keep the default path or choose a custom one.");
+    "The wine prefix will be installed in the selected directory. You can keep the default path or choose a custom one.");
 
     // Path field box
     const QRect path_rect = util::layout::install_modal::path_field(w);
@@ -149,15 +158,15 @@ void GameInstall::paint_content(QPainter& painter)
     painter.drawText(path_rect.adjusted(14, 34, -14, 0), Qt::AlignTop | Qt::AlignLeft, game_path);
 
     // Disk note
-    QFont note_font = util::assets::fonts[util::assets::Font::Inter];
-    note_font.setPixelSize(util::layout::scaled(util::layout::text::k_label, w));
-    note_font.setWeight(QFont::Medium);
-    painter.setFont(note_font);
-    painter.setPen(QColor(0x98, 0x87, 0x76));
-    painter.drawText(util::layout::install_modal::changepath_line(w), Qt::AlignRight | Qt::AlignVCenter, "~ 2 GB of free disk space required.");
+    // QFont note_font = util::assets::fonts[util::assets::Font::Inter];
+    // note_font.setPixelSize(util::layout::scaled(util::layout::text::k_label, w));
+    // note_font.setWeight(QFont::Medium);
+    // painter.setFont(note_font);
+    // painter.setPen(QColor(0x98, 0x87, 0x76));
+    // painter.drawText(util::layout::install_modal::changepath_line(w), Qt::AlignRight | Qt::AlignVCenter, "~ 2 GB of free disk space required.");
 }
 
-bool GameInstall::eventFilter(QObject* obj, QEvent* event)
+bool WineInstall::eventFilter(QObject* obj, QEvent* event)
 {
     if (obj == cancel_button || obj == install_button || obj == change_path_button)
     {

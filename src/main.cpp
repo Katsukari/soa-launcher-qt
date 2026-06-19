@@ -2,6 +2,8 @@
 #include "MainWindow.hpp"
 #include <spdlog/spdlog.h>
 #include "util/Assets.hpp"
+#include "core/Log.hpp"
+#include "widgets/LauncherLog.hpp"
 
 // TODO list:
 // - add shell class
@@ -12,12 +14,16 @@
 
 int main(int argc, char *argv[])
 {
-    spdlog::info("Running Story Of Alicia for Linux and macOS");
-    spdlog::info("Version: 0.1.0");
-
     QApplication app(argc, argv);
+    core::log::init();
+    LauncherLog::instance();
+
+    SPDLOG_INFO("Running Story Of Alicia for Linux and macOS");
+    SPDLOG_INFO("Version: 0.1.0");
 
     util::assets::load_all();
+
+    SPDLOG_DEBUG("loaded all assets successfully!");
 
     MainWindow window;
     window.show();

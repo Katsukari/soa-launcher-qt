@@ -1,5 +1,7 @@
 #pragma once
 #include <QWidget>
+
+#include "core/wine/Shell.hpp"
 #include "util/Assets.hpp"
 #include "util/ModalOverlay.hpp"
 
@@ -9,11 +11,16 @@ class LauncherSettings;
 class WineSettings;
 class AdvancedSettings;
 
+namespace core::wine::shell
+{
+    class Shell;
+}
+
 class Settings : public util::modal_overlay::ModalOverlay
 {
     Q_OBJECT
     public:
-        explicit Settings(QWidget* parent = nullptr);
+        explicit Settings(core::wine::Shell* shell, QWidget* parent = nullptr);
 
     protected:
         void paint_content(QPainter& painter) override;
@@ -27,4 +34,5 @@ class Settings : public util::modal_overlay::ModalOverlay
 
         QPushButton * close_button {};
         QStackedWidget * stack {};
+        core::wine::Shell * shell {};
 };

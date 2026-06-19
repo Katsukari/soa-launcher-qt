@@ -2,21 +2,27 @@
 #include <QWidget>
 
 class QPlainTextEdit;
-class WineTerminal;
+class LauncherLog;
+
+namespace core::wine
+{
+    class Shell;
+}
 
 class WineSettings : public QWidget
 {
     Q_OBJECT
-public:
-    explicit WineSettings(QWidget* parent = nullptr);
+    public:
+        explicit WineSettings(core::wine::Shell * shell, QWidget* parent = nullptr);
 
-private:
-    void setup_dxvk_option();
-    void setup_prefix_option();
-    void setup_wine_binary_option();
-    void setup_wine_args_option();
-    void setup_game_args_option();
-    void setup_log_button();
+    private:
+        void setup_dxvk_option();
+        void setup_prefix_option();
+        void setup_wine_binary_option();
+        void setup_wine_args_option();
+        void setup_game_args_option();
+        void setup_generate_button();
 
-    WineTerminal* log_window {};
+        LauncherLog * log_window {};
+        core::wine::Shell * shell{};
 };

@@ -1,6 +1,8 @@
 #pragma once
 #include <QWidget>
 
+// I know having the namespace also named modal_overlay is duplication,
+// but I want to extend this class later so it wont be a simple class.
 namespace util::modal_overlay
 {
     class ModalOverlay : public QWidget

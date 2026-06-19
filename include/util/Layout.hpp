@@ -164,12 +164,11 @@ namespace util::layout
     }
 
     // SettingsWidget (full-window overlay + centered box)
-    // Both tabs (Launcher + Wine) use the SAME box. The wine terminal is a
-    // separate top-level window
+    // Three tabs (Launcher / Wine / Advanced) share the SAME box. The log is a
+    // single shared top-level window (LauncherLog), not part of the box.
     namespace settings
     {
         inline constexpr QSize k_box {630, 555};
-        inline constexpr QSize k_box_results {630, 650};
         inline constexpr QSize k_close_icon {13, 13};
         inline constexpr QSize k_close_hit {22, 22};
         inline constexpr int   k_margin_top = 69;
@@ -200,10 +199,19 @@ namespace util::layout
         inline constexpr int   k_desc_h    = 40;
         inline constexpr int   k_title_h   = 26;
 
+        // Row top-y (4 rows, even ~104px spacing).
         inline constexpr int   k_row1_y = 78;
         inline constexpr int   k_row2_y = 182;
         inline constexpr int   k_row3_y = 286;
         inline constexpr int   k_row4_y = 390;
+
+        // Footer buttons (GitHub / Show Log / Generate) sit below the rows.
+        // One place to nudge footer layout instead of literals in each widget.
+        inline constexpr int   k_footer_y    = 490;
+        inline constexpr QSize k_footer_btn  {110, 30};
+        inline constexpr int   k_footer_gap  = 10;
+        // Big primary footer button (Generate), centered, taller.
+        inline constexpr QSize k_footer_big  {240, 38};
 
         QRect box_rect(QSize win);
         QSize box(QSize win);
@@ -229,6 +237,11 @@ namespace util::layout
         QRect run_check(QSize win, int y);
         QRect slider_rect(QSize win, int y);
         QRect page_title(QSize win);
+
+        // Footer button rects (default-space -> pass through scaled()).
+        QRect footer_left(QSize win);    // first footer button (e.g. GitHub)
+        QRect footer_right(QSize win);   // second footer button beside it (Show Log)
+        QRect footer_big(QSize win);     // centered big primary button (Generate)
     }
 
     // CustomSelect dropdown
@@ -244,7 +257,7 @@ namespace util::layout
         int   option_overlap(QSize win);
     }
 
-    // GameInstall modal overlay
+    // WineInstall modal overlay
     namespace install_modal
     {
         // Box dimensions & placement

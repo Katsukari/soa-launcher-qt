@@ -2,11 +2,16 @@
 #include <QPushButton>
 #include "util/ModalOverlay.hpp"
 
-class GameInstall : public util::modal_overlay::ModalOverlay
+namespace core::wine
+{
+    class Shell;
+}
+
+class WineInstall : public util::modal_overlay::ModalOverlay
 {
     Q_OBJECT
     public:
-        explicit GameInstall(QWidget* parent = nullptr);
+        explicit WineInstall(core::wine::Shell* shell, QWidget* parent = nullptr);
 
     protected:
         void paint_content(QPainter& painter) override;
@@ -16,9 +21,10 @@ class GameInstall : public util::modal_overlay::ModalOverlay
         void setup_close_button();
         void setup_buttons();
 
-        QString game_path {"/home/<user>/soa-launcher/drive_c/Users/<user>/AppData/Roaming/Story Of Alicia/game"};
+        QString game_path {};
         QPushButton* close_button {};
         QPushButton* install_button {};
         QPushButton* cancel_button {};
         QPushButton* change_path_button {};
+        core::wine::Shell *shell{};
 };

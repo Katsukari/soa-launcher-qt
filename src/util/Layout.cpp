@@ -137,6 +137,23 @@ namespace util::layout
             constexpr int x = k_ctrl_x + k_ctrl_w - k_slider.width();
             return scaled(QRect{ x, y, k_slider.width(), k_slider.height() }, win);
         }
+
+        QRect footer_left(QSize win)
+        {
+            return layout::scaled(QRect(k_text_x, k_footer_y, k_footer_btn.width(), k_footer_btn.height()), win);
+        }
+
+        QRect footer_right(QSize win)
+        {
+            const int x = k_text_x + k_footer_btn.width() + k_footer_gap;
+            return layout::scaled(QRect(x, k_footer_y, k_footer_btn.width(), k_footer_btn.height()),win);
+        }
+
+        QRect footer_big(QSize win)
+        {
+            const int x = (k_box.width() - k_footer_big.width()) / 2;
+            return layout::scaled(QRect(x, k_footer_y, k_footer_big.width(), k_footer_big.height()),win);
+        }
     }
 
     namespace select

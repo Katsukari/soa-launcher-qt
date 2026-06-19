@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 4.3)
-project(soa-launcher-qt
+project(soa-launcher
         LANGUAGES CXX
         DESCRIPTION "Story of Alicia Launcher"
         VERSION 0.1.0
@@ -50,11 +50,13 @@ set(LAUNCHER_SOURCES
         src/widgets/LauncherSettings.cpp
         src/widgets/WineSettings.cpp
         src/widgets/ImageDropdown.cpp
-        src/widgets/GameInstall.cpp
+        src/widgets/WineInstall.cpp
         src/util/ModalOverlay.cpp
         src/util/SimpleUtils.cpp
-        src/widgets/WineTerminal.cpp
+        src/widgets/LauncherLog.cpp
         src/widgets/AdvancedSettings.cpp
+        src/core/Log.cpp
+        src/core/wine/Shell.cpp
 )
 
 set(LAUNCHER_HEADERS
@@ -66,12 +68,15 @@ set(LAUNCHER_HEADERS
         include/widgets/LauncherSettings.hpp
         include/widgets/WineSettings.hpp
         include/widgets/ImageDropdown.hpp
-        include/widgets/GameInstall.hpp
+        include/widgets/WineInstall.hpp
         include/util/ModalOverlay.hpp
         include/util/SimpleUtils.hpp
-        include/widgets/WineTerminal.hpp
+        include/widgets/LauncherLog.hpp
         include/widgets/AdvancedSettings.hpp
         include/core/wine/Shell.hpp
+        include/core/QtLogSink.hpp
+        include/core/Log.hpp
+        include/util/Styles.hpp
 )
 
 # Resources (.qrc files)
@@ -102,6 +107,8 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
         Qt6::Concurrent
         spdlog::spdlog
 )
+
+target_compile_definitions(soa-launcher PRIVATE SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE)
 
 # Platform-specific configuration
 

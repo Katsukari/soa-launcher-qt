@@ -3,6 +3,7 @@
 #include "widgets/Settings.hpp"
 #include "util/Assets.hpp"
 #include "util/Layout.hpp"
+#include "core/wine/Shell.hpp"
 
 #include <QPushButton>
 #include <QLabel>
@@ -12,13 +13,15 @@
 #include <QWindow>
 
 #include "util/ModalOverlay.hpp"
-#include "widgets/GameInstall.hpp"
+#include "widgets/WineInstall.hpp"
 
 MainWindow::MainWindow(QWidget* parent) : QWidget(parent)
 {
     setWindowFlags(Qt::FramelessWindowHint);
     setFixedSize(util::layout::win::k_default);
     setAttribute(Qt::WA_TranslucentBackground);
+
+    shell = new core::wine::Shell(this);
 
     setup_window_buttons();
     setup_logo();
@@ -84,13 +87,14 @@ void MainWindow::setup_version_label()
 
 void MainWindow::setup_settings()
 {
-    settings = new Settings(this);
+    settings = new Settings(shell, this);
     settings->move(0, 0);
     settings->hide();
 }
 
 void MainWindow::setup_download_box()
 {
+    game_install = new WineInstall(shell, this);
     const QSize w = size();
     download_box = new DownloadBox(this);
     download_box->move(util::layout::download::pos(w));
@@ -116,10 +120,9 @@ void MainWindow::setup_download_box()
 
 void MainWindow::setup_game_install()
 {
-    game_install = new GameInstall(this);
     game_install->hide();
 
-    connect(game_install, &GameInstall::closed, this, [this]()
+    connect(game_install, &WineInstall::closed, this, [this]()
     {
         on_overlay_closed(game_install);
     });
@@ -129,7 +132,7 @@ void MainWindow::on_overlay_opened(util::modal_overlay::ModalOverlay * m)
 {
     if (m->keeps_chrome())
     {
-        // GameInstall: keep frames painting, keep chrome buttons but raise them above the modal
+        // WineInstall: keep frames painting, keep chrome buttons but raise them above the modal
         chrome_hidden = false;
         close_button->raise();
         minimize_button->raise();
@@ -169,8 +172,8 @@ void MainWindow::paintEvent(QPaintEvent*)
     painter.setClipping(false);
 
     // Frames + sidebar icons drawn unless a chrome-hiding overlay (Settings) is open.
-    // GameInstall keeps chrome, so these stay painted under its blur and show through sharp
-    // (GameInstall re-draws them on top via ModalOverlay::paint_frames).
+    // WineInstall keeps chrome, so these stay painted under its blur and show through sharp
+    // (WineInstall re-draws them on top via ModalOverlay::paint_frames).
     if (!chrome_hidden)
     {
         const QPixmap left = util::assets::images[util::assets::Image::LeftFrame]

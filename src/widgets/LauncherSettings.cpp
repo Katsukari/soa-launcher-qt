@@ -1,8 +1,10 @@
 #include "widgets/LauncherSettings.hpp"
 #include "widgets/ImageDropdown.hpp"
+#include "widgets/LauncherLog.hpp"
 #include "util/Assets.hpp"
 #include "util/Layout.hpp"
 #include "util/SimpleUtils.hpp"
+#include "util/Styles.hpp"
 
 #include <QLabel>
 #include <QPushButton>
@@ -15,6 +17,7 @@ LauncherSettings::LauncherSettings(QWidget* parent) : QWidget(parent)
     setup_run_connectivity_test_option();
     setup_launcher_size_option();
     setup_github_button();
+    setup_log_button();
 }
 
 void LauncherSettings::setup_launch_on_startup_option()
@@ -40,7 +43,8 @@ void LauncherSettings::setup_launch_on_startup_option()
     {
         static bool on = false;   // display-only toggle for now
         on = !on;
-        const auto& a = on ? util::assets::buttons[util::assets::Button::SliderOn] : util::assets::buttons[util::assets::Button::SliderOff];
+        const auto& a = on ? util::assets::buttons[util::assets::Button::SliderOn]
+                           : util::assets::buttons[util::assets::Button::SliderOff];
         slider->setIcon(QIcon(a.normal.scaled(ssz, Qt::KeepAspectRatio, Qt::SmoothTransformation)));
     });
 }
@@ -94,16 +98,24 @@ void LauncherSettings::setup_github_button()
     const QSize w = window()->size();
     auto* gh = new QPushButton("GITHUB", this);
     gh->setCursor(Qt::PointingHandCursor);
-    gh->setStyleSheet(
-        "QPushButton { background:#D8CDC0; border:none; border-radius:6px;"
-        " color:#4F1717; font-family:'Eurostile'; font-weight:900; font-size:11px; }"
-        "QPushButton:hover { background:#E6DCD0; }");
-    gh->setGeometry(util::layout::scaled(util::layout::settings::k_text_x, w),
-                    util::layout::scaled(496, w),
-                    util::layout::scaled(110, w), util::layout::scaled(30, w));
+    gh->setStyleSheet(util::styles::k_neutral_button);
+    gh->setGeometry(util::layout::settings::footer_left(w));
     connect(gh, &QPushButton::clicked, this, []()
     {
         QDesktopServices::openUrl(QUrl("https://github.com/Story-Of-Alicia/soa-launcher-qt"));
     });
 }
 
+void LauncherSettings::setup_log_button()
+{
+    const QSize w = window()->size();
+    auto* show_log = new QPushButton("SHOW LOG", this);
+    show_log->setCursor(Qt::PointingHandCursor);
+    show_log->setStyleSheet(util::styles::k_neutral_button);
+    show_log->setGeometry(util::layout::settings::footer_right(w));   // beside GitHub
+    connect(show_log, &QPushButton::clicked, this, []()
+    {
+        LauncherLog::instance()->show();
+        LauncherLog::instance()->raise();
+    });
+}

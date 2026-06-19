@@ -1,10 +1,18 @@
 #pragma once
 #include <QMainWindow>
 
+#include "widgets/WineInstall.hpp"
+
 namespace util::modal_overlay
 {
     class ModalOverlay;
 }
+
+namespace core::wine
+{
+    class Shell;
+}
+
 class QPushButton;
 class QLabel;
 class DownloadBox;
@@ -38,5 +46,6 @@ class MainWindow : public QWidget
         QPushButton * minimize_button = nullptr;
         DownloadBox * download_box = nullptr;
         Settings * settings = nullptr;
-        GameInstall * game_install = nullptr;
+    WineInstall *game_install = nullptr;
+        core::wine::Shell * shell {};
 };
