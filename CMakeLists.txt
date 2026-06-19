@@ -117,6 +117,10 @@ target_compile_options(${PROJECT_NAME} PRIVATE
         $<$<COMPILE_LANGUAGE:Swift>:-parse-as-library>
 )
 
+set_target_properties(${PROJECT_NAME} PROPERTIES
+        POSITION_INDEPENDENT_CODE OFF
+)
+
 target_compile_definitions(${PROJECT_NAME} PRIVATE SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE)
 
 # Platform-specific configuration
