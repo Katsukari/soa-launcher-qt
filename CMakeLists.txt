@@ -58,6 +58,8 @@ target_compile_options(soa_network PRIVATE
         "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xcc -fmodule-map-file=${CMAKE_SOURCE_DIR}/src/core/network/module.modulemap>"
 )
 
+target_link_options(soa_network PRIVATE -static-stdlib)
+
 # The bridge header lives under include/.
 target_include_directories(soa_network PRIVATE
         include
