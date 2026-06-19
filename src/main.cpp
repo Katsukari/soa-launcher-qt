@@ -4,6 +4,7 @@
 #include "util/Assets.hpp"
 #include "core/Log.hpp"
 #include "widgets/LauncherLog.hpp"
+#include "core/network/soa_bridge.h"
 
 // TODO list:
 // - add shell class
@@ -24,6 +25,8 @@ int main(int argc, char *argv[])
     util::assets::load_all();
 
     SPDLOG_DEBUG("loaded all assets successfully!");
+
+    soa_ping();
 
     MainWindow window;
     window.show();

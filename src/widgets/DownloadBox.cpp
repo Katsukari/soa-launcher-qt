@@ -53,7 +53,7 @@ void DownloadBox::setup_message()
     const auto message_label = new QLabel(this);
     message_label->setText(
         "Welcome to Story of Alicia. To participate in the playtest, you\n"
-        "have to first download the game.");
+        "have to first network the game.");
     message_label->setAlignment(Qt::AlignCenter);
     message_label->setWordWrap(true);
 

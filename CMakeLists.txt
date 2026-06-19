@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 4.3)
-project(soa-launcher
+project(soa_launcher
         LANGUAGES CXX
         DESCRIPTION "Story of Alicia Launcher"
         VERSION 0.1.0
@@ -8,6 +8,7 @@ project(soa-launcher
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+enable_language(Swift)
 
 # Qt auto-generators for MOC and RCC
 set(CMAKE_AUTOMOC ON)
@@ -57,6 +58,8 @@ set(LAUNCHER_SOURCES
         src/widgets/AdvancedSettings.cpp
         src/core/Log.cpp
         src/core/wine/Shell.cpp
+        src/core/network/soa_bridge.cpp
+        src/core/network/soa_bridge.swift
 )
 
 set(LAUNCHER_HEADERS
@@ -77,6 +80,7 @@ set(LAUNCHER_HEADERS
         include/core/QtLogSink.hpp
         include/core/Log.hpp
         include/util/Styles.hpp
+        include/core/network/soa_bridge.h
 )
 
 # Resources (.qrc files)
@@ -108,7 +112,12 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
         spdlog::spdlog
 )
 
-target_compile_definitions(soa-launcher PRIVATE SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE)
+target_compile_options(${PROJECT_NAME} PRIVATE
+        $<$<COMPILE_LANGUAGE:Swift>:-Xcc -fmodule-map-file=${CMAKE_SOURCE_DIR}/src/core/network/module.modulemap>
+        $<$<COMPILE_LANGUAGE:Swift>:-parse-as-library>
+)
+
+target_compile_definitions(${PROJECT_NAME} PRIVATE SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE)
 
 # Platform-specific configuration
 
@@ -126,14 +135,14 @@ endif()
 # Statically link the C++ runtime so the binary doesn't depend
 # on the user's installed libstdc++/libgcc version.
 # On macOS with AppleClang, libc++ is part of the OS - no static linking needed.
-if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    target_link_options(${PROJECT_NAME} PRIVATE
-            -static-libstdc++
-            -static-libgcc
-    )
-elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND NOT APPLE)
-    target_link_options(${PROJECT_NAME} PRIVATE -static-libstdc++)
-endif()
+#if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+#    target_link_options(${PROJECT_NAME} PRIVATE
+#            -static-libstdc++
+#            -static-libgcc
+#    )
+#elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND NOT APPLE)
+#    target_link_options(${PROJECT_NAME} PRIVATE -static-libstdc++)
+#endif()
 
 # Install + Qt deploy
 

@@ -1,0 +1,5 @@
+module SoaBridge
+{
+    header "../../../include/core/network/soa_bridge.h"
+    export *
+}
