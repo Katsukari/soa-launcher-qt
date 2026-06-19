@@ -23,7 +23,7 @@ core logic on every supported OS.
 
 The download / verification engine is written in **Swift**, bridged to the C++ side
 through a small C interface. C++ has no networking in its standard library. The
-alternatives are a C-style API (libcurl) or a heavy framework (Boost.Asio) where
+alternatives are a C-style API (libcurl) or a heavy framework (Boost.Asio) where as
 Swift ships first-class async networking (`URLSession`) and hashing (`CryptoKit`).
 
 Swift is a **build-time** dependency only. The shipped binary is native linked code,

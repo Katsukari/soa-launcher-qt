@@ -33,7 +33,7 @@ class QtSignalSink : public spdlog::sinks::base_sink<Mutex>
             spdlog::memory_buf_t buf;
             this->formatter_->format(msg, buf);
             const QString line  = QString::fromStdString(fmt::to_string(buf)).trimmed();
-            const int     level = static_cast<int>(msg.level);   // <-- capture level
+            const int     level = static_cast<int>(msg.level);
             QMetaObject::invokeMethod(&LogBridge::instance(),
                 [level, line] { LogBridge::instance().post(level, line); },
                 Qt::QueuedConnection);
