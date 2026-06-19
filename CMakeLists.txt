@@ -156,14 +156,14 @@ endif()
 # link target (Swift is in soa_network), g++ does the linking and these flags
 # are valid again.
 # On macOS with AppleClang, libc++ is part of the OS - no static linking needed.
-if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    target_link_options(${PROJECT_NAME} PRIVATE
-            -static-libstdc++
-            -static-libgcc
-    )
-elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND NOT APPLE)
-    target_link_options(${PROJECT_NAME} PRIVATE -static-libstdc++)
-endif()
+#if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+#    target_link_options(${PROJECT_NAME} PRIVATE
+#            -static-libstdc++
+#            -static-libgcc
+#    )
+#elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND NOT APPLE)
+#    target_link_options(${PROJECT_NAME} PRIVATE -static-libstdc++)
+#endif()
 
 # Install + Qt deploy
 
