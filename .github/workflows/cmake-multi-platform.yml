@@ -21,31 +21,81 @@ jobs:
             cpp_compiler: clang++   # AppleClang
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Install CMake + Ninja
-      uses: lukka/get-cmake@latest
+      - uses: actions/checkout@v4
 
-    - name: Install Qt
-      uses: jurplel/install-qt-action@v4
-      with:
-        version: '6.8.3'        # LTS
-        target: 'desktop'
-        cache: true
-        install-deps: true      # pulls libxcb/xkb deps on Linux
+      # macOS ships Swift via Xcode, but make sure full Xcode (not just the
+      # Command Line Tools) is selected so CMake can find swiftc.
+      - name: Select Xcode (macOS)
+        if: runner.os == 'macOS'
+        run: sudo xcode-select -s /Applications/Xcode.app
 
-    - name: Configure
-      run: >
-        cmake -B ${{ github.workspace }}/build
-        -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
-        -DCMAKE_BUILD_TYPE=Release
-        -S ${{ github.workspace }}
+      # Ubuntu runners have no Swift toolchain by default - install one so
+      # enable_language(Swift) succeeds.
+      - name: Install Swift (Linux)
+        if: runner.os == 'Linux'
+        uses: swift-actions/setup-swift@v2
 
-    - name: Build
-      run: cmake --build ${{ github.workspace }}/build --config Release
+      - name: Verify Swift is available
+        run: swift --version
 
-    - name: Test
-      working-directory: ${{ github.workspace }}/build
-      # offscreen platform so QApplication-based tests don't need a display
-      env:
-        QT_QPA_PLATFORM: offscreen
-      run: ctest --output-on-failure --build-config Release
+      - name: Install CMake + Ninja
+        uses: lukka/get-cmake@latest
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'        # LTS
+          target: 'desktop'
+          cache: true
+          install-deps: true      # pulls libxcb/xkb deps on Linux
+
+      - name: Configure
+        run: >
+          cmake -B ${{ github.workspace }}/build
+          -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
+          -DCMAKE_BUILD_TYPE=Release
+          -S ${{ github.workspace }}
+
+      - name: Build
+        run: cmake --build ${{ github.workspace }}/build --config Release
+
+      - name: Test
+        working-directory: ${{ github.workspace }}/build
+        # offscreen platform so QApplication-based tests don't need a display
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: ctest --output-on-failure --build-config Release
+
+      # ------------------------------------------------------------------
+      # Package a .dmg on macOS. Runs macdeployqt first so the .app bundles
+      # the Qt frameworks (otherwise the dmg only runs where Qt is installed).
+      # ------------------------------------------------------------------
+      - name: Bundle Qt frameworks (macOS)
+        if: runner.os == 'macOS'
+        working-directory: ${{ github.workspace }}/build
+        run: |
+          APP=$(find . -maxdepth 1 -name "*.app" | head -n1)
+          echo "Bundling: $APP"
+          macdeployqt "$APP" -verbose=1
+
+      - name: Package .dmg (macOS)
+        if: runner.os == 'macOS'
+        working-directory: ${{ github.workspace }}/build
+        run: cpack -G DragNDrop --verbose
+
+      - name: Upload .dmg artifact (macOS)
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: soa-launcher-macos-dmg
+          path: ${{ github.workspace }}/build/*.dmg
+          if-no-files-found: warn
+
+      # Optional: upload the Linux build too (raw binary) for testing.
+      - name: Upload Linux binary
+        if: runner.os == 'Linux' && matrix.cpp_compiler == 'g++'
+        uses: actions/upload-artifact@v4
+        with:
+          name: soa-launcher-linux
+          path: ${{ github.workspace }}/build/soa_launcher
+          if-no-files-found: warn
