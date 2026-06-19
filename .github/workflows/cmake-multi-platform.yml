@@ -50,8 +50,11 @@ jobs:
           install-deps: true      # pulls libxcb/xkb deps on Linux
 
       - name: Configure
+        # Swift requires the Ninja (or Xcode) generator - CI defaults to Unix
+        # Makefiles, which doesn't support Swift. Ninja is installed above.
         run: >
           cmake -B ${{ github.workspace }}/build
+          -G Ninja
           -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
           -DCMAKE_BUILD_TYPE=Release
           -S ${{ github.workspace }}
