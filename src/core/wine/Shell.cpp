@@ -61,6 +61,20 @@ namespace core::wine
         return process->state() != QProcess::NotRunning;
     }
 
+    void Shell::set_wine_binary(const QString& path)
+    {
+        config.wine_binary = path.toStdString();
+        SPDLOG_DEBUG("wine binary set to {}", config.wine_binary.empty() ? "(default: wine on PATH)" : config.wine_binary);
+    }
+
+    QString Shell::wine_binary() const
+    {
+        // empty -> use "wine" from PATH
+        return config.wine_binary.empty()
+            ? QStringLiteral("wine")
+            : QString::fromStdString(config.wine_binary);
+    }
+
     void Shell::run_command(const QString& program, const QStringList& args,
                             const QProcessEnvironment& env)
     {
@@ -87,13 +101,24 @@ namespace core::wine
 
     bool Shell::is_wine_installed() const
     {
-        const QString path = QStandardPaths::findExecutable("wine");
-        if (path.isEmpty())
+        const QString wine = wine_binary();
+
+        // If it's an absolute path, check the file exists directly.
+        // If it's just "wine" (PATH lookup), use findExecutable.
+        if (QFileInfo(wine).isAbsolute())
+        {
+            const bool ok = QFileInfo::exists(wine);
+            SPDLOG_DEBUG("wine binary {}: {}", wine.toStdString(), ok ? "found" : "NOT found");
+            return ok;
+        }
+
+        const QString found = QStandardPaths::findExecutable(wine);
+        if (found.isEmpty())
         {
             SPDLOG_DEBUG("wine not found on PATH");
             return false;
         }
-        SPDLOG_DEBUG("wine found: {}", path.toStdString());
+        SPDLOG_DEBUG("wine found: {}", found.toStdString());
         return true;
     }
 
@@ -152,7 +177,15 @@ namespace core::wine
                 delete conn;
             });
 
-        run_command("wineboot", { "--init" }, env);
+        // derive wineboot from the wine binary's directory
+        const QString wine = wine_binary();
+        QString wineboot;
+        if (QFileInfo(wine).isAbsolute())
+            wineboot = QFileInfo(wine).dir().filePath("wineboot");
+        else
+            wineboot = "wineboot";   // PATH lookup
+        
+        run_command(wineboot, { "--init" }, env);
     }
 
     void Shell::run_game(const QString& user, const QString& token)
@@ -201,7 +234,7 @@ namespace core::wine
              << "-OP" << QString("[%1]").arg(token);
 
         process->setWorkingDirectory(gameDir);
-        run_command("wine", args, env);
+        run_command(wine_binary(), args, env);
     }
 
     // stub for later

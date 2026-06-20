@@ -15,6 +15,7 @@ namespace core::wine
         std::string wine_version {};
         std::string wine_arch {};        // "win64" / "win32"
         std::string wine_prefix {};
+        std::string wine_binary {};
         std::string game_install_path {};
         std::string launcher_root_path {};
     };
@@ -36,6 +37,9 @@ namespace core::wine
             void set_root_path(const QString& root);
             QString wine_prefix() const { return QString::fromStdString(config.wine_prefix); }
             QString game_install_path() const { return QString::fromStdString(config.game_install_path); }
+
+        void set_wine_binary(const QString& path);
+        QString wine_binary() const;
 
         void run_command(const QString& program, const QStringList& args,
         const QProcessEnvironment& env = QProcessEnvironment::systemEnvironment());

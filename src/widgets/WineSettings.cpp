@@ -11,8 +11,7 @@
 
 #include "core/wine/Shell.hpp"
 
-WineSettings::WineSettings(core::wine::Shell* shell_, QWidget* parent)
-    : QWidget(parent), shell(shell_)
+WineSettings::WineSettings(core::wine::Shell* shell_, QWidget* parent) : QWidget(parent), shell(shell_)
 {
     setup_dxvk_option();
     setup_prefix_option();
@@ -101,6 +100,8 @@ void WineSettings::setup_wine_binary_option()
     field->setStyleSheet(util::styles::k_field);
     field->setGeometry(cp.x(), cp.y(), field_w, h);
 
+    field->setText(shell->wine_binary());
+
     auto* browse = new QPushButton("...", this);
     browse->setCursor(Qt::PointingHandCursor);
     browse->setStyleSheet(util::styles::k_neutral_button);
@@ -108,7 +109,15 @@ void WineSettings::setup_wine_binary_option()
     connect(browse, &QPushButton::clicked, this, [this, field]()
     {
         const QString file = QFileDialog::getOpenFileName(this, "Select Wine / Proton Binary");
-        if (!file.isEmpty()) field->setText(file);
+        if (!file.isEmpty())
+        {
+            shell->set_wine_binary(file);
+            field->setText(file);
+        }
+    });
+    connect(field, &QLineEdit::editingFinished, this, [this, field]()
+    {
+        shell->set_wine_binary(field->text());
     });
 }
 
