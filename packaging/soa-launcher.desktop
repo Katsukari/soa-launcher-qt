@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Story Of Alicia
+Comment=Story Of Alicia game launcher
+Exec=soa_launcher
+Icon=soa-launcher
+Categories=Game;
+Terminal=false

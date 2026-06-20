@@ -1,6 +1,7 @@
 #include "core/wine/Shell.hpp"
 
 #include <QDir>
+#include <QFileInfo>
 #include <QStandardPaths>
 
 #include "core/Log.hpp"
@@ -13,14 +14,12 @@ namespace core::wine
         process = new QProcess(this);
         process->setProcessChannelMode(QProcess::MergedChannels);   // stdout+stderr together
 
-        // Stream output as it arrives.
+        // Stream output as it arrives
         connect(process, &QProcess::readyReadStandardOutput, this, &Shell::handle_output);
 
-        // Process failed to start / crashed / etc.
+        // Process failed to start / crashed / etc
         connect(process, &QProcess::errorOccurred, this, [this](QProcess::ProcessError err)
             {
-                // started==false only matters for FailedToStart, other errors
-                // happen mid-run and are reported via finished().
                 if (err == QProcess::FailedToStart)
                 {
                     current.started = false;
@@ -46,10 +45,10 @@ namespace core::wine
 
     void Shell::set_root_path(const QString& prefix_root)
     {
-        // The root the user picks IS the wine prefix (or where to generate one).
+        // The root the user picks IS the wine prefix (or where to generate one)
         config.wine_prefix = prefix_root.toStdString();
 
-        // Game lives inside the prefix, at the Windows-mirrored AppData path.
+        // Game lives inside the prefix, at the Windows-mirrored AppData path
         const QString user = qEnvironmentVariable("USER", QDir::homePath().section('/', -1));
         const QString game = QDir(prefix_root).filePath(QString("drive_c/users/%1/AppData/Roaming/Story Of Alicia/game").arg(user));
         config.game_install_path = game.toStdString();
@@ -88,7 +87,6 @@ namespace core::wine
 
     bool Shell::is_wine_installed() const
     {
-        // Found on PATH -> non-empty path. No subprocess, instant.
         const QString path = QStandardPaths::findExecutable("wine");
         if (path.isEmpty())
         {
@@ -157,7 +155,55 @@ namespace core::wine
         run_command("wineboot", { "--init" }, env);
     }
 
-    // stubs for later
+    void Shell::run_game(const QString& user, const QString& token)
+    {
+        if (!is_wine_installed())
+        {
+            SPDLOG_ERROR("run_game: wine is not installed");
+            return;
+        }
+
+        if (config.game_install_path.empty())
+        {
+            SPDLOG_ERROR("run_game: no game install path configured");
+            return;
+        }
+
+        if (is_busy())
+        {
+            SPDLOG_WARN("run_game: shell busy, ignoring");
+            return;
+        }
+
+        const QString gameDir = QString::fromStdString(config.game_install_path);
+        const QString exePath = QDir(gameDir).filePath("Alicia.exe");
+
+        if (!QFileInfo::exists(exePath))
+        {
+            SPDLOG_ERROR("run_game: Alicia.exe not found at {}", exePath.toStdString());
+            return;
+        }
+
+        const QString prefix = QString::fromStdString(config.wine_prefix);
+
+        SPDLOG_INFO("launching game as user {} (prefix {})", user.toStdString(), prefix.toStdString());
+
+        QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+        env.insert("WINEPREFIX", prefix);
+        // env.insert("DXVK_HUD", "fps");
+
+        // The game takes flags: Alicia.exe -GameID 4 -ID [user] -OP [token]
+        // Run through wine, with the working dir set to the game folder
+        QStringList args;
+        args << exePath
+             << "-GameID" << "4"
+             << "-ID" << QString("[%1]").arg(user)
+             << "-OP" << QString("[%1]").arg(token);
+
+        process->setWorkingDirectory(gameDir);
+        run_command("wine", args, env);
+    }
+
+    // stub for later
     void Shell::setup_proton() { }
-    void Shell::run_game()     { }
 }

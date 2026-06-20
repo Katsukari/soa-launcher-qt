@@ -4,6 +4,7 @@
 #include "util/Assets.hpp"
 #include "util/Layout.hpp"
 #include "core/wine/Shell.hpp"
+#include "core/auth/AuthHandler.hpp"
 
 #include <QPushButton>
 #include <QLabel>
@@ -22,6 +23,7 @@ MainWindow::MainWindow(QWidget* parent) : QWidget(parent)
     setAttribute(Qt::WA_TranslucentBackground);
 
     shell = new core::wine::Shell(this);
+    auth  = new AuthHandler(shell, this);
 
     setup_window_buttons();
     setup_logo();
@@ -173,7 +175,7 @@ void MainWindow::paintEvent(QPaintEvent*)
 
     // Frames + sidebar icons drawn unless a chrome-hiding overlay (Settings) is open.
     // WineInstall keeps chrome, so these stay painted under its blur and show through sharp
-    // (WineInstall re-draws them on top via ModalOverlay::paint_frames).
+    // (WineInstall re-draws them on top via ModalOverlay::paint_frames)
     if (!chrome_hidden)
     {
         const QPixmap left = util::assets::images[util::assets::Image::LeftFrame]

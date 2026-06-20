@@ -18,6 +18,7 @@ class QLabel;
 class DownloadBox;
 class Settings;
 class GameInstall;
+class AuthHandler;
 
 class MainWindow : public QWidget
 {
@@ -25,6 +26,7 @@ class MainWindow : public QWidget
 
     public:
         explicit MainWindow(QWidget* parent = nullptr);
+        [[nodiscard]] AuthHandler * auth_handler() const { return auth; }
 
     protected:
         void paintEvent(QPaintEvent* event) override;
@@ -46,6 +48,7 @@ class MainWindow : public QWidget
         QPushButton * minimize_button = nullptr;
         DownloadBox * download_box = nullptr;
         Settings * settings = nullptr;
-    WineInstall *game_install = nullptr;
+        WineInstall *game_install = nullptr;
         core::wine::Shell * shell {};
+        AuthHandler * auth {};
 };

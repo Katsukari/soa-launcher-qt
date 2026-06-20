@@ -9,8 +9,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Swift is only used for the networking library (core/network). Enabling it as
-# its own language lets that library build with Swift while the rest stays C++.
+# Swift is only used for the networking library (core/network).
 enable_language(Swift)
 
 # Qt auto-generators for MOC and RCC
@@ -31,7 +30,7 @@ find_package(Qt6 REQUIRED COMPONENTS
         Concurrent
 )
 
-# spdlog — fetched automatically, no submodule needed
+# spdlog - fetched automatically, no submodule needed
 include(FetchContent)
 FetchContent_Declare(
         spdlog
@@ -42,25 +41,15 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(spdlog)
 
-# ---------------------------------------------------------------------------
 # Swift networking library (isolated)
-#
-# Swift lives in its own static library so the C++ executable's compile/link
-# flags (-fPIC, -static-libstdc++, etc.) never leak into swiftc, and so Swift
-# doesn't synthesise its own main(). The executable just links this.
-# ---------------------------------------------------------------------------
 add_library(soa_network STATIC
         src/core/network/soa_bridge.swift
 )
 
-# Swift needs the module map to import the C bridge header (soa_log, etc.).
 target_compile_options(soa_network PRIVATE
         "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xcc -fmodule-map-file=${CMAKE_SOURCE_DIR}/src/core/network/module.modulemap>"
 )
 
-target_link_options(soa_network PRIVATE -static-stdlib)
-
-# The bridge header lives under include/.
 target_include_directories(soa_network PRIVATE
         include
 )
@@ -85,6 +74,7 @@ set(LAUNCHER_SOURCES
         src/core/Log.cpp
         src/core/wine/Shell.cpp
         src/core/network/soa_bridge.cpp
+        src/core/network/AuthHandler.cpp
 )
 
 set(LAUNCHER_HEADERS
@@ -106,6 +96,8 @@ set(LAUNCHER_HEADERS
         include/core/Log.hpp
         include/util/Styles.hpp
         include/core/network/soa_bridge.h
+        include/core/network/DownloadBridge.hpp
+        include/core/auth/AuthHandler.hpp
 )
 
 # Resources (.qrc files)
@@ -135,7 +127,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
         Qt6::Network
         Qt6::Concurrent
         spdlog::spdlog
-        soa_network            # the Swift networking library
+        soa_network
 )
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE)
@@ -153,28 +145,28 @@ if(APPLE)
     )
 endif()
 
-# Statically link the C++ runtime so the binary doesn't depend on the user's
-# installed libstdc++/libgcc version. Now that the executable is a pure C++
-# link target (Swift is in soa_network), g++ does the linking and these flags
-# are valid again.
-# On macOS with AppleClang, libc++ is part of the OS - no static linking needed.
-#if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-#    target_link_options(${PROJECT_NAME} PRIVATE
-#            -static-libstdc++
-#            -static-libgcc
-#    )
-#elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND NOT APPLE)
-#    target_link_options(${PROJECT_NAME} PRIVATE -static-libstdc++)
-#endif()
-
-# Install + Qt deploy
+# ---------------------------------------------------------------------------
+# Install rules (used by both `cpack` on macOS and the AppImage build on Linux)
+include(GNUInstallDirs)
 
 install(TARGETS ${PROJECT_NAME}
-        BUNDLE DESTINATION .
-        RUNTIME DESTINATION bin
+        BUNDLE  DESTINATION .
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
-# Packaging (generates .dmg on macOS, .tar.gz on Linux)
+if(NOT APPLE)
+    install(FILES packaging/soa-launcher.desktop
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+
+    install(FILES packaging/soa-launcher.png
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps)
+endif()
+
+# Packaging
+#  - macOS : .dmg via CPack DragNDrop generator (run `cpack`)
+#  - Linux : .AppImage via linuxdeploy - see packaging/build_appimage.sh
+#            (CPack is not used on Linux; linuxdeploy walks the binary's real
+#            dependencies and bundles Qt, the Swift runtime, plugins, ICU, etc)
 
 set(CPACK_PACKAGE_NAME "Story Of Alicia Launcher")
 set(CPACK_PACKAGE_VENDOR "Story Of Alicia")
@@ -184,11 +176,8 @@ set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "${PROJECT_DESCRIPTION}")
 if(APPLE)
     set(CPACK_GENERATOR "DragNDrop")
     set(CPACK_DMG_VOLUME_NAME "Story Of Alicia Launcher")
-else()
-    set(CPACK_GENERATOR "TGZ")
+    include(CPack)
 endif()
-
-include(CPack)
 
 # Tests
 

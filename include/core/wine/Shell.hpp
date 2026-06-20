@@ -37,8 +37,6 @@ namespace core::wine
             QString wine_prefix() const { return QString::fromStdString(config.wine_prefix); }
             QString game_install_path() const { return QString::fromStdString(config.game_install_path); }
 
-            // Async: returns immediately. Streams output via output_line(),
-            // reports completion via command_finished()
         void run_command(const QString& program, const QStringList& args,
         const QProcessEnvironment& env = QProcessEnvironment::systemEnvironment());
 
@@ -50,7 +48,7 @@ namespace core::wine
 
             // stubbed for later
             void setup_proton();
-            void run_game();
+            void run_game(const QString& user, const QString& token);
 
             signals:
                 void command_finished(const command_result& result);
@@ -58,7 +56,7 @@ namespace core::wine
 
         private:
             QProcess*      process {};
-            command_result current;          // accumulates while running
+            command_result current;
             wine_config    config;
 
             void handle_output();
