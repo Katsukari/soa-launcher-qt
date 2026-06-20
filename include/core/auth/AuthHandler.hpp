@@ -1,7 +1,7 @@
 #pragma once
 
 #include <QObject>
-#include <QString>
+#include <QUrl>
 
 namespace core::wine { class Shell; }
 
@@ -10,15 +10,16 @@ class AuthHandler : public QObject
 {
     Q_OBJECT
 
-public:
-    explicit AuthHandler(core::wine::Shell* shell, QObject* parent = nullptr);
+    public:
+        explicit AuthHandler(core::wine::Shell* shell, QObject* parent = nullptr);
 
-    // Open the Discord OAuth login page in the user's browser.
-    void open_login();
+        // Open the Discord OAuth login page in the user's browser.
+        void open_login();
 
-    // Parse a soa:// callback URL and launch the game
-    void handle_url(const QUrl& url);
+    public slots:
+        // Parse a soa:// callback URL and launch the game
+        void handle_url(const QUrl& url) const;
 
-private:
-    core::wine::Shell* shell {};   // borrowed
+    private:
+        core::wine::Shell* shell {};   // borrowed
 };

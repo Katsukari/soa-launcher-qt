@@ -34,7 +34,7 @@ void AuthHandler::open_login()
     QDesktopServices::openUrl(QUrl(k_discord_oauth_url));
 }
 
-void AuthHandler::handle_url(const QUrl& url)
+void AuthHandler::handle_url(const QUrl& url) const
 {
     SPDLOG_INFO("received soa url: {}", url.toString().toStdString());
 
