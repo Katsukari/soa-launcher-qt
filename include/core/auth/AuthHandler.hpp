@@ -17,7 +17,7 @@ public:
     void open_login();
 
     // Parse a soa:// callback URL and launch the game
-    void handle_url(const QString& url);
+    void handle_url(const QUrl& url);
 
 private:
     core::wine::Shell* shell {};   // borrowed

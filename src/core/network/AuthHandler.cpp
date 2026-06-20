@@ -34,19 +34,18 @@ void AuthHandler::open_login()
     QDesktopServices::openUrl(QUrl(k_discord_oauth_url));
 }
 
-void AuthHandler::handle_url(const QString& url)
+void AuthHandler::handle_url(const QUrl& url)
 {
-    SPDLOG_INFO("received soa url: {}", url.toStdString());
+    SPDLOG_INFO("received soa url: {}", url.toString().toStdString());
 
-    const QUrl parsed(url);
-    const QUrlQuery query(parsed);
+    const QUrlQuery query(url);
 
     const QString user  = query.queryItemValue("user");
     const QString token = query.queryItemValue("token");
 
     if (user.isEmpty() || token.isEmpty())
     {
-        SPDLOG_ERROR("soa url missing user or token: {}", url.toStdString());
+        SPDLOG_ERROR("soa url missing user or token: {}", url.toString().toStdString());
         return;
     }
 

@@ -1,4 +1,5 @@
 #include <QApplication>
+#include <QUrl>
 #include "MainWindow.hpp"
 #include <spdlog/spdlog.h>
 #include "util/Assets.hpp"
@@ -30,7 +31,7 @@ int main(int argc, char *argv[])
         const QString a = QString::fromLocal8Bit(argv[i]);
         if (a.startsWith("soa://"))
         {
-            window.auth_handler()->handle_url(a);
+            window.auth_handler()->handle_url(QUrl(a));
             break;
         }
     }
