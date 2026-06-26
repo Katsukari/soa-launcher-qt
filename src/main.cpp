@@ -32,7 +32,7 @@ int main(int argc, char *argv[])
         const QString a = QString::fromLocal8Bit(argv[i]);
         if (a.startsWith("soa://"))
         {
-            window.auth_handler()->handle_url(QUrl(a));
+            window.auth_handler()->handle_url(QString(a));
             break;
         }
     }

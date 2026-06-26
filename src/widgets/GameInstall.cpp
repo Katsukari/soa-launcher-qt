@@ -147,7 +147,18 @@ void GameInstall::start_install()
 
     SPDLOG_INFO("game install: starting download to {}", game_path.toStdString());
 
-    if (!download) download = new DownloadProgress(this);
+    if (!download)
+    {
+        download = new DownloadProgress(this);
+        connect(download, &DownloadProgress::download_finished, this, [this](bool ok)
+        {
+            installing = false;
+            if (download) download->hide();
+            hide();
+            if (ok) emit install_complete();
+            else    emit closed();
+        });
+    }
 
     download->show_over(this);
 }

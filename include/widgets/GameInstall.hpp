@@ -16,6 +16,10 @@ class GameInstall : public util::modal_overlay::ModalOverlay
     public:
         explicit GameInstall(core::wine::Shell* shell, QWidget* parent = nullptr);
 
+    signals:
+        void closed();
+        void install_complete();
+
     protected:
         void paint_content(QPainter& painter) override;
         bool eventFilter(QObject* obj, QEvent* event) override;

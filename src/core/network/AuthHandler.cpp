@@ -5,15 +5,15 @@
 #include <QUrlQuery>
 
 #include "core/wine/Shell.hpp"
+#include "util/Config.hpp"
 #include "core/Log.hpp"
 #include <spdlog/spdlog.h>
 
+using util::config::Config;
+
 namespace
 {
-    // Discord OAuth login URL. Redirects to authentication.storyofalicia.com,
-    // which hands back a soa:// URL containing user + token
-    const char* k_discord_oauth_url =
-        "https://discord.com/oauth2/authorize"
+    const char* k_discord_oauth_url = "https://discord.com/oauth2/authorize"
         "?client_id=1272602862043795586"
         "&response_type=code"
         "&redirect_uri=https%3A%2F%2Fauthentication.storyofalicia.com%2F"
@@ -23,8 +23,6 @@ namespace
 AuthHandler::AuthHandler(core::wine::Shell* shell_, QObject* parent)
     : QObject(parent), shell(shell_)
 {
-    // Register as the in-process handler for soa:// URLs. When a soa:// URL is
-    // dispatched through Qt, handle_url() is invoked.
     QDesktopServices::setUrlHandler("soa", this, "handle_url");
 }
 
@@ -34,21 +32,25 @@ void AuthHandler::open_login()
     QDesktopServices::openUrl(QUrl(k_discord_oauth_url));
 }
 
-void AuthHandler::handle_url(const QUrl& url) const
+void AuthHandler::handle_url(const QString& url)
 {
-    SPDLOG_INFO("received soa url: {}", url.toString().toStdString());
+    SPDLOG_INFO("received soa url: {}", url.toStdString());
 
-    const QUrlQuery query(url);
+    const QUrl parsed(url);
+    const QUrlQuery query(parsed);
 
-    const QString user  = query.queryItemValue("user");
-    const QString token = query.queryItemValue("token");
+    const QString user     = query.queryItemValue("user");
+    const QString token    = query.queryItemValue("token");
+    const QString username = query.queryItemValue("username");
 
     if (user.isEmpty() || token.isEmpty())
     {
-        SPDLOG_ERROR("soa url missing user or token: {}", url.toString().toStdString());
+        SPDLOG_ERROR("soa url missing user or token: {}", url.toStdString());
         return;
     }
 
-    SPDLOG_INFO("auth ok: user={}, launching game", user.toStdString());
-    shell->run_game(user, token);
+    Config::instance().set_auth(user, token, username);
+    SPDLOG_INFO("auth ok: user={} username={}", user.toStdString(), username.toStdString());
+
+    emit authenticated(user, token, username);
 }

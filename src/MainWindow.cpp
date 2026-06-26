@@ -100,7 +100,7 @@ void MainWindow::setup_start_box()
 {
     wine_install = new WineInstall(shell, this);
     const QSize w = size();
-    start_box = new StartBox(this);
+    start_box = new StartBox(auth, shell, this);
     start_box->move(util::layout::download::pos(w));
 
     connect(start_box, &StartBox::settings_requested, this, [this]()
@@ -147,6 +147,12 @@ void MainWindow::setup_game_install()
     connect(game_install, &GameInstall::closed, this, [this]()
     {
         on_overlay_closed(game_install);
+    });
+
+    connect(game_install, &GameInstall::install_complete, this, [this]()
+    {
+        on_overlay_closed(game_install);
+        start_box->on_download_complete();
     });
 }
 

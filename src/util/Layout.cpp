@@ -190,6 +190,8 @@ namespace util::layout
         // child rects: box-local constants shifted into window space by k_rect origin, then scaled
         QRect close(const QSize win)     { return scaled(k_close.translated(k_rect.topLeft()), win); }
         QSize close_icon(const QSize win){ return scaled(k_close_icon, win); }
+        QRect pause(const QSize win)     { return scaled(k_pause.translated(k_rect.topLeft()), win); }
+        QSize pause_icon(const QSize win){ return scaled(k_pause_hit, win); }
         QRect title(const QSize win)     { return scaled(k_title.translated(k_rect.topLeft()), win); }
         QRect info_row(const QSize win)  { return scaled(k_info.translated(k_rect.topLeft()), win); }
         QRect bar_rect(const QSize win)  { return scaled(k_bar.translated(k_rect.topLeft()), win); }

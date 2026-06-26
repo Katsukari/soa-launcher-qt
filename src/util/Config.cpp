@@ -19,9 +19,10 @@ namespace util::config
     class Config::Impl
     {
         public:
-            QVariantMap values;     // mirror of config.json
-            QString     username;   // from .env
-            QString     token;      // from .env
+            QVariantMap values;
+            QString     username;
+            QString     token;
+            QString     display_name;
     };
 
     Config& Config::instance()
@@ -39,10 +40,9 @@ namespace util::config
 
         load();
         load_env();
-        apply_defaults();   // fill any missing keys (preserves user values), writes a full file
+        apply_defaults();
         save();
 
-        // Watch config.json so hand-edits are picked up live.
         watcher = new QFileSystemWatcher(this);
         watcher->addPath(file_path());
         connect(watcher, &QFileSystemWatcher::fileChanged, this, [this](const QString& path)
@@ -71,7 +71,6 @@ namespace util::config
         return QDir(base).filePath(".env");
     }
 
-    // config.json load and save
     void Config::load()
     {
         QFile f(file_path());
@@ -115,7 +114,6 @@ namespace util::config
         QTimer::singleShot(150, this, [this]() { writing = false; });
     }
 
-    // .env load and save (auth secrets)
     void Config::load_env()
     {
         QFile f(env_path());
@@ -125,7 +123,6 @@ namespace util::config
             return;
         }
 
-        // Minimal KEY=VALUE parser, One pair per line, comments ignored
         while (!f.atEnd())
         {
             const QString line = QString::fromUtf8(f.readLine()).trimmed();
@@ -141,6 +138,7 @@ namespace util::config
 
             if (key == "SOA_USER") d->username = val;
             else if (key == "SOA_TOKEN") d->token = val;
+            else if (key == "SOA_USERNAME") d->display_name = val;
         }
         f.close();
 
@@ -161,9 +159,10 @@ namespace util::config
         out << "# This file contains your login token. Do NOT share it.\n";
         out << "SOA_USER=" << d->username << "\n";
         out << "SOA_TOKEN=" << d->token << "\n";
+        out << "SOA_USERNAME=" << d->display_name << "\n";
         f.close();
 
-        // Owner-only permissions so others can't read the token
+        // Owner-only permissions so others can't read the token.
         f.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner);
 
         SPDLOG_DEBUG("config: wrote .env (auth)");
@@ -205,23 +204,19 @@ namespace util::config
 
         const QString default_prefix = QDir(QDir::homePath()).filePath("soa-launcher");
 
-        // Wine
         set_if_missing("wine_prefix",      default_prefix);
         set_if_missing("wine_arch",        "win64");
         set_if_missing("use_dxvk",         false);
         set_if_missing("wine_args",        "");
         set_if_missing("rosetta_x87_path", "");
 
-        // Launcher
         set_if_missing("launch_on_startup", false);
         set_if_missing("after_game_start",  "keep");
         set_if_missing("launcher_size",     "1400x846");
 
-        // Advanced / game args
         set_if_missing("game_id",   "4");
         set_if_missing("game_args", "");
 
-        // Game path defaults to the derived AppData path so empty means "use default"
         set_if_missing("game_install_path", derive_game_path(default_prefix));
     }
 
@@ -232,7 +227,6 @@ namespace util::config
         emit changed();
     }
 
-    // Getters. Empty means "not set" - we return the default in that case.
     QString Config::wine_binary() const       { return d->values.value("wine_binary").toString(); }
     QString Config::winetricks_binary() const { return d->values.value("winetricks_binary").toString(); }
     QString Config::rosetta_x87_path() const  { return d->values.value("rosetta_x87_path").toString(); }
@@ -255,16 +249,15 @@ namespace util::config
 
     QString Config::game_install_path() const
     {
-        // Empty derive from the current prefix, A stored value is a user override
         const QString v = d->values.value("game_install_path").toString();
         return v.isEmpty() ? derive_game_path(wine_prefix()) : v;
     }
 
     QString Config::username() const          { return d->username; }
     QString Config::token() const             { return d->token; }
+    QString Config::display_name() const      { return d->display_name; }
     bool    Config::has_auth() const          { return !d->username.isEmpty() && !d->token.isEmpty(); }
 
-    // Setters
     void Config::set_wine_binary(const QString& v)       { d->values["wine_binary"] = v;       save(); emit changed(); }
     void Config::set_winetricks_binary(const QString& v) { d->values["winetricks_binary"] = v; save(); emit changed(); }
     void Config::set_rosetta_x87_path(const QString& v)  { d->values["rosetta_x87_path"] = v;  save(); emit changed(); }
@@ -288,17 +281,23 @@ namespace util::config
 
     void Config::set_game_install_path(const QString& v)
     {
-        // Empty clears the override (back to the derived default), a value sets it
         d->values["game_install_path"] = v;
         save();
         emit changed();
     }
 
-    // Auth setters - write to .env
-    void Config::set_auth(const QString& username, const QString& token)
+    bool Config::game_installed() const
     {
-        d->username = username;
-        d->token    = token;
+        const QDir dir(game_install_path());
+        if (!dir.exists()) return false;
+        return !dir.isEmpty(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot);
+    }
+
+    void Config::set_auth(const QString& username, const QString& token, const QString& display_name)
+    {
+        d->username     = username;
+        d->token        = token;
+        d->display_name = display_name;
         save_env();
         emit changed();
     }
@@ -307,6 +306,7 @@ namespace util::config
     {
         d->username.clear();
         d->token.clear();
+        d->display_name.clear();
         save_env();
         emit changed();
     }

@@ -342,6 +342,8 @@ namespace util::layout
         inline constexpr QSize k_close_icon {18, 18};
         inline constexpr QSize k_close_hit  {18, 18};
         inline constexpr QRect k_close = anchor_top_right({0, 0, k_box.width(), k_box.height()}, 22, 17, k_close_hit);
+        inline constexpr QSize k_pause_hit  {16, 16};
+        inline constexpr QRect k_pause = anchor_top_right({0, 0, k_box.width(), k_box.height()}, 48, 18, k_pause_hit);
 
         inline constexpr QRect k_title {0, k_title_y, k_box.width(), k_title_h};
         inline constexpr QRect k_info  {k_pad_x, k_info_y,  k_box.width() - 2 * k_pad_x, k_info_h};
@@ -354,6 +356,8 @@ namespace util::layout
         QRect rect(QSize win);
         QRect close(QSize win);
         QSize close_icon(QSize win);
+        QRect pause(QSize win);
+        QSize pause_icon(QSize win);
         QRect title(QSize win);
         QRect info_row(QSize win);
         QRect bar_rect(QSize win);
