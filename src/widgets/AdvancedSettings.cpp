@@ -2,7 +2,10 @@
 #include "util/Assets.hpp"
 #include "util/Layout.hpp"
 #include "util/SimpleUtils.hpp"
+#include "util/Config.hpp"
 #include <QLineEdit>
+
+using util::config::Config;
 
 namespace
 {
@@ -35,4 +38,10 @@ void AdvancedSettings::setup_game_args_option()
     field->setPlaceholderText("Alicia.exe (default)");
     field->setStyleSheet(k_field_style);
     field->setGeometry(cp.x(), cp.y(), util::layout::settings::ctrl_w(w), util::layout::scaled(34, w));
+    field->setText(Config::instance().game_args());
+
+    connect(field, &QLineEdit::editingFinished, this, [field]()
+    {
+        Config::instance().set_game_args(field->text());
+    });
 }

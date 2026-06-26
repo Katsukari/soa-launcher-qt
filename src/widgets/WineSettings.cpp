@@ -4,12 +4,15 @@
 #include "util/Layout.hpp"
 #include "util/SimpleUtils.hpp"
 #include "util/Styles.hpp"
+#include "util/Config.hpp"
 
 #include <QPushButton>
 #include <QLineEdit>
 #include <QFileDialog>
 
 #include "core/wine/Shell.hpp"
+
+using util::config::Config;
 
 WineSettings::WineSettings(core::wine::Shell* shell_, QWidget* parent) : QWidget(parent), shell(shell_)
 {
@@ -33,17 +36,23 @@ void WineSettings::setup_dxvk_option()
     slider->setStyleSheet("border:none; background:transparent;");
     const QRect sr = util::layout::settings::slider_rect(w, util::layout::settings::k_row1_y);
     const QSize ssz = sr.size();
-    slider->setIcon(QIcon(util::assets::buttons[util::assets::Button::SliderOn].normal
-        .scaled(ssz, Qt::KeepAspectRatio, Qt::SmoothTransformation)));   // on by default
     slider->setIconSize(ssz);
     slider->setGeometry(sr);
-    connect(slider, &QPushButton::clicked, this, [slider, ssz]()
+
+    // Initialise the icon from the current config value.
+    auto paint = [slider, ssz](bool on)
     {
-        static bool on = true;
-        on = !on;
         const auto& a = on ? util::assets::buttons[util::assets::Button::SliderOn]
                            : util::assets::buttons[util::assets::Button::SliderOff];
         slider->setIcon(QIcon(a.normal.scaled(ssz, Qt::KeepAspectRatio, Qt::SmoothTransformation)));
+    };
+    paint(Config::instance().use_dxvk());
+
+    connect(slider, &QPushButton::clicked, this, [paint]()
+    {
+        const bool on = !Config::instance().use_dxvk();
+        Config::instance().set_use_dxvk(on);
+        paint(on);
     });
 }
 
@@ -58,11 +67,11 @@ void WineSettings::setup_prefix_option()
     const int    cw  = util::layout::settings::ctrl_w(w);
     const int    h   = util::layout::scaled(34, w);
     const int    gap = util::layout::scaled(6, w);
-    const int    bw  = util::layout::scaled(34, w);   // browse only (generate moved to footer)
-    const int    field_w = cw - bw - gap;             // field gets the freed width
+    const int    bw  = util::layout::scaled(34, w);
+    const int    field_w = cw - bw - gap;
 
     auto* field = new QLineEdit(this);
-    field->setText(shell->wine_prefix());
+    field->setText(Config::instance().wine_prefix());
     field->setStyleSheet(util::styles::k_field);
     field->setGeometry(cp.x(), cp.y(), field_w, h);
 
@@ -76,8 +85,12 @@ void WineSettings::setup_prefix_option()
         if (!dir.isEmpty())
         {
             field->setText(dir);
-            shell->set_root_path(dir);   // keep the shell's prefix in sync with the field
+            Config::instance().set_wine_prefix(dir);
         }
+    });
+    connect(field, &QLineEdit::editingFinished, this, [field]()
+    {
+        Config::instance().set_wine_prefix(field->text());
     });
 }
 
@@ -99,8 +112,7 @@ void WineSettings::setup_wine_binary_option()
     field->setPlaceholderText("system wine");
     field->setStyleSheet(util::styles::k_field);
     field->setGeometry(cp.x(), cp.y(), field_w, h);
-
-    field->setText(shell->wine_binary());
+    field->setText(Config::instance().wine_binary());
 
     auto* browse = new QPushButton("...", this);
     browse->setCursor(Qt::PointingHandCursor);
@@ -111,13 +123,13 @@ void WineSettings::setup_wine_binary_option()
         const QString file = QFileDialog::getOpenFileName(this, "Select Wine / Proton Binary");
         if (!file.isEmpty())
         {
-            shell->set_wine_binary(file);
+            Config::instance().set_wine_binary(file);
             field->setText(file);
         }
     });
-    connect(field, &QLineEdit::editingFinished, this, [this, field]()
+    connect(field, &QLineEdit::editingFinished, this, [field]()
     {
-        shell->set_wine_binary(field->text());
+        Config::instance().set_wine_binary(field->text());
     });
 }
 
@@ -133,6 +145,12 @@ void WineSettings::setup_wine_args_option()
     field->setPlaceholderText("e.g. WINEDEBUG=-all");
     field->setStyleSheet(util::styles::k_field);
     field->setGeometry(cp.x(), cp.y(), util::layout::settings::ctrl_w(w), util::layout::scaled(34, w));
+    field->setText(Config::instance().wine_args());
+
+    connect(field, &QLineEdit::editingFinished, this, [field]()
+    {
+        Config::instance().set_wine_args(field->text());
+    });
 }
 
 void WineSettings::setup_generate_button()
@@ -141,7 +159,7 @@ void WineSettings::setup_generate_button()
     auto* generate = new QPushButton("INSTALL WINE PREFIX", this);
     generate->setCursor(Qt::PointingHandCursor);
     generate->setStyleSheet(util::styles::k_primary_button);
-    generate->setGeometry(util::layout::settings::footer_big(w));   // centered big footer button
+    generate->setGeometry(util::layout::settings::footer_big(w));
 
     connect(generate, &QPushButton::clicked, this, [this]()
     {

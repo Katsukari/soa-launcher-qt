@@ -4,20 +4,21 @@
 #include <QFileInfo>
 #include <QStandardPaths>
 
+#include "util/Config.hpp"
 #include "core/Log.hpp"
 #include <spdlog/spdlog.h>
 
 namespace core::wine
 {
+    using util::config::Config;
+
     Shell::Shell(QObject* parent) : QObject(parent)
     {
         process = new QProcess(this);
         process->setProcessChannelMode(QProcess::MergedChannels);   // stdout+stderr together
 
-        // Stream output as it arrives
         connect(process, &QProcess::readyReadStandardOutput, this, &Shell::handle_output);
 
-        // Process failed to start / crashed / etc
         connect(process, &QProcess::errorOccurred, this, [this](QProcess::ProcessError err)
             {
                 if (err == QProcess::FailedToStart)
@@ -27,7 +28,6 @@ namespace core::wine
                 }
             });
 
-        // Completion.
         connect(process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this,
             [this](int code, QProcess::ExitStatus status)
             {
@@ -40,20 +40,6 @@ namespace core::wine
 
                 emit command_finished(current);
             });
-        set_root_path(QDir(QDir::homePath()).filePath("soa-launcher"));
-    }
-
-    void Shell::set_root_path(const QString& prefix_root)
-    {
-        // The root the user picks IS the wine prefix (or where to generate one)
-        config.wine_prefix = prefix_root.toStdString();
-
-        // Game lives inside the prefix, at the Windows-mirrored AppData path
-        const QString user = qEnvironmentVariable("USER", QDir::homePath().section('/', -1));
-        const QString game = QDir(prefix_root).filePath(QString("drive_c/users/%1/AppData/Roaming/Story Of Alicia/game").arg(user));
-        config.game_install_path = game.toStdString();
-
-        SPDLOG_DEBUG("prefix {} -> game {}", config.wine_prefix, config.game_install_path);
     }
 
     bool Shell::is_busy() const
@@ -61,18 +47,17 @@ namespace core::wine
         return process->state() != QProcess::NotRunning;
     }
 
-    void Shell::set_wine_binary(const QString& path)
-    {
-        config.wine_binary = path.toStdString();
-        SPDLOG_DEBUG("wine binary set to {}", config.wine_binary.empty() ? "(default: wine on PATH)" : config.wine_binary);
-    }
-
     QString Shell::wine_binary() const
     {
-        // empty -> use "wine" from PATH
-        return config.wine_binary.empty()
-            ? QStringLiteral("wine")
-            : QString::fromStdString(config.wine_binary);
+        const QString w = Config::instance().wine_binary();
+        return w.isEmpty() ? QStringLiteral("wine") : w;
+    }
+
+    QString Shell::wineboot_binary() const
+    {
+        const QString wine = wine_binary();
+        if (QFileInfo(wine).isAbsolute()) return QFileInfo(wine).dir().filePath("wineboot");
+        return QStringLiteral("wineboot");
     }
 
     void Shell::run_command(const QString& program, const QStringList& args,
@@ -103,8 +88,6 @@ namespace core::wine
     {
         const QString wine = wine_binary();
 
-        // If it's an absolute path, check the file exists directly.
-        // If it's just "wine" (PATH lookup), use findExecutable.
         if (QFileInfo(wine).isAbsolute())
         {
             const bool ok = QFileInfo::exists(wine);
@@ -131,7 +114,8 @@ namespace core::wine
             return;
         }
 
-        if (config.wine_prefix.empty())
+        const QString prefix = Config::instance().wine_prefix();
+        if (prefix.isEmpty())
         {
             SPDLOG_ERROR("setup_wine: no wine prefix configured");
             emit wine_setup_finished(false);
@@ -145,47 +129,78 @@ namespace core::wine
             return;
         }
 
-        const QString prefix = QString::fromStdString(config.wine_prefix);
-        const QString arch   = config.wine_arch.empty() ? QStringLiteral("win64") : QString::fromStdString(config.wine_arch);
+        const QString arch = Config::instance().wine_arch();
 
-        SPDLOG_INFO("setting up wine prefix at {} (arch {})", config.wine_prefix, arch.toStdString());
+        SPDLOG_INFO("setting up wine prefix at {} (arch {})", prefix.toStdString(), arch.toStdString());
 
-        QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-        env.insert("WINEPREFIX", prefix);
-        env.insert("WINEARCH", arch);
+        // Env shared by both wineboot and winetricks.
+        setup_env = QProcessEnvironment::systemEnvironment();
+        setup_env.insert("WINEPREFIX", prefix);
+        setup_env.insert("WINEARCH", arch);
+        setup_env.insert("WINE", wine_binary());
 
-        setting_up_wine = true;
+        // One connection drives the whole chain, advancing setup_step on each
         auto* conn = new QMetaObject::Connection;
         *conn = connect(this, &Shell::command_finished, this,
             [this, conn](const command_result& r)
             {
-                if (!setting_up_wine) return;
-                setting_up_wine = false;
+                if (setup_step == SetupStep::Idle) return;
 
                 const bool ok = r.started && !r.crashed && r.exit_code == 0;
-                if (ok)
+                if (!ok)
                 {
-                    SPDLOG_INFO("wine prefix setup complete");
-                }
-                else
-                {
-                    SPDLOG_ERROR("wine prefix setup failed (started={}, crashed={}, exit={})", r.started, r.crashed, r.exit_code);
+                    SPDLOG_ERROR("wine setup step failed (started={}, crashed={}, exit={})",
+                                 r.started, r.crashed, r.exit_code);
+                    setup_step = SetupStep::Idle;
+                    emit setup_status("Setup failed. Check the log for details.");
+                    emit wine_setup_finished(false);
+                    disconnect(*conn);
+                    delete conn;
+                    return;
                 }
 
-                emit wine_setup_finished(ok);
-                disconnect(*conn);
-                delete conn;
+                switch (setup_step)
+                {
+                    case SetupStep::Wineboot:
+                        SPDLOG_INFO("wineboot complete; installing base packages via winetricks");
+                        setup_step = SetupStep::Winetricks;
+                        start_winetricks();
+                        break;
+
+                    case SetupStep::Winetricks:
+                        SPDLOG_INFO("wine prefix setup complete (prefix + base packages)");
+                        setup_step = SetupStep::Idle;
+                        emit setup_status("Done!");
+                        emit wine_setup_finished(true);
+                        disconnect(*conn);
+                        delete conn;
+                        break;
+
+                    default:
+                        break;
+                }
             });
 
-        // derive wineboot from the wine binary's directory
-        const QString wine = wine_binary();
-        QString wineboot;
-        if (QFileInfo(wine).isAbsolute())
-            wineboot = QFileInfo(wine).dir().filePath("wineboot");
-        else
-            wineboot = "wineboot";   // PATH lookup
-        
-        run_command(wineboot, { "--init" }, env);
+        setup_step = SetupStep::Wineboot;
+        emit setup_status("Creating Wine prefix...");
+        run_command(wineboot_binary(), { "--init" }, setup_env);
+    }
+
+    void Shell::start_winetricks()
+    {
+        // Base packages the game needs. DXVK is added only if the user enabled it.
+        //   vcrun2019 for convenience and d3dx9, d3dcompiler_47 - required for the game
+        QStringList packages = { "-q", "vcrun2019", "d3dx9", "d3dcompiler_47" };
+
+        if (Config::instance().use_dxvk())
+        {
+            packages << "dxvk";
+            SPDLOG_INFO("winetricks: DXVK enabled, including it");
+        }
+
+        emit setup_status("Installing components (this can take a while)...");
+        SPDLOG_INFO("running: winetricks {}", packages.join(' ').toStdString());
+        run_command("winetricks", packages, setup_env);
     }
 
     void Shell::run_game(const QString& user, const QString& token)
@@ -196,7 +211,8 @@ namespace core::wine
             return;
         }
 
-        if (config.game_install_path.empty())
+        const QString gameDir = Config::instance().game_install_path();
+        if (gameDir.isEmpty())
         {
             SPDLOG_ERROR("run_game: no game install path configured");
             return;
@@ -208,30 +224,31 @@ namespace core::wine
             return;
         }
 
-        const QString gameDir = QString::fromStdString(config.game_install_path);
         const QString exePath = QDir(gameDir).filePath("Alicia.exe");
-
         if (!QFileInfo::exists(exePath))
         {
             SPDLOG_ERROR("run_game: Alicia.exe not found at {}", exePath.toStdString());
             return;
         }
 
-        const QString prefix = QString::fromStdString(config.wine_prefix);
+        const QString prefix = Config::instance().wine_prefix();
+        const QString gameId = Config::instance().game_id();
 
         SPDLOG_INFO("launching game as user {} (prefix {})", user.toStdString(), prefix.toStdString());
 
         QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
         env.insert("WINEPREFIX", prefix);
-        // env.insert("DXVK_HUD", "fps");
 
-        // The game takes flags: Alicia.exe -GameID 4 -ID [user] -OP [token]
-        // Run through wine, with the working dir set to the game folder
+        // The game takes flags: Alicia.exe -GameID <id> -ID [user] -OP [token]
         QStringList args;
         args << exePath
-             << "-GameID" << "4"
+             << "-GameID" << gameId
              << "-ID" << QString("[%1]").arg(user)
              << "-OP" << QString("[%1]").arg(token);
+
+        // Append any freeform extra game args from config.
+        const QString extra = Config::instance().game_args();
+        if (!extra.isEmpty()) args << extra.split(' ', Qt::SkipEmptyParts);
 
         process->setWorkingDirectory(gameDir);
         run_command(wine_binary(), args, env);

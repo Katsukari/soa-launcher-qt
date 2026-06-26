@@ -8,12 +8,12 @@
 #include "Settings.hpp"
 
 
-class DownloadBox : public QWidget
+class StartBox : public QWidget
 {
     Q_OBJECT
 
     public:
-        explicit DownloadBox(QWidget * parent = nullptr);
+        explicit StartBox(QWidget * parent = nullptr);
         void paintEvent(QPaintEvent * event) override;
         bool eventFilter(QObject * obj, QEvent* event) override;
 

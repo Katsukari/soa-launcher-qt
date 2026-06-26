@@ -5,10 +5,13 @@
 #include "util/Layout.hpp"
 #include "util/SimpleUtils.hpp"
 #include "util/Styles.hpp"
+#include "util/Config.hpp"
 
 #include <QLabel>
 #include <QPushButton>
 #include <QDesktopServices>
+
+using util::config::Config;
 
 LauncherSettings::LauncherSettings(QWidget* parent) : QWidget(parent)
 {
@@ -34,18 +37,22 @@ void LauncherSettings::setup_launch_on_startup_option()
 
     const QRect sr = util::layout::settings::slider_rect(w, util::layout::settings::k_row1_y);
     const QSize ssz = sr.size();
-    slider->setIcon(QIcon(util::assets::buttons[util::assets::Button::SliderOff].normal
-        .scaled(ssz, Qt::KeepAspectRatio, Qt::SmoothTransformation)));
     slider->setIconSize(ssz);
     slider->setGeometry(sr);
 
-    connect(slider, &QPushButton::clicked, this, [slider, ssz]()
+    auto paint = [slider, ssz](bool on)
     {
-        static bool on = false;   // display-only toggle for now
-        on = !on;
         const auto& a = on ? util::assets::buttons[util::assets::Button::SliderOn]
                            : util::assets::buttons[util::assets::Button::SliderOff];
         slider->setIcon(QIcon(a.normal.scaled(ssz, Qt::KeepAspectRatio, Qt::SmoothTransformation)));
+    };
+    paint(Config::instance().launch_on_startup());
+
+    connect(slider, &QPushButton::clicked, this, [paint]()
+    {
+        const bool on = !Config::instance().launch_on_startup();
+        Config::instance().set_launch_on_startup(on);
+        paint(on);
     });
 }
 
@@ -57,7 +64,15 @@ void LauncherSettings::setup_after_game_start_option()
                             "Choose what the launcher does after the game starts up.");
 
     auto* dd = new ImageDropdown({ "Keep launcher open", "Minimize to tray" }, this);
+
+    // Reflect the stored value ("keep" / "minimize").
+    dd->set_index(Config::instance().after_game_start() == "minimize" ? 1 : 0);
     dd->move(util::layout::settings::ctrl_pos(w, util::layout::settings::k_row2_y));
+
+    connect(dd, &ImageDropdown::changed, this, [](int idx)
+    {
+        Config::instance().set_after_game_start(idx == 1 ? "minimize" : "keep");
+    });
 }
 
 void LauncherSettings::setup_run_connectivity_test_option()
@@ -86,11 +101,21 @@ void LauncherSettings::setup_launcher_size_option()
                             "LAUNCHER SIZE",
                             "Choose your preferred window size for the launcher.");
 
+    const QStringList sizes = { "1120x677", "1400x846", "1600x967", "1920x1160" };
     auto* dd = new ImageDropdown(
         { "Small (1120x677)", "Default (1400x846)", "Large (1600x967)", "4K (1920x1160)" }, this);
-    dd->set_index(1);   // Default
+
+    // Select the entry matching the stored size (default to "Default").
+    int idx = sizes.indexOf(Config::instance().launcher_size());
+    if (idx < 0) idx = 1;
+    dd->set_index(idx);
     dd->move(util::layout::settings::ctrl_pos(w, util::layout::settings::k_row4_y));
     dd->raise();
+
+    connect(dd, &ImageDropdown::changed, this, [sizes](int i)
+    {
+        if (i >= 0 && i < sizes.size()) Config::instance().set_launcher_size(sizes[i]);
+    });
 }
 
 void LauncherSettings::setup_github_button()
@@ -112,7 +137,7 @@ void LauncherSettings::setup_log_button()
     auto* show_log = new QPushButton("SHOW LOG", this);
     show_log->setCursor(Qt::PointingHandCursor);
     show_log->setStyleSheet(util::styles::k_neutral_button);
-    show_log->setGeometry(util::layout::settings::footer_right(w));   // beside GitHub
+    show_log->setGeometry(util::layout::settings::footer_right(w));
     connect(show_log, &QPushButton::clicked, this, []()
     {
         LauncherLog::instance()->show();

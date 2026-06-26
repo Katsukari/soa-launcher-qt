@@ -273,8 +273,10 @@ namespace util::layout
         inline constexpr int   k_path_inset   = 33;
         inline constexpr int   k_path_h       = 69;
         inline constexpr int   k_path_y       = 150;  // body_y + body_h + 30
-        inline constexpr int   k_changepath_y = 234;   // path_y + path_h + 15
+        inline constexpr int   k_changepath_y = 248;
         inline constexpr int   k_changepath_h = 20;
+        inline constexpr int   k_warn_y       = 224;
+        inline constexpr int   k_warn_h       = 18;
         inline constexpr int   k_button_row_y = 287;   // changepath_y + changepath_h + 40
         inline constexpr int   k_button_h     = 40;
         inline constexpr int   k_bottom_pad   = 55;
@@ -291,6 +293,7 @@ namespace util::layout
         inline constexpr QRect k_body  {k_text_x, k_body_y, k_box.width() - 2 * k_text_x, k_body_h};
         inline constexpr QRect k_path  {k_path_inset, k_path_y, k_box.width() - 2 * k_path_inset, k_path_h};
         inline constexpr QRect k_changepath {k_path_inset, k_changepath_y, k_box.width() - 2 * k_path_inset, k_changepath_h};
+        inline constexpr QRect k_warn        {k_path_inset, k_warn_y, k_box.width() - 2 * k_path_inset, k_warn_h};
 
         inline constexpr int   k_btn_w   = (k_box.width() - 2 * k_button_outer - k_button_gap) / 2;
         inline constexpr QRect k_cancel  {k_button_outer, k_button_row_y, k_btn_w, k_button_h};
@@ -306,8 +309,54 @@ namespace util::layout
         QRect  body(QSize win);
         QRect  path_field(QSize win);
         QRect  changepath_line(QSize win);
+        QRect  warning_line(QSize win);
         QRect  cancel_button(QSize win);
         QRect  install_button(QSize win);
         QSize  close_icon(QSize win);
+    }
+
+    // DownloadProgress / PrefixProgress modal (small box-download.png 490x190).
+    // Same authoring pattern as install_modal: box-local constexpr rects,
+    // accessors translate into window space by k_rect origin, then scale.
+    // The progress bar is SLIM (14px tall in default space) - the fill/marquee
+    // composites the start/middle/end pieces inside it.
+    namespace download_modal
+    {
+        // Box dimensions & placement
+        inline constexpr QSize k_box        {490, 190};
+        inline constexpr int   k_margin_top = 40;   // dy offset from vertical center
+
+        // Box-local positioning
+        inline constexpr int   k_pad_x       = 30;   // side padding
+        inline constexpr int   k_title_y     = 24;
+        inline constexpr int   k_title_h     = 30;
+        inline constexpr int   k_info_y      = 74;   // left/right label row (time/speed | status/step)
+        inline constexpr int   k_info_h      = 18;
+        inline constexpr int   k_bar_y       = 100;
+        inline constexpr int   k_bar_h       = 14;   // SLIM bar
+        inline constexpr int   k_under_y     = 124;  // percent / status line below bar
+        inline constexpr int   k_under_h     = 20;
+
+        // Computed layout
+        inline constexpr QRect k_rect = center_in_region(k_box, 0, k_margin_top);
+        inline constexpr QSize k_close_icon {18, 18};
+        inline constexpr QSize k_close_hit  {18, 18};
+        inline constexpr QRect k_close = anchor_top_right({0, 0, k_box.width(), k_box.height()}, 22, 17, k_close_hit);
+
+        inline constexpr QRect k_title {0, k_title_y, k_box.width(), k_title_h};
+        inline constexpr QRect k_info  {k_pad_x, k_info_y,  k_box.width() - 2 * k_pad_x, k_info_h};
+        inline constexpr QRect k_bar   {k_pad_x, k_bar_y,   k_box.width() - 2 * k_pad_x, k_bar_h};
+        inline constexpr QRect k_under {k_pad_x, k_under_y, k_box.width() - 2 * k_pad_x, k_under_h};
+
+        // Accessor functions
+        QRect box_rect(QSize win);
+        QSize box(QSize win);
+        QRect rect(QSize win);
+        QRect close(QSize win);
+        QSize close_icon(QSize win);
+        QRect title(QSize win);
+        QRect info_row(QSize win);
+        QRect bar_rect(QSize win);
+        QRect under_row(QSize win);
     }
 }

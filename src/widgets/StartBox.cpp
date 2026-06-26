@@ -1,7 +1,7 @@
-#include "widgets/DownloadBox.hpp"
+#include "widgets/StartBox.hpp"
 #include "util/Layout.hpp"
 
-DownloadBox::DownloadBox(QWidget* parent) : QWidget(parent)
+StartBox::StartBox(QWidget* parent) : QWidget(parent)
 {
     const QSize w = window()->size();
     setFixedSize(util::layout::download::box(w));
@@ -12,7 +12,7 @@ DownloadBox::DownloadBox(QWidget* parent) : QWidget(parent)
     setup_download_button();
 }
 
-void DownloadBox::setup_title()
+void StartBox::setup_title()
 {
     const QSize w = window()->size();
 
@@ -27,7 +27,7 @@ void DownloadBox::setup_title()
     title_label->setGeometry(util::layout::scaled(util::layout::download::k_title, w));
 }
 
-void DownloadBox::setup_settings_button()
+void StartBox::setup_settings_button()
 {
     const QSize w = window()->size();
     const QRect button = util::layout::scaled(util::layout::download::k_settings_button, w);
@@ -46,7 +46,7 @@ void DownloadBox::setup_settings_button()
     connect(settings_button, &QPushButton::clicked, this, [this] { emit settings_requested(); });
 }
 
-void DownloadBox::setup_message()
+void StartBox::setup_message()
 {
     const QSize w = window()->size();
 
@@ -67,7 +67,7 @@ void DownloadBox::setup_message()
     message_label->setGeometry(util::layout::scaled(util::layout::download::k_note, w));
 }
 
-void DownloadBox::setup_download_button()
+void StartBox::setup_download_button()
 {
     const QSize w = window()->size();
 
@@ -91,7 +91,7 @@ void DownloadBox::setup_download_button()
     download_button->installEventFilter(this);
 }
 
-void DownloadBox::paintEvent(QPaintEvent* event)
+void StartBox::paintEvent(QPaintEvent* event)
 {
     Q_UNUSED(event);
     const QSize w = window()->size();
@@ -103,7 +103,7 @@ void DownloadBox::paintEvent(QPaintEvent* event)
     painter.drawPixmap(util::layout::scaled(util::layout::download::k_note, w), util::assets::images[util::assets::Image::BoxNote2]);
 }
 
-bool DownloadBox::eventFilter(QObject* obj, QEvent* event)
+bool StartBox::eventFilter(QObject* obj, QEvent* event)
 {
     if (obj == download_button)
     {

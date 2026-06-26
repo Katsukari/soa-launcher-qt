@@ -16,8 +16,7 @@ LauncherLog* LauncherLog::instance()
     if (!s_instance)
     {
         s_instance = new LauncherLog();
-        connect(&LogBridge::instance(), &LogBridge::message,
-                s_instance, &LauncherLog::append_line);
+        connect(&LogBridge::instance(), &LogBridge::message, s_instance, &LauncherLog::append_line);
     }
     return s_instance;
 }
@@ -37,11 +36,11 @@ LauncherLog::LauncherLog(QWidget* parent) : QDialog(parent)
     auto* copy  = new QPushButton("Copy", this);
     auto* lock  = new QPushButton("Autoscroll: On", this);
 
-    // Dropdown maps to spdlog level thresholds (trace0 debug1 info2 warn3 err4).
+    // Dropdown maps to spdlog level thresholds (trace0 debug1 info2 warn3 err4)
     verbosity = new QComboBox(this);
-    verbosity->addItem("Errors only");   // -> 4 (err+)
-    verbosity->addItem("Normal");        // -> 2 (info+)
-    verbosity->addItem("Verbose");       // -> 1 (debug+)
+    verbosity->addItem("Errors only");
+    verbosity->addItem("Normal");
+    verbosity->addItem("Verbose");
     verbosity->setCurrentIndex(1);       // Normal
 
     connect(verbosity, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
@@ -95,8 +94,7 @@ void LauncherLog::rerender()
 {
     output->clear();
     for (const Entry& e : entries)
-        if (passes(e.level))
-            output->appendPlainText(e.text);
+        if (passes(e.level)) output->appendPlainText(e.text);
     if (autoscroll)
         output->verticalScrollBar()->setValue(output->verticalScrollBar()->maximum());
 }

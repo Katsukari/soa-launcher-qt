@@ -1,5 +1,5 @@
 #include "MainWindow.hpp"
-#include "widgets/DownloadBox.hpp"
+#include "widgets/StartBox.hpp"
 #include "widgets/Settings.hpp"
 #include "util/Assets.hpp"
 #include "util/Layout.hpp"
@@ -15,6 +15,7 @@
 
 #include "util/ModalOverlay.hpp"
 #include "widgets/WineInstall.hpp"
+#include "widgets/GameInstall.hpp"
 
 MainWindow::MainWindow(QWidget* parent) : QWidget(parent)
 {
@@ -29,7 +30,8 @@ MainWindow::MainWindow(QWidget* parent) : QWidget(parent)
     setup_logo();
     setup_version_label();
     setup_settings();
-    setup_download_box();
+    setup_start_box();
+    setup_wine_install();
     setup_game_install();
 }
 
@@ -94,25 +96,24 @@ void MainWindow::setup_settings()
     settings->hide();
 }
 
-void MainWindow::setup_download_box()
+void MainWindow::setup_start_box()
 {
-    game_install = new WineInstall(shell, this);
+    wine_install = new WineInstall(shell, this);
     const QSize w = size();
-    download_box = new DownloadBox(this);
-    download_box->move(util::layout::download::pos(w));
+    start_box = new StartBox(this);
+    start_box->move(util::layout::download::pos(w));
 
-    connect(download_box, &DownloadBox::settings_requested, this, [this]()
+    connect(start_box, &StartBox::settings_requested, this, [this]()
     {
-        on_overlay_opened(settings);       // keeps_chrome()==false -> frames hidden, chrome hidden
+        on_overlay_opened(settings);
         settings->show_over(this);
     });
 
-    connect(download_box, &DownloadBox::download_triggered, this, [this]()
+    connect(start_box, &StartBox::download_triggered, this, [this]()
     {
-        game_install->show_over(this);
-        on_overlay_opened(game_install);
+        wine_install->show_over(this);
+        on_overlay_opened(wine_install);
     });
-
 
     connect(settings, &Settings::closed, this, [this]()
     {
@@ -120,11 +121,30 @@ void MainWindow::setup_download_box()
     });
 }
 
+void MainWindow::setup_wine_install()
+{
+    wine_install->hide();
+
+    connect(wine_install, &WineInstall::closed, this, [this]()
+    {
+        on_overlay_closed(wine_install);
+    });
+
+    connect(wine_install, &WineInstall::prefix_complete, this, [this]()
+    {
+        wine_install->hide();
+        game_install->show_over(this);
+        on_overlay_opened(game_install);
+        game_install->raise();
+    });
+}
+
 void MainWindow::setup_game_install()
 {
+    game_install = new GameInstall(shell, this);
     game_install->hide();
 
-    connect(game_install, &WineInstall::closed, this, [this]()
+    connect(game_install, &GameInstall::closed, this, [this]()
     {
         on_overlay_closed(game_install);
     });
@@ -134,19 +154,17 @@ void MainWindow::on_overlay_opened(util::modal_overlay::ModalOverlay * m)
 {
     if (m->keeps_chrome())
     {
-        // WineInstall: keep frames painting, keep chrome buttons but raise them above the modal
         chrome_hidden = false;
         close_button->raise();
         minimize_button->raise();
     }
     else
     {
-        // Settings: hide everything
         chrome_hidden = true;
         close_button->hide();
         minimize_button->hide();
     }
-    update();   // repaint frames per the new gate
+    update();
 }
 
 void MainWindow::on_overlay_closed(util::modal_overlay::ModalOverlay *)
@@ -164,7 +182,6 @@ void MainWindow::paintEvent(QPaintEvent*)
     painter.setRenderHint(QPainter::Antialiasing);
     painter.setRenderHint(QPainter::SmoothPixmapTransform);
 
-    // Background always drawn.
     const QRect bg = util::layout::region::rect(w);
     const int radius = util::layout::scaled(util::layout::region::k_radius, w);
     QPainterPath path;
@@ -173,9 +190,6 @@ void MainWindow::paintEvent(QPaintEvent*)
     painter.drawPixmap(bg, util::assets::images[util::assets::Image::Background]);
     painter.setClipping(false);
 
-    // Frames + sidebar icons drawn unless a chrome-hiding overlay (Settings) is open.
-    // WineInstall keeps chrome, so these stay painted under its blur and show through sharp
-    // (WineInstall re-draws them on top via ModalOverlay::paint_frames)
     if (!chrome_hidden)
     {
         const QPixmap left = util::assets::images[util::assets::Image::LeftFrame]

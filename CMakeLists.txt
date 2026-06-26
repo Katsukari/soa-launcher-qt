@@ -60,7 +60,7 @@ set(LAUNCHER_SOURCES
         src/main.cpp
         src/MainWindow.cpp
         src/util/Assets.cpp
-        src/widgets/DownloadBox.cpp
+        src/widgets/StartBox.cpp
         src/widgets/Settings.cpp
         src/util/Layout.cpp
         src/widgets/LauncherSettings.cpp
@@ -75,12 +75,16 @@ set(LAUNCHER_SOURCES
         src/core/wine/Shell.cpp
         src/core/network/soa_bridge.cpp
         src/core/network/AuthHandler.cpp
+        src/util/Config.cpp
+        src/widgets/GameInstall.cpp
+        src/widgets/DownloadProgress.cpp
+        src/widgets/PrefixProgress.cpp
 )
 
 set(LAUNCHER_HEADERS
         include/MainWindow.hpp
         include/util/Assets.hpp
-        include/widgets/DownloadBox.hpp
+        include/widgets/StartBox.hpp
         include/widgets/Settings.hpp
         include/util/Layout.hpp
         include/widgets/LauncherSettings.hpp
@@ -98,6 +102,10 @@ set(LAUNCHER_HEADERS
         include/core/network/soa_bridge.h
         include/core/network/DownloadBridge.hpp
         include/core/auth/AuthHandler.hpp
+        include/util/Config.hpp
+        include/widgets/GameInstall.hpp
+        include/widgets/DownloadProgress.hpp
+        include/widgets/PrefixProgress.hpp
 )
 
 # Resources (.qrc files)

@@ -1,42 +1,42 @@
 #pragma once
-#include <QPushButton>
 
-#include "PrefixProgress.hpp"
+#include <QPushButton>
 #include "util/ModalOverlay.hpp"
-#include "core/network/soa_bridge.h"
 
 namespace core::wine
 {
     class Shell;
 }
 
-class PrefixProgress;
+class DownloadProgress;
 
-class WineInstall : public util::modal_overlay::ModalOverlay
+class GameInstall : public util::modal_overlay::ModalOverlay
 {
     Q_OBJECT
     public:
-        explicit WineInstall(core::wine::Shell* shell, QWidget* parent = nullptr);
+        explicit GameInstall(core::wine::Shell* shell, QWidget* parent = nullptr);
 
     protected:
         void paint_content(QPainter& painter) override;
         bool eventFilter(QObject* obj, QEvent* event) override;
 
-    signals:
-        void closed();
-        void prefix_complete();
-
     private:
         void setup_close_button();
         void setup_buttons();
+        void start_install();
+
+        bool path_inside_prefix() const;
 
         QString game_path {};
+        bool    show_warning {};
+
         QPushButton* close_button {};
         QPushButton* install_button {};
         QPushButton* cancel_button {};
         QPushButton* change_path_button {};
+
         core::wine::Shell * shell {};
-        PrefixProgress * prefix_progress {};
-        bool        installing {};
-        void start_install();
-};
+        bool installing {};
+
+        DownloadProgress * download {};
+    };
