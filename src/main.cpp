@@ -11,6 +11,7 @@
 // TODO list:
 // - add descriptive comments as most design is raw code (especially Layout.hpp)
 // - In the end do recheck of every widget and make sure it's aligned as possible to the webview2 launcher
+// - FIX COMMENTS IN EVERY FILE
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
