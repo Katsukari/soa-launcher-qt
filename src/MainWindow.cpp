@@ -18,6 +18,14 @@
 #include "widgets/WineInstall.hpp"
 #include "widgets/GameInstall.hpp"
 
+#include "core/state/InstallState.hpp"
+#include "core/state/ViewRouter.hpp"
+#include "core/state/Stage.hpp"
+#include "core/state/View.hpp"
+
+using core::state::Stage;
+using core::state::View;
+
 MainWindow::MainWindow(QWidget* parent) : QWidget(parent)
 {
     setWindowFlags(Qt::FramelessWindowHint);
@@ -27,6 +35,8 @@ MainWindow::MainWindow(QWidget* parent) : QWidget(parent)
     shell = new core::wine::Shell(this);
     auth  = new AuthHandler(shell, this);
 
+    install_state = new core::state::InstallState(this);
+
     setup_window_buttons();
     setup_logo();
     setup_version_label();
@@ -34,6 +44,11 @@ MainWindow::MainWindow(QWidget* parent) : QWidget(parent)
     setup_playtest();
     setup_wine_install();
     setup_game_install();
+
+    connect(install_state, &core::state::InstallState::stage_changed,
+            this, &MainWindow::on_stage_changed);
+
+    install_state->probe();
 }
 
 void MainWindow::setup_window_buttons()
@@ -95,7 +110,7 @@ void MainWindow::setup_playtest()
 {
     wine_install = new WineInstall(shell, this);
     const QSize w = size();
-    playtest = new Playtest(auth, shell, this);
+    playtest = new Playtest(auth, shell, install_state, this);
     playtest->move(util::layout::playtest::pos(w));
 
     connect(playtest, &Playtest::settings_requested, this, [this]()
@@ -106,8 +121,7 @@ void MainWindow::setup_playtest()
 
     connect(playtest, &Playtest::download_triggered, this, [this]()
     {
-        wine_install->show_over(this);
-        on_overlay_opened(wine_install);
+        open_for_current_stage();
     });
 
     connect(settings, &Settings::closed, this, [this]()
@@ -124,14 +138,6 @@ void MainWindow::setup_wine_install()
     {
         on_overlay_closed(wine_install);
     });
-
-    connect(wine_install, &WineInstall::prefix_complete, this, [this]()
-    {
-        wine_install->hide();
-        game_install->show_over(this);
-        on_overlay_opened(game_install);
-        game_install->raise();
-    });
 }
 
 void MainWindow::setup_game_install()
@@ -143,12 +149,60 @@ void MainWindow::setup_game_install()
     {
         on_overlay_closed(game_install);
     });
+}
 
-    connect(game_install, &GameInstall::install_complete, this, [this]()
+void MainWindow::open_for_current_stage()
+{
+    const View v = core::state::view_for(install_state->stage());
+
+    if (v == View::WineInstall && !wine_install->isVisible())
     {
-        on_overlay_closed(game_install);
-        playtest->on_download_complete();
-    });
+        wine_install->show_over(this);
+        on_overlay_opened(wine_install);
+    }
+    else if (v == View::GameInstall && !game_install->isVisible())
+    {
+        game_install->show_over(this);
+        on_overlay_opened(game_install);
+    }
+}
+
+void MainWindow::on_stage_changed(Stage s)
+{
+    const View v = core::state::view_for(s);
+    if (v == last_view) return;
+    last_view = v;
+
+    switch (v)
+    {
+        case View::WineInstall:
+            if (game_install->isVisible()) { game_install->hide(); on_overlay_closed(game_install); }
+            if (s == Stage::NeedsPrefix) break;
+            if (!wine_install->isVisible())
+            {
+                wine_install->show_over(this);
+                on_overlay_opened(wine_install);
+            }
+            break;
+
+        case View::GameInstall:
+            if (wine_install->isVisible()) { wine_install->hide(); on_overlay_closed(wine_install); }
+            if (!game_install->isVisible())
+            {
+                game_install->show_over(this);
+                on_overlay_opened(game_install);
+            }
+            break;
+
+        case View::Playtest:
+            if (wine_install->isVisible()) { wine_install->hide(); on_overlay_closed(wine_install); }
+            if (game_install->isVisible()) { game_install->hide(); on_overlay_closed(game_install); }
+            break;
+
+        case View::Loading:
+        case View::Error:
+            break;
+    }
 }
 
 void MainWindow::on_overlay_opened(util::modal_overlay::ModalOverlay * m)

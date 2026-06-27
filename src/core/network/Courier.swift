@@ -29,10 +29,12 @@ final class Courier
 	_ percent: Int,
 	_ received: UInt64,
 	_ total: UInt64,
-	_ throughput: UInt64)
+	_ throughput: UInt64,
+	_ fileIndex: Int,
+	_ fileCount: Int)
 		{
 		message.withCString { c in
-			onProgress(phase, c, Int32(percent), received, total, throughput, ctx)
+			onProgress(phase, c, Int32(percent), received, total, throughput, Int32(fileIndex), Int32(fileCount), ctx)
 		}
 	}
 
@@ -47,7 +49,7 @@ final class Courier
 	}
 
 	func run(_ body: @escaping () async throws -> Void)
-	{
+		{
 		task?.cancel()
 		task = Task {
 			do {

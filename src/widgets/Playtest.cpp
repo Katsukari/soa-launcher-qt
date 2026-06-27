@@ -4,27 +4,13 @@
 #include "util/Config.hpp"
 #include "core/auth/AuthHandler.hpp"
 #include "core/wine/Shell.hpp"
+#include "core/state/InstallState.hpp"
 
 using util::config::Config;
+using core::state::Stage;
 
 namespace
 {
-    const char* k_blue_button =
-        "QPushButton"
-        "{"
-        "    border: none;"
-        "    border-radius: 8px;"
-        "    color: white;"
-        "    font-family: 'Eurostile';"
-        "    font-weight: 900;"
-        "    font-size: 17px;"
-        "    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,"
-        "        stop:0 #56C8EE, stop:1 #1FA6DE);"
-        "}"
-        "QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:0, y2:1,"
-        "    stop:0 #6FD4F2, stop:1 #2FB4E8); }"
-        "QPushButton:disabled { background: #BFD4DC; color: #EAF2F5; }";
-
     const char* k_note_box =
         "QLabel"
         "{"
@@ -62,14 +48,14 @@ namespace
 
     const char* k_checkbox =
         "QCheckBox { color: #392518; font-family: 'Inter'; font-size: 14px; spacing: 8px; }"
-        "QCheckBox::indicator { width: 18px; height: 18px; border-radius: 4px;"
-        "    border: 1px solid #C9BBAA; background: white; }"
-        "QCheckBox::indicator:checked { background: #2FB4E0; border: 1px solid #2FB4E0;"
-        "    image: url(:/assets/check.png); }";
+        "QCheckBox::indicator { width: 18px; height: 18px; }"
+        "QCheckBox::indicator:unchecked { image: url(:/assets/checkbox.png); }"
+        "QCheckBox::indicator:checked { image: url(:/assets/checkbox-ticked.png); }";
 }
 
-Playtest::Playtest(AuthHandler* auth_, core::wine::Shell* shell_, QWidget* parent)
-    : QWidget(parent), auth(auth_), shell(shell_)
+Playtest::Playtest(AuthHandler* auth_, core::wine::Shell* shell_,
+                   core::state::InstallState* install_state_, QWidget* parent)
+    : QWidget(parent), auth(auth_), shell(shell_), install_state(install_state_)
 {
     const QSize w = window()->size();
     setFixedSize(util::layout::playtest::box(w));
@@ -91,23 +77,33 @@ Playtest::Playtest(AuthHandler* auth_, core::wine::Shell* shell_, QWidget* paren
         Config::instance().set_game_install_path("");
     });
 
-    connect(auth, &AuthHandler::authenticated, this,
-        [this](const QString&, const QString&, const QString& username)
-        {
-            signed_in_label->setText("  SIGNED IN AS " + username.toUpper());
-            set_state(State::SignedIn);
-        });
+    on_stage_changed(install_state->stage());
+    connect(install_state, &core::state::InstallState::stage_changed,
+            this, &Playtest::on_stage_changed);
+}
 
-    if (Config::instance().has_auth() && Config::instance().game_installed())
+Playtest::State Playtest::state_for(Stage s)
+{
+    switch (s)
+    {
+        case Stage::NeedsAuth:      return State::Login;
+        case Stage::Authenticating: return State::Waiting;
+        case Stage::Ready:          return State::SignedIn;
+        default:                    return State::Download;
+    }
+}
+
+void Playtest::on_stage_changed(Stage s)
+{
+    const State next = state_for(s);
+
+    if (next == State::SignedIn)
     {
         const QString name = Config::instance().display_name();
         signed_in_label->setText("  SIGNED IN AS " + (name.isEmpty() ? "PLAYER" : name.toUpper()));
-        set_state(State::SignedIn);
     }
-    else
-    {
-        set_state(State::Download);
-    }
+
+    set_state(next);
 }
 
 void Playtest::setup_title()
@@ -182,18 +178,20 @@ void Playtest::setup_login_state()
 {
     const QSize w = window()->size();
 
-    discord_button = new QPushButton("  PROCEED WITH DISCORD", this);
+    const QRect dr = util::layout::playtest::discord_button(w);
+    const QPixmap& discord_normal = util::assets::buttons[util::assets::Button::Discord].normal;
+    const int dw = dr.width();
+    const int dh = qRound(dw * static_cast<double>(discord_normal.height()) / discord_normal.width());
+
+    discord_button = new QPushButton(this);
+    discord_button->setFlat(true);
     discord_button->setCursor(Qt::PointingHandCursor);
-    discord_button->setFocusPolicy(Qt::NoFocus);
-    discord_button->setStyleSheet(k_blue_button);
-    discord_button->setIcon(QIcon(util::assets::images[util::assets::Image::CloseIcon]));
-    discord_button->setIconSize(util::layout::playtest::discord_icon(w));
-    discord_button->setGeometry(util::layout::playtest::discord_button(w));
-    connect(discord_button, &QPushButton::clicked, this, [this]()
-    {
-        auth->open_login();
-        set_state(State::Waiting);
-    });
+    discord_button->setText("");
+    discord_button->setStyleSheet("border: none; background: transparent;");
+    discord_button->setIcon(QIcon(discord_normal));
+    discord_button->setIconSize(QSize(dw, dh));
+    discord_button->setGeometry(dr.x(), dr.y(), dw, dh);
+    discord_button->installEventFilter(this);
 
     disclaimer_label = new QLabel(this);
     disclaimer_label->setWordWrap(true);
@@ -254,22 +252,21 @@ void Playtest::setup_signedin_state()
     signed_in_label->setStyleSheet(k_banner_box);
     signed_in_label->setGeometry(util::layout::playtest::signed_in_banner(w));
 
-    enter_button = new QPushButton("ENTER THE PLAYTEST", this);
-    enter_button->setCursor(Qt::PointingHandCursor);
-    enter_button->setFocusPolicy(Qt::NoFocus);
-    enter_button->setStyleSheet(k_blue_button);
-    enter_button->setGeometry(util::layout::playtest::enter_button(w));
-    enter_button->setEnabled(false);
-    connect(enter_button, &QPushButton::clicked, this, [this]()
-    {
-        shell->run_game(Config::instance().username(), Config::instance().token());
-    });
-}
+    const QRect er = util::layout::playtest::enter_button(w);
+    const QPixmap& enter_normal = util::assets::buttons[util::assets::Button::Enter].normal;
+    const int ew = er.width();
+    const int eh = qRound(ew * static_cast<double>(enter_normal.height()) / enter_normal.width());
 
-void Playtest::on_download_complete()
-{
-    if (state == State::Download)
-        set_state(State::Login);
+    enter_button = new QPushButton(this);
+    enter_button->setFlat(true);
+    enter_button->setCursor(Qt::PointingHandCursor);
+    enter_button->setText("");
+    enter_button->setStyleSheet("border: none; background: transparent;");
+    enter_button->setIcon(QIcon(enter_normal));
+    enter_button->setIconSize(QSize(ew, eh));
+    enter_button->setGeometry(er.x(), er.y(), ew, eh);
+    enter_button->setEnabled(false);
+    enter_button->installEventFilter(this);
 }
 
 void Playtest::set_state(State s)
@@ -332,6 +329,22 @@ bool Playtest::eventFilter(QObject* obj, QEvent* event)
 
         if (event->type() == QEvent::MouseButtonRelease && download_button->underMouse())
             emit download_triggered();
+    }
+    else if (obj == discord_button)
+    {
+        const auto& button = util::assets::buttons[util::assets::Button::Discord];
+        util::simple_utils::apply_button_state(event, discord_button, button.normal, button.hover, button.clicked);
+
+        if (event->type() == QEvent::MouseButtonRelease && discord_button->underMouse())
+            auth->open_login();
+    }
+    else if (obj == enter_button)
+    {
+        const auto& button = util::assets::buttons[util::assets::Button::Enter];
+        util::simple_utils::apply_button_state(event, enter_button, button.normal, button.hover, button.clicked);
+
+        if (event->type() == QEvent::MouseButtonRelease && enter_button->underMouse() && enter_button->isEnabled())
+            shell->run_game(Config::instance().username(), Config::instance().token());
     }
     return QWidget::eventFilter(obj, event);
 }

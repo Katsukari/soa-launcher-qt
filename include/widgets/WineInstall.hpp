@@ -1,15 +1,12 @@
 #pragma once
 #include <QPushButton>
-
 #include "PrefixProgress.hpp"
 #include "util/ModalOverlay.hpp"
-#include "core/network/Courier.h"
 
 namespace core::wine
 {
     class Shell;
 }
-
 class PrefixProgress;
 
 class WineInstall : public util::modal_overlay::ModalOverlay
@@ -17,19 +14,14 @@ class WineInstall : public util::modal_overlay::ModalOverlay
     Q_OBJECT
     public:
         explicit WineInstall(core::wine::Shell* shell, QWidget* parent = nullptr);
-
     protected:
         void paint_content(QPainter& painter) override;
         bool eventFilter(QObject* obj, QEvent* event) override;
-
-    signals:
-        void closed();
-        void prefix_complete();
-
+        signals:
+            void closed();
     private:
         void setup_close_button();
         void setup_buttons();
-
         QString game_path {};
         QString warn_message {};
         QPushButton* close_button {};

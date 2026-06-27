@@ -1,4 +1,4 @@
-#include "../../../include/core/state/ViewRouter.hpp"
+#include "core/state/ViewRouter.hpp"
 
 namespace core::state
 {
@@ -7,16 +7,20 @@ namespace core::state
         switch (stage)
         {
             case Stage::Probing:         return View::Loading;
+
             case Stage::NeedsPrefix:     return View::WineInstall;
             case Stage::PrefixBroken:    return View::WineInstall;
-            case Stage::SettingUpPrefix: return View::PrefixProgress;
+            case Stage::SettingUpPrefix: return View::WineInstall;
+
             case Stage::NeedsDownload:   return View::GameInstall;
-            case Stage::Downloading:     return View::DownloadProgress;
             case Stage::NeedsUpdate:     return View::GameInstall;
-            case Stage::Updating:        return View::DownloadProgress;
-            case Stage::NeedsAuth:       return View::PlaytestLogin;
-            case Stage::Authenticating:  return View::PlaytestWaiting;
-            case Stage::Ready:           return View::PlaytestReady;
+            case Stage::Downloading:     return View::GameInstall;
+            case Stage::Updating:        return View::GameInstall;
+
+            case Stage::NeedsAuth:       return View::Playtest;
+            case Stage::Authenticating:  return View::Playtest;
+            case Stage::Ready:           return View::Playtest;
+
             case Stage::Broken:          return View::Error;
         }
         return View::Loading;

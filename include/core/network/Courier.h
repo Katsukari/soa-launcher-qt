@@ -27,6 +27,8 @@ typedef void (*courier_progress_cb)(courier_phase phase,
                                 uint64_t    received,
                                 uint64_t    total,
                                 uint64_t    throughput,
+                                int         file_index,
+                                int         file_count,
                                 void*       ctx);
 
 typedef void (*courier_done_cb)(bool        ok,

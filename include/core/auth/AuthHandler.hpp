@@ -1,11 +1,12 @@
 #pragma once
 
-#include <QObject>
 #include <QString>
+
+#include "core/status/StatusReporter.hpp"
 
 namespace core::wine { class Shell; }
 
-class AuthHandler : public QObject
+class AuthHandler : public core::status::StatusReporter
 {
     Q_OBJECT
 

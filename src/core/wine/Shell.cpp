@@ -12,10 +12,10 @@ namespace core::wine
 {
     using util::config::Config;
 
-    Shell::Shell(QObject* parent) : QObject(parent)
+    Shell::Shell(QObject* parent) : StatusReporter("wine", parent)
     {
         process = new QProcess(this);
-        process->setProcessChannelMode(QProcess::MergedChannels);   // stdout+stderr together
+        process->setProcessChannelMode(QProcess::MergedChannels);
 
         connect(process, &QProcess::readyReadStandardOutput, this, &Shell::handle_output);
 
@@ -56,7 +56,8 @@ namespace core::wine
     QString Shell::wineboot_binary() const
     {
         const QString wine = wine_binary();
-        if (QFileInfo(wine).isAbsolute()) return QFileInfo(wine).dir().filePath("wineboot");
+        if (QFileInfo(wine).isAbsolute())
+            return QFileInfo(wine).dir().filePath("wineboot");
         return QStringLiteral("wineboot");
     }
 
@@ -110,6 +111,7 @@ namespace core::wine
         if (!is_wine_installed())
         {
             SPDLOG_ERROR("setup_wine: wine is not installed");
+            fail("Wine is not installed");
             emit wine_setup_finished(false);
             return;
         }
@@ -118,6 +120,7 @@ namespace core::wine
         if (prefix.isEmpty())
         {
             SPDLOG_ERROR("setup_wine: no wine prefix configured");
+            fail("No Wine prefix configured");
             emit wine_setup_finished(false);
             return;
         }
@@ -133,13 +136,11 @@ namespace core::wine
 
         SPDLOG_INFO("setting up wine prefix at {} (arch {})", prefix.toStdString(), arch.toStdString());
 
-        // Env shared by both wineboot and winetricks.
         setup_env = QProcessEnvironment::systemEnvironment();
         setup_env.insert("WINEPREFIX", prefix);
         setup_env.insert("WINEARCH", arch);
         setup_env.insert("WINE", wine_binary());
 
-        // One connection drives the whole chain, advancing setup_step on each
         auto* conn = new QMetaObject::Connection;
         *conn = connect(this, &Shell::command_finished, this,
             [this, conn](const command_result& r)
@@ -152,7 +153,9 @@ namespace core::wine
                     SPDLOG_ERROR("wine setup step failed (started={}, crashed={}, exit={})",
                                  r.started, r.crashed, r.exit_code);
                     setup_step = SetupStep::Idle;
-                    emit setup_status("Setup failed. Check the log for details.");
+                    const QString msg = "Setup failed. Check the log for details.";
+                    emit setup_status(msg);
+                    fail(msg);
                     emit wine_setup_finished(false);
                     disconnect(*conn);
                     delete conn;
@@ -171,6 +174,7 @@ namespace core::wine
                         SPDLOG_INFO("wine prefix setup complete (prefix + base packages)");
                         setup_step = SetupStep::Idle;
                         emit setup_status("Done!");
+                        done();
                         emit wine_setup_finished(true);
                         disconnect(*conn);
                         delete conn;
@@ -182,14 +186,16 @@ namespace core::wine
             });
 
         setup_step = SetupStep::Wineboot;
-        emit setup_status("Creating Wine prefix...");
+        {
+            const QString msg = "Creating Wine prefix...";
+            emit setup_status(msg);
+            working(msg);
+        }
         run_command(wineboot_binary(), { "--init" }, setup_env);
     }
 
     void Shell::start_winetricks()
     {
-        // Base packages the game needs. DXVK is added only if the user enabled it.
-        //   vcrun2019 for convenience and d3dx9, d3dcompiler_47 - required for the game
         QStringList packages = { "-q", "vcrun2019", "d3dx9", "d3dcompiler_47" };
 
         if (Config::instance().use_dxvk())
@@ -198,7 +204,9 @@ namespace core::wine
             SPDLOG_INFO("winetricks: DXVK enabled, including it");
         }
 
-        emit setup_status("Installing components (this can take a while)...");
+        const QString msg = "Installing components (this can take a while)...";
+        emit setup_status(msg);
+        working(msg);
         SPDLOG_INFO("running: winetricks {}", packages.join(' ').toStdString());
         run_command("winetricks", packages, setup_env);
     }
@@ -239,21 +247,19 @@ namespace core::wine
         QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
         env.insert("WINEPREFIX", prefix);
 
-        // The game takes flags: Alicia.exe -GameID <id> -ID [user] -OP [token]
         QStringList args;
         args << exePath
              << "-GameID" << gameId
              << "-ID" << QString("[%1]").arg(user)
              << "-OP" << QString("[%1]").arg(token);
 
-        // Append any freeform extra game args from config.
         const QString extra = Config::instance().game_args();
-        if (!extra.isEmpty()) args << extra.split(' ', Qt::SkipEmptyParts);
+        if (!extra.isEmpty())
+            args << extra.split(' ', Qt::SkipEmptyParts);
 
         process->setWorkingDirectory(gameDir);
         run_command(wine_binary(), args, env);
     }
 
-    // stub for later
     void Shell::setup_proton() { }
 }

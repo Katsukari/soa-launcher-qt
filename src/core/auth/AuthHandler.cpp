@@ -13,7 +13,8 @@ using util::config::Config;
 
 namespace
 {
-    const char* k_discord_oauth_url = "https://discord.com/oauth2/authorize"
+    const char* k_discord_oauth_url =
+        "https://discord.com/oauth2/authorize"
         "?client_id=1272602862043795586"
         "&response_type=code"
         "&redirect_uri=https%3A%2F%2Fauthentication.storyofalicia.com%2F"
@@ -21,7 +22,7 @@ namespace
 }
 
 AuthHandler::AuthHandler(core::wine::Shell* shell_, QObject* parent)
-    : QObject(parent), shell(shell_)
+    : core::status::StatusReporter("auth", parent), shell(shell_)
 {
     QDesktopServices::setUrlHandler("soa", this, "handle_url");
 }
@@ -29,6 +30,7 @@ AuthHandler::AuthHandler(core::wine::Shell* shell_, QObject* parent)
 void AuthHandler::open_login()
 {
     SPDLOG_INFO("opening Discord login in browser");
+    working("Waiting for Discord login...");
     QDesktopServices::openUrl(QUrl(k_discord_oauth_url));
 }
 
@@ -46,11 +48,13 @@ void AuthHandler::handle_url(const QString& url)
     if (user.isEmpty() || token.isEmpty())
     {
         SPDLOG_ERROR("soa url missing user or token: {}", url.toStdString());
+        fail("Login response was missing user or token.");
         return;
     }
 
     Config::instance().set_auth(user, token, username);
     SPDLOG_INFO("auth ok: user={} username={}", user.toStdString(), username.toStdString());
 
+    done();
     emit authenticated(user, token, username);
 }

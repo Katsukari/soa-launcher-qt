@@ -128,7 +128,6 @@ void WineInstall::start_install()
     if (!prefix_progress)
     {
         prefix_progress = new PrefixProgress(shell, this);
-        connect(prefix_progress, &PrefixProgress::prefix_complete, this, &WineInstall::prefix_complete);
     }
     prefix_progress->show_over(this);
 

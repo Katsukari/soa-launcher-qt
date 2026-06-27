@@ -8,7 +8,6 @@
 #include "util/ProgressBar.hpp"
 #include <QPainter>
 #include <QPushButton>
-#include <QRegularExpression>
 
 #include "core/network/CourierBridge.hpp"
 #include "widgets/LauncherLog.hpp"
@@ -18,6 +17,8 @@
 namespace dl = util::layout::progress_modal;
 using util::config::Config;
 using core::network::CourierBridge;
+using core::network::DownloadStatus;
+using core::status::State;
 
 namespace
 {
@@ -29,44 +30,21 @@ DownloadProgress::DownloadProgress(QWidget* parent) : ModalOverlay(parent)
     setup_buttons();
     close_button->installEventFilter(this);
 
-    connect(&CourierBridge::instance(), &CourierBridge::progress, this,
-        [this](courier_phase ph, const QString& message, int pct, qulonglong rec, qulonglong tot, qulonglong tput)
+    connect(&CourierBridge::instance(), &CourierBridge::download_status, this,
+        [this](const DownloadStatus& ds)
         {
-            phase    = ph;
-            status   = message;
-            percent  = pct;
-            received = rec;
-            total    = tot;
-            speed    = tput;
+            const bool finished = ds.base.state == State::Done || ds.base.state == State::Failed;
+            current = ds;
 
-            static const QRegularExpression re("\\((\\d+)\\s*/\\s*(\\d+)\\)");
-            const auto m = re.match(message);
-            if (m.hasMatch())
-            {
-                const int idx = m.captured(1).toInt();
-                if (idx != file_index)
-                    SPDLOG_INFO("download: {} ({}%)", message.toStdString(), pct);
-                file_index = idx;
-                file_count = m.captured(2).toInt();
-            }
-            update();
-        });
-
-    connect(&CourierBridge::instance(), &CourierBridge::finished, this,
-        [this](bool ok, const QString& message)
-        {
-            done    = ok;
-            failed  = !ok;
-            status  = message;
-            if (ok) percent = 100;
-
-            if (ok)
-                SPDLOG_INFO("download: finished - {}", message.toStdString());
-            else
-                SPDLOG_ERROR("download: failed - {}", message.toStdString());
+            if (ds.base.state == State::Done)
+                SPDLOG_INFO("download: finished - {}", ds.base.message.toStdString());
+            else if (ds.base.state == State::Failed)
+                SPDLOG_ERROR("download: failed - {}", ds.base.message.toStdString());
 
             update();
-            emit download_finished(ok);
+
+            if (finished)
+                emit download_finished(ds.base.state == State::Done);
         });
 }
 
@@ -112,18 +90,7 @@ void DownloadProgress::setup_buttons()
 void DownloadProgress::showEvent(QShowEvent* event)
 {
     ModalOverlay::showEvent(event);
-
-    phase      = courier_phase_preparing;
-    status     = "Preparing download...";
-    percent    = 0;
-    received   = 0;
-    total      = 0;
-    speed      = 0;
-    file_index = 0;
-    file_count = 0;
-    done       = false;
-    failed     = false;
-
+    current = DownloadStatus{};
     start_download();
 }
 
@@ -180,30 +147,34 @@ void DownloadProgress::paint_content(QPainter& painter)
 
     painter.drawPixmap(dl::box_rect(w), util::assets::images[util::assets::Image::BoxDownload]);
 
+    const bool done  = current.base.state == State::Done;
+    const bool failed = current.base.state == State::Failed;
+    const int  files  = current.file_count;
+
     QString title_text;
     if (done)
         title_text = "DOWNLOAD COMPLETE";
     else
     {
-        switch (phase)
+        switch (current.phase)
         {
             case courier_phase_preparing:
                 title_text = "PREPARING";
                 break;
             case courier_phase_checking:
-                title_text = file_count > 0
-                    ? QString("CHECKING %1 OF %2 FILES").arg(file_index).arg(file_count)
+                title_text = files > 0
+                    ? QString("CHECKING %1 OF %2 FILES").arg(current.file_index).arg(files)
                     : "CHECKING FILES";
                 break;
             case courier_phase_verifying:
-                title_text = file_count > 0
-                    ? QString("VERIFYING %1 OF %2 FILES").arg(file_index).arg(file_count)
+                title_text = files > 0
+                    ? QString("VERIFYING %1 OF %2 FILES").arg(current.file_index).arg(files)
                     : "VERIFYING FILES";
                 break;
             case courier_phase_downloading:
             default:
-                title_text = file_count > 0
-                    ? QString("DOWNLOADING %1 OF %2 FILES").arg(file_index).arg(file_count)
+                title_text = files > 0
+                    ? QString("DOWNLOADING %1 OF %2 FILES").arg(current.file_index).arg(files)
                     : "DOWNLOADING";
                 break;
         }
@@ -223,7 +194,7 @@ void DownloadProgress::paint_content(QPainter& painter)
     painter.setPen(util::colors::k_text_label);
 
     const QRect info = dl::info_row(w);
-    const qulonglong remaining = (total > received) ? (total - received) : 0;
+    const qulonglong remaining = (current.total > current.received) ? (current.total - current.received) : 0;
 
     QString left_text;
     QString right_text;
@@ -231,21 +202,22 @@ void DownloadProgress::paint_content(QPainter& painter)
     {
         left_text = "Finished";
     }
-    else if (phase == courier_phase_downloading)
+    else if (current.phase == courier_phase_downloading)
     {
-        left_text  = "Time remaining: " + human_eta(remaining, speed);
-        right_text = "Download Speed: " + human_speed(speed);
+        left_text  = "Time remaining: " + human_eta(remaining, current.speed);
+        right_text = "Download Speed: " + human_speed(current.speed);
     }
 
     painter.drawText(info, Qt::AlignLeft | Qt::AlignVCenter, left_text);
     painter.drawText(info, Qt::AlignRight | Qt::AlignVCenter, right_text);
 
-    util::progress_bar::draw(painter, dl::bar_rect(w), percent / 100.0);
+    util::progress_bar::draw(painter, dl::bar_rect(w), current.base.progress);
 
     QFont pct_font = util::assets::fonts[util::assets::Font::Inter];
     pct_font.setPixelSize(util::layout::scaled(util::layout::text::k_label, w));
     pct_font.setWeight(QFont::DemiBold);
     painter.setFont(pct_font);
     painter.setPen(failed ? util::colors::k_warning : util::colors::k_text_maroon);
-    painter.drawText(dl::under_row(w), Qt::AlignCenter, QString("%1%").arg(qBound(0, percent, 100)));
+    const int shown = current.base.progress < 0.0 ? 0 : qRound(current.base.progress * 100.0);
+    painter.drawText(dl::under_row(w), Qt::AlignCenter, QString("%1%").arg(qBound(0, shown, 100)));
 }

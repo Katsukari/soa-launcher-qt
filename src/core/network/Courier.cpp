@@ -3,9 +3,14 @@
 #include <spdlog/spdlog.h>
 
 #include "core/network/CourierBridge.hpp"
+#include "core/network/DownloadStatus.hpp"
 
 #include <QMetaObject>
 #include <QString>
+
+using core::status::State;
+using core::status::Status;
+using core::network::DownloadStatus;
 
 extern "C" void soa_log(int level, const char* message)
 {
@@ -22,24 +27,45 @@ extern "C" void soa_log(int level, const char* message)
 
 namespace
 {
+    const char* phase_name(courier_phase p)
+    {
+        switch (p)
+        {
+            case courier_phase_preparing:   return "preparing";
+            case courier_phase_checking:    return "checking";
+            case courier_phase_downloading: return "downloading";
+            case courier_phase_verifying:   return "verifying";
+        }
+        return "preparing";
+    }
+
     void on_progress_cb(courier_phase phase,
                         const char* message,
                         int         percent,
                         uint64_t    received,
                         uint64_t    total,
                         uint64_t    throughput,
+                        int         file_index,
+                        int         file_count,
                         void*       )
     {
         const QString msg = QString::fromUtf8(message ? message : "");
         QMetaObject::invokeMethod(
             &core::network::CourierBridge::instance(),
-            [phase, msg, percent, received, total, throughput]()
+            [phase, msg, percent, received, total, throughput, file_index, file_count]()
             {
-                emit core::network::CourierBridge::instance().progress(
-                    phase, msg, percent,
-                    static_cast<qulonglong>(received),
-                    static_cast<qulonglong>(total),
-                    static_cast<qulonglong>(throughput));
+                DownloadStatus ds;
+                ds.base.state    = State::Working;
+                ds.base.phase    = phase_name(phase);
+                ds.base.message  = msg;
+                ds.base.progress = percent / 100.0;
+                ds.phase      = phase;
+                ds.received   = static_cast<qulonglong>(received);
+                ds.total      = static_cast<qulonglong>(total);
+                ds.speed      = static_cast<qulonglong>(throughput);
+                ds.file_index = file_index;
+                ds.file_count = file_count;
+                core::network::CourierBridge::instance().report(ds);
             },
             Qt::QueuedConnection);
     }
@@ -51,7 +77,11 @@ namespace
             &core::network::CourierBridge::instance(),
             [ok, msg]()
             {
-                emit core::network::CourierBridge::instance().finished(ok, msg);
+                DownloadStatus ds;
+                ds.base.state    = ok ? State::Done : State::Failed;
+                ds.base.message  = msg;
+                ds.base.progress = ok ? 1.0 : -1.0;
+                core::network::CourierBridge::instance().report(ds);
             },
             Qt::QueuedConnection);
     }
@@ -59,10 +89,18 @@ namespace
 
 namespace core::network
 {
+    CourierBridge::CourierBridge() : StatusReporter("courier") {}
+
     CourierBridge& CourierBridge::instance()
     {
         static CourierBridge bridge;
         return bridge;
+    }
+
+    void CourierBridge::report(const DownloadStatus& ds)
+    {
+        set_status(ds.base);
+        emit download_status(ds);
     }
 
     courier_progress_cb CourierBridge::progress_callback()
@@ -72,6 +110,6 @@ namespace core::network
 
     courier_done_cb CourierBridge::done_callback()
     {
-        return &on_done_cb;
+        return & on_done_cb;
     }
 }

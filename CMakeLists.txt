@@ -121,10 +121,11 @@ set(LAUNCHER_HEADERS
         include/core/status/Status.hpp
         include/core/status/StatusReporter.hpp
         include/core/status/StatusBus.hpp
-        src/core/state/View.hpp
-        src/core/state/ViewRouter.hpp
-        src/core/state/Stage.hpp
-        src/core/state/InstallState.hpp
+        include/core/state/View.hpp
+        include/core/state/ViewRouter.hpp
+        include/core/state/Stage.hpp
+        include/core/state/InstallState.hpp
+        include/core/network/DownloadStatus.hpp
 )
 
 set(LAUNCHER_RESOURCES

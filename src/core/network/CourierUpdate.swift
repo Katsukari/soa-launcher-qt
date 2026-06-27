@@ -19,9 +19,9 @@ extension Courier
 	func startUpdate(installPath: String)
 		{
 		run { [self] in
-			reportProgress(courier_phase_preparing, "Requesting game version...", 0, 0, 0, 0)
+			reportProgress(courier_phase_preparing, "Requesting game version...", 0, 0, 0, 0, 0, 0)
 			let version = try await fetchRemoteVersion()
-			reportProgress(courier_phase_preparing, "Requesting manifest...", 0, 0, 0, 0)
+			reportProgress(courier_phase_preparing, "Requesting manifest...", 0, 0, 0, 0, 0, 0)
 			let manifest = try await fetchManifest(version: version)
 			guard !manifest.files.isEmpty else { throw Err("Manifest has no files") }
 
@@ -33,14 +33,14 @@ extension Courier
 				try Task.checkCancellation()
 				let local = localComparePath(installDir: installPath, entry: entry)
 				let pct = Int(Double(i + 1) / Double(manifest.files.count) * 100)
-				reportProgress(courier_phase_checking, "Checking (\(i + 1)/\(manifest.files.count))", pct, 0, 0, 0)
+				reportProgress(courier_phase_checking, "Checking (\(i + 1)/\(manifest.files.count))", pct, 0, 0, 0, i + 1, manifest.files.count)
 				let hash = md5OfFile(at: local)
 				if hash == nil || hash != entry.hash { needed.append(entry) }
 			}
 
 			if needed.isEmpty {
 				try writeVersionJson(installPath: installPath, version: version)
-				reportProgress(courier_phase_checking, "Already up to date.", 100, 1, 1, 0)
+				reportProgress(courier_phase_checking, "Already up to date.", 100, 1, 1, 0, 0, 0)
 				reportDone(true, "Already up to date.")
 				return
 			}
@@ -84,7 +84,7 @@ extension Courier
 					? Int(Double(receivedBytes) / Double(totalBytes) * 100)
 					: 0
 					reportProgress(courier_phase_downloading, "Downloading (\(i + 1)/\(needed.count))",
-						pct, receivedBytes, totalBytes, throughput)
+						pct, receivedBytes, totalBytes, throughput, i + 1, needed.count)
 				}
 
 				if actualHash != entry.hash {
@@ -99,7 +99,7 @@ extension Courier
 			}
 
 			try writeVersionJson(installPath: installPath, version: version)
-			reportProgress(courier_phase_downloading, "Update complete.", 100, totalBytes, totalBytes, 0)
+			reportProgress(courier_phase_downloading, "Update complete.", 100, totalBytes, totalBytes, 0, needed.count, needed.count)
 			reportDone(true, "Updated \(needed.count) file(s).")
 		}
 	}

@@ -4,6 +4,7 @@
 #include <QString>
 
 #include "core/network/Courier.h"
+#include "core/network/DownloadStatus.hpp"
 
 class QTimer;
 class QPushButton;
@@ -34,16 +35,7 @@ class DownloadProgress : public util::modal_overlay::ModalOverlay
 
         courier* downloader {};
 
-        courier_phase phase { courier_phase_preparing };
-        QString status      { "Preparing download..." };
-        int     percent     {0};
-        qulonglong received {0};
-        qulonglong total    {0};
-        qulonglong speed    {0};
-        int     file_index  {0};
-        int     file_count  {0};
-        bool    done        {};
-        bool    failed      {};
+        core::network::DownloadStatus current;
 
         QPushButton* close_button {};
         QPushButton* log_button {};
