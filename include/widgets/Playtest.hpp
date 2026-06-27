@@ -11,11 +11,11 @@ class AuthHandler;
 
 namespace core::wine { class Shell; }
 
-class StartBox : public QWidget
+class Playtest : public QWidget
 {
     Q_OBJECT
     public:
-        explicit StartBox(AuthHandler* auth, core::wine::Shell* shell, QWidget* parent = nullptr);
+        explicit Playtest(AuthHandler* auth, core::wine::Shell* shell, QWidget* parent = nullptr);
         void paintEvent(QPaintEvent* event) override;
         bool eventFilter(QObject* obj, QEvent* event) override;
 
@@ -24,7 +24,7 @@ class StartBox : public QWidget
 
         signals:
             void settings_requested();
-        void download_triggered();
+            void download_triggered();
 
     private:
         enum class State { Download, Login, Waiting, SignedIn };

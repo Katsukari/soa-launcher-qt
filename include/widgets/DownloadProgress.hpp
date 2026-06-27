@@ -27,7 +27,6 @@ class DownloadProgress : public util::modal_overlay::ModalOverlay
     private:
         void setup_buttons();
         void start_download();
-        void draw_fill(QPainter& painter, const QRect& bar) const;
         void update_pause_icon();
 
         static QString human_size(qulonglong bytes);

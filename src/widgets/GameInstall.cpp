@@ -98,9 +98,7 @@ void GameInstall::setup_buttons()
         "}"
         "QPushButton:hover { color: #6FD4EF; outline: none; border: none; }"
     );
-    const QRect cp_row = util::layout::install_modal::changepath_line(w);
-    const int cp_hit_w = qMin(cp_row.width() / 3, 150);
-    change_path_button->setGeometry(cp_row.left(), cp_row.top(), cp_hit_w, cp_row.height() + 4);
+    change_path_button->setGeometry(util::layout::install_modal::change_path_button(w));
 
     connect(change_path_button, &QPushButton::clicked, this, [this]
     {

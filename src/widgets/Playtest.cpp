@@ -1,4 +1,4 @@
-#include "widgets/StartBox.hpp"
+#include "widgets/Playtest.hpp"
 #include "util/Layout.hpp"
 #include "util/Config.hpp"
 #include "core/auth/AuthHandler.hpp"
@@ -67,11 +67,11 @@ namespace
         "    image: url(:/assets/check.png); }";
 }
 
-StartBox::StartBox(AuthHandler* auth_, core::wine::Shell* shell_, QWidget* parent)
+Playtest::Playtest(AuthHandler* auth_, core::wine::Shell* shell_, QWidget* parent)
     : QWidget(parent), auth(auth_), shell(shell_)
 {
     const QSize w = window()->size();
-    setFixedSize(util::layout::download::box(w));
+    setFixedSize(util::layout::playtest::box(w));
 
     setup_title();
     setup_settings_button();
@@ -84,7 +84,7 @@ StartBox::StartBox(AuthHandler* auth_, core::wine::Shell* shell_, QWidget* paren
     reset_path_button->setCursor(Qt::PointingHandCursor);
     reset_path_button->setFocusPolicy(Qt::NoFocus);
     reset_path_button->setStyleSheet(k_reset_link);
-    reset_path_button->setGeometry(util::layout::scaled(QRect{0, 288, 620, 22}, w));
+    reset_path_button->setGeometry(util::layout::playtest::reset(w));
     connect(reset_path_button, &QPushButton::clicked, this, []()
     {
         Config::instance().set_game_install_path("");
@@ -109,7 +109,7 @@ StartBox::StartBox(AuthHandler* auth_, core::wine::Shell* shell_, QWidget* paren
     }
 }
 
-void StartBox::setup_title()
+void Playtest::setup_title()
 {
     const QSize w = window()->size();
 
@@ -121,13 +121,13 @@ void StartBox::setup_title()
     title_font.setWeight(QFont::Black);
     title_label->setFont(title_font);
     title_label->setStyleSheet("color: #4F1717; background: transparent;");
-    title_label->setGeometry(util::layout::scaled(util::layout::download::k_title, w));
+    title_label->setGeometry(util::layout::playtest::title(w));
 }
 
-void StartBox::setup_settings_button()
+void Playtest::setup_settings_button()
 {
     const QSize w = window()->size();
-    const QRect button = util::layout::scaled(util::layout::download::k_settings_button, w);
+    const QRect button = util::layout::playtest::settings_button(w);
 
     settings_button = new QPushButton(this);
     settings_button->setFlat(true);
@@ -143,7 +143,7 @@ void StartBox::setup_settings_button()
     connect(settings_button, &QPushButton::clicked, this, [this] { emit settings_requested(); });
 }
 
-void StartBox::setup_download_state()
+void Playtest::setup_download_state()
 {
     const QSize w = window()->size();
 
@@ -159,7 +159,7 @@ void StartBox::setup_download_state()
     msg_font.setWeight(QFont::Medium);
     message_label->setFont(msg_font);
     message_label->setStyleSheet("color: #4F1717; background: transparent; padding: 0px 12px;");
-    message_label->setGeometry(util::layout::scaled(util::layout::download::k_note, w));
+    message_label->setGeometry(util::layout::playtest::message(w));
 
     download_button = new QPushButton(this);
     download_button->setFlat(true);
@@ -169,10 +169,10 @@ void StartBox::setup_download_state()
 
     const QPixmap& normal = util::assets::buttons[util::assets::Button::DownloadGame].normal;
 
-    const int bw = util::layout::scaled(util::layout::download::k_button_w, w);
+    const int bw = util::layout::playtest::dl_button_w(w);
     const int bh = qRound(bw * static_cast<double>(normal.height()) / normal.width());
-    const int bx = util::layout::scaled(util::layout::download::k_button_x, w);
-    const int by = util::layout::scaled(util::layout::download::k_button_y, w);
+    const int bx = util::layout::playtest::dl_button_x(w);
+    const int by = util::layout::playtest::dl_button_y(w);
 
     download_button->setIcon(QIcon(normal));
     download_button->setIconSize(QSize(bw, bh));
@@ -180,7 +180,7 @@ void StartBox::setup_download_state()
     download_button->installEventFilter(this);
 }
 
-void StartBox::setup_login_state()
+void Playtest::setup_login_state()
 {
     const QSize w = window()->size();
 
@@ -189,8 +189,8 @@ void StartBox::setup_login_state()
     discord_button->setFocusPolicy(Qt::NoFocus);
     discord_button->setStyleSheet(k_blue_button);
     discord_button->setIcon(QIcon(util::assets::images[util::assets::Image::CloseIcon]));
-    discord_button->setIconSize(util::layout::scaled(QSize{24, 24}, w));
-    discord_button->setGeometry(util::layout::scaled(QRect{90, 100, 440, 56}, w));
+    discord_button->setIconSize(util::layout::playtest::discord_icon(w));
+    discord_button->setGeometry(util::layout::playtest::discord_button(w));
     connect(discord_button, &QPushButton::clicked, this, [this]()
     {
         auth->open_login();
@@ -207,10 +207,10 @@ void StartBox::setup_login_state()
         "and service purposes. This data can be removed upon request by emailing "
         "<a href=\"mailto:dev@storyofalicia.com\" style=\"color:#2FB4E0;\">dev@storyofalicia.com</a>.");
     disclaimer_label->setStyleSheet(k_note_box);
-    disclaimer_label->setGeometry(util::layout::scaled(QRect{90, 176, 440, 104}, w));
+    disclaimer_label->setGeometry(util::layout::playtest::disclaimer(w));
 }
 
-void StartBox::setup_waiting_state()
+void Playtest::setup_waiting_state()
 {
     const QSize w = window()->size();
 
@@ -221,7 +221,7 @@ void StartBox::setup_waiting_state()
     wf.setWeight(QFont::Black);
     waiting_title->setFont(wf);
     waiting_title->setStyleSheet("color: #4F1717; background: transparent;");
-    waiting_title->setGeometry(util::layout::scaled(QRect{0, 104, 620, 28}, w));
+    waiting_title->setGeometry(util::layout::playtest::waiting_title(w));
 
     steps_label = new QLabel(this);
     steps_label->setWordWrap(true);
@@ -231,36 +231,36 @@ void StartBox::setup_waiting_state()
         "<b>2.</b>&nbsp; On the website, tick the checkboxes and click <b>Enter the Game</b>.<br>"
         "<b>3.</b>&nbsp; The launcher will update automatically once done.");
     steps_label->setStyleSheet(k_note_box);
-    steps_label->setGeometry(util::layout::scaled(QRect{90, 152, 440, 110}, w));
+    steps_label->setGeometry(util::layout::playtest::steps(w));
 }
 
-void StartBox::setup_signedin_state()
+void Playtest::setup_signedin_state()
 {
     const QSize w = window()->size();
 
     check_bugs = new QCheckBox("I understand the game has bugs and is not the final version.", this);
     check_bugs->setCursor(Qt::PointingHandCursor);
     check_bugs->setStyleSheet(k_checkbox);
-    check_bugs->setGeometry(util::layout::scaled(QRect{95, 96, 440, 24}, w));
+    check_bugs->setGeometry(util::layout::playtest::check_bugs(w));
 
     check_rules = new QCheckBox(this);
     check_rules->setCursor(Qt::PointingHandCursor);
     check_rules->setStyleSheet(k_checkbox);
     check_rules->setText("I have read and will obey the server rules.");
-    check_rules->setGeometry(util::layout::scaled(QRect{95, 124, 440, 24}, w));
+    check_rules->setGeometry(util::layout::playtest::check_rules(w));
 
     connect(check_bugs,  &QCheckBox::toggled, this, [this]() { refresh_enter_enabled(); });
     connect(check_rules, &QCheckBox::toggled, this, [this]() { refresh_enter_enabled(); });
 
     signed_in_label = new QLabel("  SIGNED IN", this);
     signed_in_label->setStyleSheet(k_banner_box);
-    signed_in_label->setGeometry(util::layout::scaled(QRect{90, 160, 440, 46}, w));
+    signed_in_label->setGeometry(util::layout::playtest::signed_in_banner(w));
 
     enter_button = new QPushButton("ENTER THE PLAYTEST", this);
     enter_button->setCursor(Qt::PointingHandCursor);
     enter_button->setFocusPolicy(Qt::NoFocus);
     enter_button->setStyleSheet(k_blue_button);
-    enter_button->setGeometry(util::layout::scaled(QRect{90, 222, 440, 56}, w));
+    enter_button->setGeometry(util::layout::playtest::enter_button(w));
     enter_button->setEnabled(false);
     connect(enter_button, &QPushButton::clicked, this, [this]()
     {
@@ -268,20 +268,20 @@ void StartBox::setup_signedin_state()
     });
 }
 
-void StartBox::on_download_complete()
+void Playtest::on_download_complete()
 {
     if (state == State::Download)
         set_state(State::Login);
 }
 
-void StartBox::set_state(State s)
+void Playtest::set_state(State s)
 {
     state = s;
     apply_state_visibility();
     if (s == State::SignedIn) refresh_enter_enabled();
 }
 
-void StartBox::apply_state_visibility()
+void Playtest::apply_state_visibility()
 {
     const bool download = state == State::Download;
     const bool login    = state == State::Login;
@@ -301,14 +301,16 @@ void StartBox::apply_state_visibility()
     check_rules->setVisible(signedin);
     signed_in_label->setVisible(signedin);
     enter_button->setVisible(signedin);
+
+    reset_path_button->setVisible(!download);
 }
 
-void StartBox::refresh_enter_enabled()
+void Playtest::refresh_enter_enabled()
 {
     enter_button->setEnabled(check_bugs->isChecked() && check_rules->isChecked());
 }
 
-void StartBox::paintEvent(QPaintEvent* event)
+void Playtest::paintEvent(QPaintEvent* event)
 {
     Q_UNUSED(event);
     const QSize w = window()->size();
@@ -319,11 +321,11 @@ void StartBox::paintEvent(QPaintEvent* event)
     painter.drawPixmap(rect(), util::assets::images[util::assets::Image::BoxCard]);
 
     if (state == State::Download)
-        painter.drawPixmap(util::layout::scaled(util::layout::download::k_note, w),
+        painter.drawPixmap(util::layout::playtest::message(w),
                            util::assets::images[util::assets::Image::BoxNote2]);
 }
 
-bool StartBox::eventFilter(QObject* obj, QEvent* event)
+bool Playtest::eventFilter(QObject* obj, QEvent* event)
 {
     if (obj == download_button)
     {

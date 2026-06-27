@@ -19,9 +19,8 @@ class WineSettings : public QWidget
         void setup_dxvk_option();
         void setup_prefix_option();
         void setup_wine_binary_option();
+        void setup_tricks_option();
         void setup_wine_args_option();
-        void setup_game_args_option();
-        void setup_generate_button();
 
         LauncherLog * log_window {};
         core::wine::Shell * shell{};

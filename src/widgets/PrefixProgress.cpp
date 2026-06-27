@@ -2,6 +2,7 @@
 #include "widgets/LauncherLog.hpp"
 #include "util/Assets.hpp"
 #include "util/Layout.hpp"
+#include "../../include/util/ProgressBar.hpp"
 #include <QPainter>
 #include <QPushButton>
 #include <QTimer>
@@ -10,7 +11,7 @@
 #include "core/Log.hpp"
 #include <spdlog/spdlog.h>
 
-namespace dl = util::layout::download_modal;
+namespace dl = util::layout::progress_modal;
 
 namespace
 {
@@ -112,11 +113,7 @@ void PrefixProgress::setup_buttons()
         "QPushButton:hover { color: #6FD4EF; }"
         "QPushButton:focus { outline: none; border: none; }"
     );
-    const QRect under = dl::under_row(w);
-    log_button->setGeometry(under.left() + under.width() / 2 - util::layout::scaled(50, w),
-                            under.bottom() + util::layout::scaled(6, w),
-                            util::layout::scaled(100, w),
-                            util::layout::scaled(22, w));
+    log_button->setGeometry(dl::log_button(w));
     connect(log_button, &QPushButton::clicked, this, []()
     {
         LauncherLog::instance()->show();
@@ -144,36 +141,6 @@ void PrefixProgress::hideEvent(QHideEvent* event)
     anim->stop();
 }
 
-void PrefixProgress::draw_fill(QPainter& painter, const QRect& bar) const
-{
-    painter.drawPixmap(bar, util::assets::images[util::assets::Image::ProgressBarTrack]);
-
-    if (current_pct <= 0.0) return;
-
-    const QPixmap& start_px = util::assets::images[util::assets::Image::ProgressBarStart];
-    const QPixmap& mid_px   = util::assets::images[util::assets::Image::ProgressBarMiddle];
-    const QPixmap& end_px   = util::assets::images[util::assets::Image::ProgressBarEnd];
-
-    const int h  = bar.height();
-    const int sw = (start_px.height() > 0) ? start_px.width() * h / start_px.height() : h;
-    const int ew = (end_px.height()   > 0) ? end_px.width()   * h / end_px.height()   : h;
-
-    const int fill_w = int(bar.width() * (current_pct / 100.0));
-
-    painter.save();
-    painter.setClipRect(QRect(bar.left(), bar.top(), fill_w, h));
-
-    const int mid_left  = bar.left() + sw;
-    const int mid_right = bar.left() + fill_w - ew;
-    const int mid_w     = qMax(0, mid_right - mid_left);
-
-    painter.drawPixmap(QRect(bar.left(), bar.top(), sw, h), start_px);
-    if (mid_w > 0) painter.drawPixmap(QRect(mid_left, bar.top(), mid_w, h), mid_px);
-    painter.drawPixmap(QRect(bar.left() + fill_w - ew, bar.top(), ew, h), end_px);
-
-    painter.restore();
-}
-
 void PrefixProgress::paint_content(QPainter& painter)
 {
     const QSize w = window()->size();
@@ -181,14 +148,14 @@ void PrefixProgress::paint_content(QPainter& painter)
     painter.drawPixmap(dl::box_rect(w), util::assets::images[util::assets::Image::BoxDownload]);
 
     QFont title_font = util::assets::fonts[util::assets::Font::EurostileBlack];
-    title_font.setPixelSize(util::layout::scaled(20, w));
+    title_font.setPixelSize(util::layout::scaled(util::layout::text::k_row_title, w));
     title_font.setWeight(QFont::Black);
     painter.setFont(title_font);
     painter.setPen(QColor(0x4F, 0x17, 0x17));
     painter.drawText(dl::title(w), Qt::AlignCenter, "INSTALLING WINE PREFIX");
 
     QFont label_font = util::assets::fonts[util::assets::Font::Inter];
-    label_font.setPixelSize(util::layout::scaled(13, w));
+    label_font.setPixelSize(util::layout::scaled(util::layout::text::k_body, w));
     label_font.setWeight(QFont::Medium);
     painter.setFont(label_font);
     painter.setPen(QColor(0x9E, 0x8E, 0x7E));
@@ -198,10 +165,10 @@ void PrefixProgress::paint_content(QPainter& painter)
     if (step > 0)
         painter.drawText(info, Qt::AlignRight | Qt::AlignVCenter, QString("Step %1 of 2").arg(step));
 
-    draw_fill(painter, dl::bar_rect(w));
+    util::progress_bar::draw(painter, dl::bar_rect(w), current_pct / 100.0);
 
     QFont pct_font = util::assets::fonts[util::assets::Font::Inter];
-    pct_font.setPixelSize(util::layout::scaled(15, w));
+    pct_font.setPixelSize(util::layout::scaled(util::layout::text::k_label, w));
     pct_font.setWeight(QFont::DemiBold);
     painter.setFont(pct_font);
     painter.setPen(failed ? QColor(0xC0, 0x2A, 0x2A) : QColor(0x4F, 0x17, 0x17));

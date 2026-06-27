@@ -15,7 +15,7 @@ namespace core::wine
 
 class QPushButton;
 class QLabel;
-class StartBox;
+class Playtest;
 class Settings;
 class GameInstall;
 
@@ -38,7 +38,7 @@ class MainWindow : public QWidget
         void setup_logo();
         void setup_version_label();
         void setup_settings();
-        void setup_start_box();
+        void setup_playtest();
         void setup_wine_install();
         void setup_game_install();
         void on_overlay_opened(util::modal_overlay::ModalOverlay * m);
@@ -48,7 +48,7 @@ class MainWindow : public QWidget
         bool chrome_hidden {};
         QPushButton * close_button = nullptr;
         QPushButton * minimize_button = nullptr;
-        StartBox * start_box = nullptr;
+        Playtest * playtest = nullptr;
         Settings * settings = nullptr;
         WineInstall * wine_install = nullptr;
         GameInstall * game_install = nullptr;

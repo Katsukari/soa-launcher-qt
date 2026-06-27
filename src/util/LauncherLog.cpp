@@ -1,6 +1,5 @@
 #include "widgets/LauncherLog.hpp"
 #include "core/QtLogSink.hpp"
-
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QComboBox>
@@ -36,17 +35,15 @@ LauncherLog::LauncherLog(QWidget* parent) : QDialog(parent)
     auto* copy  = new QPushButton("Copy", this);
     auto* lock  = new QPushButton("Autoscroll: On", this);
 
-    // Dropdown maps to spdlog level thresholds (trace0 debug1 info2 warn3 err4)
     verbosity = new QComboBox(this);
     verbosity->addItem("Errors only");
     verbosity->addItem("Normal");
     verbosity->addItem("Verbose");
-    verbosity->setCurrentIndex(1);       // Normal
-
+    verbosity->setCurrentIndex(1);
     connect(verbosity, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
         [this](int i)
         {
-            min_level = (i == 0) ? 4 : (i == 1) ? 2 : 1;   // err / info / debug
+            min_level = (i == 0) ? 4 : (i == 1) ? 2 : 1;
             rerender();
         });
 

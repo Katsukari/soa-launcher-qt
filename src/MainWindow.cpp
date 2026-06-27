@@ -1,5 +1,5 @@
 #include "MainWindow.hpp"
-#include "widgets/StartBox.hpp"
+#include "widgets/Playtest.hpp"
 #include "widgets/Settings.hpp"
 #include "util/Assets.hpp"
 #include "util/Layout.hpp"
@@ -30,7 +30,7 @@ MainWindow::MainWindow(QWidget* parent) : QWidget(parent)
     setup_logo();
     setup_version_label();
     setup_settings();
-    setup_start_box();
+    setup_playtest();
     setup_wine_install();
     setup_game_install();
 }
@@ -96,20 +96,20 @@ void MainWindow::setup_settings()
     settings->hide();
 }
 
-void MainWindow::setup_start_box()
+void MainWindow::setup_playtest()
 {
     wine_install = new WineInstall(shell, this);
     const QSize w = size();
-    start_box = new StartBox(auth, shell, this);
-    start_box->move(util::layout::download::pos(w));
+    playtest = new Playtest(auth, shell, this);
+    playtest->move(util::layout::playtest::pos(w));
 
-    connect(start_box, &StartBox::settings_requested, this, [this]()
+    connect(playtest, &Playtest::settings_requested, this, [this]()
     {
         on_overlay_opened(settings);
         settings->show_over(this);
     });
 
-    connect(start_box, &StartBox::download_triggered, this, [this]()
+    connect(playtest, &Playtest::download_triggered, this, [this]()
     {
         wine_install->show_over(this);
         on_overlay_opened(wine_install);
@@ -152,7 +152,7 @@ void MainWindow::setup_game_install()
     connect(game_install, &GameInstall::install_complete, this, [this]()
     {
         on_overlay_closed(game_install);
-        start_box->on_download_complete();
+        playtest->on_download_complete();
     });
 }
 

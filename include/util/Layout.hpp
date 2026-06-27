@@ -6,7 +6,6 @@
 
 namespace util::layout
 {
-    // Preset window sizes
     namespace win
     {
         inline constexpr QSize k_small   {1120, 677};
@@ -15,14 +14,12 @@ namespace util::layout
         inline constexpr QSize k_4k      {1920, 1160};
     }
 
-    // Scale primitives (uniform, width-based)
     double scale(QSize win);
     int    scaled(int v, QSize win);
     QSize  scaled(QSize s, QSize win);
     QPoint scaled(QPoint p, QSize win);
     QRect  scaled(QRect r, QSize win);
 
-    // Frame insets (constant px in DEFAULT space)
     namespace region
     {
         inline constexpr int k_left   = 30;
@@ -39,10 +36,9 @@ namespace util::layout
             win::k_default.height() - k_top  - k_bottom
         };
 
-        QRect rect(QSize win);   // scaled content region
+        QRect rect(QSize win);
     }
 
-    // Authoring helpers (constexpr - operate in DEFAULT space)
     constexpr QRect center_in_region(const QSize box, const int dx = 0, const int dy = 0)
     {
         return
@@ -85,7 +81,6 @@ namespace util::layout
 
     QRect centered(QSize box, QSize win, int dx = 0, int dy = 0);
 
-    // Recurring font sizes (default-space px; scale with scaled(px, win))
     namespace text
     {
         inline constexpr int k_modal_header = 25;
@@ -98,7 +93,6 @@ namespace util::layout
         inline constexpr int k_status       = 12;
     }
 
-    // MainWindow chrome
     namespace chrome
     {
         inline constexpr int   k_logo_width = 390;
@@ -130,42 +124,59 @@ namespace util::layout
         QRect  version(QSize win);
     }
 
-    // DownloadWidget (central card)
-    namespace download
+    namespace playtest
     {
         inline constexpr QSize k_box        {620, 320};
-        inline constexpr QSize k_box_auth   {620, 360};
         inline constexpr int   k_top_offset = 350;
+        inline constexpr QRect k_rect = hcenter_in_region(k_box, k_top_offset);
 
-        inline constexpr int k_button_x = 90;
-        inline constexpr int k_button_y = 198;
-        inline constexpr int k_button_w = 440;
-
-        inline constexpr QRect k_rect      = hcenter_in_region(k_box, k_top_offset);
-        inline constexpr QRect k_rect_auth = hcenter_in_region(k_box_auth, k_top_offset);
-
-        inline constexpr QRect k_title  {0, 38, k_box.width(), 30};
-        inline constexpr QRect k_note   {90, 103, 440, 70};
+        inline constexpr QRect k_title {0, 38, k_box.width(), 30};
         inline constexpr QRect k_settings_button =
             anchor_top_right({0, 0, k_box.width(), k_box.height()}, 25, 23, {37, 37});
+        inline constexpr QRect k_reset {0, 272, k_box.width(), 22};
 
-        inline constexpr QRect k_signed_in_banner {95, 0, 430, 48};
-        inline constexpr QSize k_disclaimer       {430, 94};
+        inline constexpr QRect k_message {90, 103, 440, 70};
+        inline constexpr int   k_dl_button_x = 90;
+        inline constexpr int   k_dl_button_y = 198;
+        inline constexpr int   k_dl_button_w = 440;
+
+        inline constexpr QSize k_discord_icon   {24, 24};
+        inline constexpr QRect k_discord_button  {90, 100, 440, 56};
+        inline constexpr QRect k_disclaimer      {90, 164, 440, 100};
+
+        inline constexpr QRect k_waiting_title {0, 100, k_box.width(), 28};
+        inline constexpr QRect k_steps         {90, 148, 440, 104};
+
+        inline constexpr QRect k_check_bugs       {95, 88,  440, 24};
+        inline constexpr QRect k_check_rules      {95, 116, 440, 24};
+        inline constexpr QRect k_signed_in_banner {90, 148, 440, 46};
+        inline constexpr QRect k_enter_button     {90, 206, 440, 52};
 
         QRect  rect(QSize win);
-        QRect  rect_auth(QSize win);
         QPoint pos(QSize win);
-        QPoint pos_auth(QSize win);
         QSize  box(QSize win);
-        QSize  box_auth(QSize win);
         QRect  title(QSize win);
-        QRect  note(QSize win);
         QRect  settings_button(QSize win);
+        QRect  reset(QSize win);
+
+        QRect  message(QSize win);
+        int    dl_button_x(QSize win);
+        int    dl_button_y(QSize win);
+        int    dl_button_w(QSize win);
+
+        QSize  discord_icon(QSize win);
+        QRect  discord_button(QSize win);
+        QRect  disclaimer(QSize win);
+
+        QRect  waiting_title(QSize win);
+        QRect  steps(QSize win);
+
+        QRect  check_bugs(QSize win);
+        QRect  check_rules(QSize win);
+        QRect  signed_in_banner(QSize win);
+        QRect  enter_button(QSize win);
     }
 
-    // SettingsWidget (full-window overlay + centered box)
-    // Three tabs (Launcher / Wine / Advanced) share the SAME box. The log is a
-    // single shared top-level window (LauncherLog), not part of the box.
     namespace settings
     {
         inline constexpr QSize k_box {630, 555};
@@ -177,6 +188,7 @@ namespace util::layout
         inline constexpr int   k_padding = 37;
 
         inline constexpr QSize k_tab        {150, 44};
+        inline constexpr int   k_tab_radius = 8;
         inline constexpr int   k_tab_gap    = 6;
         inline constexpr int   k_tab_inset  = 40;
         inline constexpr int   k_tab_overlap = 4;
@@ -190,7 +202,6 @@ namespace util::layout
         inline constexpr int   k_slider_gap  = 10;
         inline constexpr int   k_desc_max_w  = 270;
 
-        // Left text column (title + description), right control column.
         inline constexpr int   k_text_x    = 37;
         inline constexpr int   k_text_w    = 290;
         inline constexpr int   k_ctrl_x    = 366;
@@ -199,19 +210,13 @@ namespace util::layout
         inline constexpr int   k_desc_h    = 40;
         inline constexpr int   k_title_h   = 26;
 
-        // Row top-y (4 rows, even ~104px spacing).
-        inline constexpr int   k_row1_y = 78;
-        inline constexpr int   k_row2_y = 182;
-        inline constexpr int   k_row3_y = 286;
-        inline constexpr int   k_row4_y = 390;
+        inline constexpr int   k_row_top         = 62;
+        inline constexpr int   k_row_bottom      = 455;
+        inline constexpr int   k_row_bottom_foot = 410;
 
-        // Footer buttons (GitHub / Show Log / Generate) sit below the rows.
-        // One place to nudge footer layout instead of literals in each widget.
-        inline constexpr int   k_footer_y    = 490;
-        inline constexpr QSize k_footer_btn  {110, 30};
-        inline constexpr int   k_footer_gap  = 10;
-        // Big primary footer button (Generate), centered, taller.
-        inline constexpr QSize k_footer_big  {240, 38};
+        inline constexpr int   k_input_h    = 34;
+        inline constexpr int   k_browse_w   = 34;
+        inline constexpr int   k_input_gap  = 6;
 
         QRect box_rect(QSize win);
         QSize box(QSize win);
@@ -228,6 +233,7 @@ namespace util::layout
         int   tab_inset(QSize win);
         int   tab_overlap(QSize win);
         QRect tab_rect(QSize win, int i);
+        int   tab_radius(QSize win);
 
         QRect row_title(QSize win, int y);
         QRect row_desc(QSize win, int y);
@@ -238,52 +244,79 @@ namespace util::layout
         QRect slider_rect(QSize win, int y);
         QRect page_title(QSize win);
 
-        // Footer button rects (default-space -> pass through scaled()).
-        QRect footer_left(QSize win);    // first footer button (e.g. GitHub)
-        QRect footer_right(QSize win);   // second footer button beside it (Show Log)
-        QRect footer_big(QSize win);     // centered big primary button (Generate)
+        int   row_y(int index, int count, bool has_footer = false);
+        QRect field_rect(QSize win, int y);
+        QRect browse_rect(QSize win, int y);
     }
 
-    // CustomSelect dropdown
-    namespace select
+    namespace launcher_settings
+    {
+        inline constexpr int   k_footer_y    = 500;
+        inline constexpr QSize k_footer_btn  {110, 30};
+        inline constexpr int   k_footer_gap  = 10;
+
+        int   row(int i);
+        QRect footer_left(QSize win);
+        QRect footer_right(QSize win);
+    }
+
+    namespace wine_settings
+    {
+        int row(int i);
+    }
+
+    namespace advanced_settings
+    {
+        inline constexpr int k_row_single = 78;
+        int row(int i = 0);
+    }
+
+    namespace dropdown
     {
         inline constexpr QSize k_box            {227, 64};
         inline constexpr int   k_option_h       = 64;
         inline constexpr int   k_option_overlap = 21;
         inline constexpr int   k_pad_bottom     = 10;
+        inline constexpr int   k_text_pad       = 20;
+        inline constexpr int   k_chevron_inset  = 28;
+        inline constexpr int   k_chevron_arm    = 5;
 
         QSize box(QSize win);
         int   option_h(QSize win);
         int   option_overlap(QSize win);
+
+        QSize  total_size(QSize win, int count);
+        QRect  closed_rect(QSize win);
+        QRect  option_rect(QSize win, int slot);
+        int    text_pad(QSize win);
+        int    pad_bottom(QSize win);
+        QPoint chevron_center(QSize win);
+        int    chevron_arm(QSize win);
     }
 
-    // WineInstall modal overlay
     namespace install_modal
     {
-        // Box dimensions & placement
         inline constexpr QSize k_box        {580, 382};
-        inline constexpr int   k_margin_top = 66;  // dy offset from vertical center
+        inline constexpr int   k_margin_top = 66;
 
-        // Box-local positioning
         inline constexpr int   k_title_y      = 40;
         inline constexpr int   k_title_h      = 30;
-        inline constexpr int   k_body_y       = 100;  // title_y + title_h + 30
+        inline constexpr int   k_body_y       = 100;
         inline constexpr int   k_body_h       = 40;
         inline constexpr int   k_text_x       = 33;
         inline constexpr int   k_path_inset   = 33;
         inline constexpr int   k_path_h       = 69;
-        inline constexpr int   k_path_y       = 150;  // body_y + body_h + 30
+        inline constexpr int   k_path_y       = 150;
         inline constexpr int   k_changepath_y = 248;
         inline constexpr int   k_changepath_h = 20;
         inline constexpr int   k_warn_y       = 224;
         inline constexpr int   k_warn_h       = 18;
-        inline constexpr int   k_button_row_y = 287;   // changepath_y + changepath_h + 40
+        inline constexpr int   k_button_row_y = 287;
         inline constexpr int   k_button_h     = 40;
         inline constexpr int   k_bottom_pad   = 55;
         inline constexpr int   k_button_outer = 70;
         inline constexpr int   k_button_gap   = 35;
 
-        // Computed layout
         inline constexpr QRect k_rect  = center_in_region(k_box, 0, k_margin_top);
         inline constexpr QSize k_close_icon {13, 13};
         inline constexpr QSize k_close_hit  {22, 22};
@@ -300,7 +333,6 @@ namespace util::layout
         inline constexpr QRect k_install {k_button_outer + k_btn_w + k_button_gap, k_button_row_y,
                                           k_box.width() - k_button_outer - (k_button_outer + k_btn_w + k_button_gap), k_button_h};
 
-        // Accessor functions
         QRect  box_rect(QSize win);
         QSize  box(QSize win);
         QRect  rect(QSize win);
@@ -309,35 +341,28 @@ namespace util::layout
         QRect  body(QSize win);
         QRect  path_field(QSize win);
         QRect  changepath_line(QSize win);
+        QRect  change_path_button(QSize win);
         QRect  warning_line(QSize win);
         QRect  cancel_button(QSize win);
         QRect  install_button(QSize win);
         QSize  close_icon(QSize win);
     }
 
-    // DownloadProgress / PrefixProgress modal (small box-download.png 490x190).
-    // Same authoring pattern as install_modal: box-local constexpr rects,
-    // accessors translate into window space by k_rect origin, then scale.
-    // The progress bar is SLIM (14px tall in default space) - the fill/marquee
-    // composites the start/middle/end pieces inside it.
-    namespace download_modal
+    namespace progress_modal
     {
-        // Box dimensions & placement
         inline constexpr QSize k_box        {490, 190};
-        inline constexpr int   k_margin_top = 40;   // dy offset from vertical center
+        inline constexpr int   k_margin_top = 40;
 
-        // Box-local positioning
-        inline constexpr int   k_pad_x       = 30;   // side padding
+        inline constexpr int   k_pad_x       = 30;
         inline constexpr int   k_title_y     = 24;
         inline constexpr int   k_title_h     = 30;
-        inline constexpr int   k_info_y      = 74;   // left/right label row (time/speed | status/step)
+        inline constexpr int   k_info_y      = 74;
         inline constexpr int   k_info_h      = 18;
         inline constexpr int   k_bar_y       = 100;
-        inline constexpr int   k_bar_h       = 14;   // SLIM bar
-        inline constexpr int   k_under_y     = 124;  // percent / status line below bar
+        inline constexpr int   k_bar_h       = 14;
+        inline constexpr int   k_under_y     = 124;
         inline constexpr int   k_under_h     = 20;
 
-        // Computed layout
         inline constexpr QRect k_rect = center_in_region(k_box, 0, k_margin_top);
         inline constexpr QSize k_close_icon {18, 18};
         inline constexpr QSize k_close_hit  {18, 18};
@@ -350,7 +375,6 @@ namespace util::layout
         inline constexpr QRect k_bar   {k_pad_x, k_bar_y,   k_box.width() - 2 * k_pad_x, k_bar_h};
         inline constexpr QRect k_under {k_pad_x, k_under_y, k_box.width() - 2 * k_pad_x, k_under_h};
 
-        // Accessor functions
         QRect box_rect(QSize win);
         QSize box(QSize win);
         QRect rect(QSize win);
@@ -362,5 +386,6 @@ namespace util::layout
         QRect info_row(QSize win);
         QRect bar_rect(QSize win);
         QRect under_row(QSize win);
+        QRect log_button(QSize win);
     }
 }

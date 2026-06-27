@@ -68,17 +68,31 @@ namespace util::layout
         QRect version(const QSize win) { return scaled(k_version, win); }
     }
 
-    namespace download
+    namespace playtest
     {
         QRect  rect(const QSize win)            { return scaled(k_rect, win); }
-        QRect  rect_auth(const QSize win)       { return scaled(k_rect_auth, win); }
         QPoint pos(const QSize win)             { return rect(win).topLeft(); }
-        QPoint pos_auth(const QSize win)        { return rect_auth(win).topLeft(); }
         QSize  box(const QSize win)             { return scaled(k_box, win); }
-        QSize  box_auth(const QSize win)        { return scaled(k_box_auth, win); }
         QRect  title(const QSize win)           { return scaled(k_title, win); }
-        QRect  note(const QSize win)            { return scaled(k_note, win); }
         QRect  settings_button(const QSize win) { return scaled(k_settings_button, win); }
+        QRect  reset(const QSize win)           { return scaled(k_reset, win); }
+
+        QRect  message(const QSize win)         { return scaled(k_message, win); }
+        int    dl_button_x(const QSize win)     { return scaled(k_dl_button_x, win); }
+        int    dl_button_y(const QSize win)     { return scaled(k_dl_button_y, win); }
+        int    dl_button_w(const QSize win)     { return scaled(k_dl_button_w, win); }
+
+        QSize  discord_icon(const QSize win)    { return scaled(k_discord_icon, win); }
+        QRect  discord_button(const QSize win)  { return scaled(k_discord_button, win); }
+        QRect  disclaimer(const QSize win)      { return scaled(k_disclaimer, win); }
+
+        QRect  waiting_title(const QSize win)   { return scaled(k_waiting_title, win); }
+        QRect  steps(const QSize win)           { return scaled(k_steps, win); }
+
+        QRect  check_bugs(const QSize win)        { return scaled(k_check_bugs, win); }
+        QRect  check_rules(const QSize win)       { return scaled(k_check_rules, win); }
+        QRect  signed_in_banner(const QSize win)  { return scaled(k_signed_in_banner, win); }
+        QRect  enter_button(const QSize win)      { return scaled(k_enter_button, win); }
     }
 
     namespace settings
@@ -98,7 +112,8 @@ namespace util::layout
         int   tab_inset(const QSize win)  { return scaled(k_tab_inset, win); }
         int   tab_overlap(const QSize win){ return scaled(k_tab_overlap, win); }
 
-        QRect page_title(QSize win) { return scaled(k_page_title, win); }
+        QRect page_title(QSize win) { return scaled(k_page_title.translated(k_rect.topLeft()), win); }
+        int   tab_radius(const QSize win) { return scaled(k_tab_radius, win); }
 
         QRect tab_rect(const QSize win, int i)
         {
@@ -138,29 +153,94 @@ namespace util::layout
             return scaled(QRect{ x, y, k_slider.width(), k_slider.height() }, win);
         }
 
+        int row_y(const int index, const int count, const bool has_footer)
+        {
+            const int bottom = has_footer ? k_row_bottom_foot : k_row_bottom;
+            if (count <= 1) return (k_row_top + bottom) / 2 - 30;
+            return k_row_top + (index * (bottom - k_row_top)) / (count - 1);
+        }
+
+        QRect field_rect(const QSize win, const int y)
+        {
+            return scaled(QRect{ k_ctrl_x, y, k_ctrl_w - k_browse_w - k_input_gap, k_input_h }, win);
+        }
+
+        QRect browse_rect(const QSize win, const int y)
+        {
+            return scaled(QRect{ k_ctrl_x + k_ctrl_w - k_browse_w, y, k_browse_w, k_input_h }, win);
+        }
+
+    }
+
+    namespace launcher_settings
+    {
+        int row(const int i)
+        {
+            static constexpr int ys[4] = { 78, 184, 290, 396 };
+            return (i >= 0 && i < 4) ? ys[i] : ys[0];
+        }
+
         QRect footer_left(QSize win)
         {
-            return layout::scaled(QRect(k_text_x, k_footer_y, k_footer_btn.width(), k_footer_btn.height()), win);
+            return scaled(QRect(settings::k_text_x, k_footer_y,
+                                k_footer_btn.width(), k_footer_btn.height()), win);
         }
 
         QRect footer_right(QSize win)
         {
-            const int x = k_text_x + k_footer_btn.width() + k_footer_gap;
-            return layout::scaled(QRect(x, k_footer_y, k_footer_btn.width(), k_footer_btn.height()),win);
-        }
-
-        QRect footer_big(QSize win)
-        {
-            const int x = (k_box.width() - k_footer_big.width()) / 2;
-            return layout::scaled(QRect(x, k_footer_y, k_footer_big.width(), k_footer_big.height()),win);
+            const int x = settings::k_text_x + k_footer_btn.width() + k_footer_gap;
+            return scaled(QRect(x, k_footer_y, k_footer_btn.width(), k_footer_btn.height()), win);
         }
     }
 
-    namespace select
+    namespace wine_settings
+    {
+        int row(const int i) { return settings::row_y(i, 5, false); }
+    }
+
+    namespace advanced_settings
+    {
+        int row(const int) { return k_row_single; }
+    }
+
+    namespace dropdown
     {
         QSize box(const QSize win)            { return scaled(k_box, win); }
         int   option_h(const QSize win)       { return scaled(k_option_h, win); }
         int   option_overlap(const QSize win) { return scaled(k_option_overlap, win); }
+
+        QSize total_size(const QSize win, const int count)
+        {
+            const QSize b = box(win);
+            const int h = b.height() + (count - 1) * (option_h(win) - option_overlap(win));
+            return { b.width(), h };
+        }
+
+        QRect closed_rect(const QSize win)
+        {
+            const QSize b = box(win);
+            return { 0, 0, b.width(), b.height() };
+        }
+
+        QRect option_rect(const QSize win, const int slot)
+        {
+            const QSize b  = box(win);
+            const int   oh = option_h(win);
+            const int   ov = option_overlap(win);
+            const int   y  = b.height() - ov + slot * (oh - ov);
+            return { 0, y, b.width(), oh };
+        }
+
+        int text_pad(const QSize win)    { return scaled(k_text_pad, win); }
+        int pad_bottom(const QSize win)  { return scaled(k_pad_bottom, win); }
+
+        QPoint chevron_center(const QSize win)
+        {
+            const QRect c = closed_rect(win);
+            return { c.right() - scaled(k_chevron_inset, win), c.center().y() };
+        }
+
+        int chevron_arm(const QSize win) { return scaled(k_chevron_arm, win); }
     }
 
     namespace install_modal
@@ -169,25 +249,29 @@ namespace util::layout
         QSize  box(const QSize win)              { return scaled(k_box, win); }
         QRect  rect(const QSize win)             { return scaled(k_rect, win); }
 
-        // child rects: box-local constants shifted into window space by k_rect origin, then scaled
         QRect  close(const QSize win)            { return scaled(k_close.translated(k_rect.topLeft()), win); }
         QRect  title(const QSize win)            { return scaled(k_title.translated(k_rect.topLeft()), win); }
         QRect  body(const QSize win)             { return scaled(k_body.translated(k_rect.topLeft()), win); }
         QRect  path_field(const QSize win)       { return scaled(k_path.translated(k_rect.topLeft()), win); }
         QRect  changepath_line(const QSize win)  { return scaled(k_changepath.translated(k_rect.topLeft()), win); }
+        QRect  change_path_button(const QSize win)
+        {
+            const QRect row = changepath_line(win);
+            const int hit_w = qMin(row.width() / 3, scaled(150, win));
+            return { row.left(), row.top(), hit_w, row.height() + scaled(4, win) };
+        }
         QRect  warning_line(const QSize win)     { return scaled(k_warn.translated(k_rect.topLeft()), win); }
         QRect  cancel_button(const QSize win)    { return scaled(k_cancel.translated(k_rect.topLeft()), win); }
         QRect  install_button(const QSize win)   { return scaled(k_install.translated(k_rect.topLeft()), win); }
         QSize  close_icon(const QSize win)       { return scaled(k_close_icon, win); }
     }
 
-    namespace download_modal
+    namespace progress_modal
     {
         QRect box_rect(const QSize win)  { return scaled(k_rect, win); }
         QSize box(const QSize win)       { return scaled(k_box, win); }
         QRect rect(const QSize win)      { return scaled(k_rect, win); }
 
-        // child rects: box-local constants shifted into window space by k_rect origin, then scaled
         QRect close(const QSize win)     { return scaled(k_close.translated(k_rect.topLeft()), win); }
         QSize close_icon(const QSize win){ return scaled(k_close_icon, win); }
         QRect pause(const QSize win)     { return scaled(k_pause.translated(k_rect.topLeft()), win); }
@@ -196,5 +280,14 @@ namespace util::layout
         QRect info_row(const QSize win)  { return scaled(k_info.translated(k_rect.topLeft()), win); }
         QRect bar_rect(const QSize win)  { return scaled(k_bar.translated(k_rect.topLeft()), win); }
         QRect under_row(const QSize win) { return scaled(k_under.translated(k_rect.topLeft()), win); }
+
+        QRect log_button(const QSize win)
+        {
+            const QRect under = under_row(win);
+            return { under.left() + under.width() / 2 - scaled(50, win),
+                     under.bottom() + scaled(6, win),
+                     scaled(100, win),
+                     scaled(22, win) };
+        }
     }
 }

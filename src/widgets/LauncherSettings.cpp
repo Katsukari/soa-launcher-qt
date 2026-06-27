@@ -12,6 +12,9 @@
 #include <QDesktopServices>
 
 using util::config::Config;
+namespace ls = util::layout::settings;
+namespace lset = util::layout::launcher_settings;
+
 
 LauncherSettings::LauncherSettings(QWidget* parent) : QWidget(parent)
 {
@@ -26,7 +29,8 @@ LauncherSettings::LauncherSettings(QWidget* parent) : QWidget(parent)
 void LauncherSettings::setup_launch_on_startup_option()
 {
     const QSize w = window()->size();
-    util::simple_utils::make_label_block(this, w, util::layout::settings::k_row1_y,
+    const int y = lset::row(0);
+    util::simple_utils::make_label_block(this, w, y,
                             "LAUNCH ON STARTUP",
                             "Automatically open the launcher when you log in to your computer.");
 
@@ -35,7 +39,7 @@ void LauncherSettings::setup_launch_on_startup_option()
     slider->setCursor(Qt::PointingHandCursor);
     slider->setStyleSheet("border:none; background:transparent;");
 
-    const QRect sr = util::layout::settings::slider_rect(w, util::layout::settings::k_row1_y);
+    const QRect sr = ls::slider_rect(w, y);
     const QSize ssz = sr.size();
     slider->setIconSize(ssz);
     slider->setGeometry(sr);
@@ -59,15 +63,15 @@ void LauncherSettings::setup_launch_on_startup_option()
 void LauncherSettings::setup_after_game_start_option()
 {
     const QSize w = window()->size();
-    util::simple_utils::make_label_block(this, w, util::layout::settings::k_row2_y,
+    const int y = lset::row(1);
+    util::simple_utils::make_label_block(this, w, y,
                             "AFTER GAME START",
                             "Choose what the launcher does after the game starts up.");
 
     auto* dd = new ImageDropdown({ "Keep launcher open", "Minimize to tray" }, this);
 
-    // Reflect the stored value ("keep" / "minimize").
     dd->set_index(Config::instance().after_game_start() == "minimize" ? 1 : 0);
-    dd->move(util::layout::settings::ctrl_pos(w, util::layout::settings::k_row2_y));
+    dd->move(ls::ctrl_pos(w, y));
 
     connect(dd, &ImageDropdown::changed, this, [](int idx)
     {
@@ -78,7 +82,8 @@ void LauncherSettings::setup_after_game_start_option()
 void LauncherSettings::setup_run_connectivity_test_option()
 {
     const QSize w = window()->size();
-    util::simple_utils::make_label_block(this, w, util::layout::settings::k_row3_y,
+    const int y = lset::row(2);
+    util::simple_utils::make_label_block(this, w, y,
                             "CONNECTIVITY CHECK",
                             "Diagnose issues connecting to the game and related servers.");
 
@@ -87,7 +92,7 @@ void LauncherSettings::setup_run_connectivity_test_option()
     button->setCursor(Qt::PointingHandCursor);
     button->setStyleSheet("border:none; background:transparent;");
 
-    const QRect br = util::layout::settings::run_check(w, util::layout::settings::k_row3_y);
+    const QRect br = ls::run_check(w, y);
     button->setIcon(QIcon(util::assets::buttons[util::assets::Button::RunCheck].normal
         .scaled(br.size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
     button->setIconSize(br.size());
@@ -97,7 +102,8 @@ void LauncherSettings::setup_run_connectivity_test_option()
 void LauncherSettings::setup_launcher_size_option()
 {
     const QSize w = window()->size();
-    util::simple_utils::make_label_block(this, w, util::layout::settings::k_row4_y,
+    const int y = lset::row(3);
+    util::simple_utils::make_label_block(this, w, y,
                             "LAUNCHER SIZE",
                             "Choose your preferred window size for the launcher.");
 
@@ -105,11 +111,10 @@ void LauncherSettings::setup_launcher_size_option()
     auto* dd = new ImageDropdown(
         { "Small (1120x677)", "Default (1400x846)", "Large (1600x967)", "4K (1920x1160)" }, this);
 
-    // Select the entry matching the stored size (default to "Default").
     int idx = sizes.indexOf(Config::instance().launcher_size());
     if (idx < 0) idx = 1;
     dd->set_index(idx);
-    dd->move(util::layout::settings::ctrl_pos(w, util::layout::settings::k_row4_y));
+    dd->move(ls::ctrl_pos(w, y));
     dd->raise();
 
     connect(dd, &ImageDropdown::changed, this, [sizes](int i)
@@ -124,7 +129,7 @@ void LauncherSettings::setup_github_button()
     auto* gh = new QPushButton("GITHUB", this);
     gh->setCursor(Qt::PointingHandCursor);
     gh->setStyleSheet(util::styles::k_neutral_button);
-    gh->setGeometry(util::layout::settings::footer_left(w));
+    gh->setGeometry(lset::footer_left(w));
     connect(gh, &QPushButton::clicked, this, []()
     {
         QDesktopServices::openUrl(QUrl("https://github.com/Story-Of-Alicia/soa-launcher-qt"));
@@ -137,7 +142,7 @@ void LauncherSettings::setup_log_button()
     auto* show_log = new QPushButton("SHOW LOG", this);
     show_log->setCursor(Qt::PointingHandCursor);
     show_log->setStyleSheet(util::styles::k_neutral_button);
-    show_log->setGeometry(util::layout::settings::footer_right(w));
+    show_log->setGeometry(lset::footer_right(w));
     connect(show_log, &QPushButton::clicked, this, []()
     {
         LauncherLog::instance()->show();

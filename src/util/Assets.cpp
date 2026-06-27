@@ -45,7 +45,7 @@ namespace util::assets
             {Image::RightFrame,          "right-frame.png"},
             {Image::RulesFrame,          "rules-frame.png"},
             {Image::SignedInAs,          "signed-in-as.png"},
-            {Image::Logo,                "soa-logo.png"},
+            {Image::Logo,                "soa-launcher.png"},
             {Image::IconLock,            "2.0 ICON.png"},
             {Image::IconPT,              "PT ICON.png"},
             {Image::SettingsButton, "Settings Button.png"},

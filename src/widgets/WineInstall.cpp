@@ -8,6 +8,7 @@
 #include <QGraphicsBlurEffect>
 
 #include "core/wine/Shell.hpp"
+#include "core/wine/WineRegistry.hpp"
 #include "util/Config.hpp"
 #include "core/Log.hpp"
 #include "widgets/LauncherLog.hpp"
@@ -98,9 +99,7 @@ void WineInstall::setup_buttons()
         "}"
         "QPushButton:hover { color: #6FD4EF; outline: none; border: none; }"
     );
-    const QRect cp_row = util::layout::install_modal::changepath_line(w);
-    const int cp_hit_w = qMin(cp_row.width() / 3, 150);
-    change_path_button->setGeometry(cp_row.left(), cp_row.top(), cp_hit_w, cp_row.height() + 4);
+    change_path_button->setGeometry(util::layout::install_modal::change_path_button(w));
 
     connect(change_path_button, &QPushButton::clicked, this, [this]
     {
@@ -123,7 +122,24 @@ void WineInstall::start_install()
         SPDLOG_WARN("install already in progress");
         return;
     }
+
+    const QString wine_path = Config::instance().wine_binary();
+    const core::wine::RuntimeType type = core::wine::WineRegistry::identify(wine_path);
+
+    if (!core::wine::tricks_available(type))
+    {
+        const QString tool = core::wine::required_tricks_tool(type);
+        warn_message = "Missing " + tool + ". Install it and try again.";
+        SPDLOG_ERROR("install blocked: {} not found on PATH", tool.toStdString());
+        update();
+        return;
+    }
+    warn_message.clear();
+
     installing = true;
+
+    LauncherLog::instance()->show();
+    LauncherLog::instance()->raise();
 
     if (!prefix_progress)
     {
@@ -190,6 +206,17 @@ void WineInstall::paint_content(QPainter& painter)
     painter.setFont(path_font);
     painter.setPen(QColor(0x4F, 0x17, 0x17));
     painter.drawText(path_rect.adjusted(14, 34, -14, 0), Qt::AlignTop | Qt::AlignLeft, game_path);
+
+    if (!warn_message.isEmpty())
+    {
+        QFont warn_font = util::assets::fonts[util::assets::Font::Inter];
+        warn_font.setPixelSize(util::layout::scaled(util::layout::text::k_desc, w));
+        warn_font.setWeight(QFont::DemiBold);
+        painter.setFont(warn_font);
+        painter.setPen(QColor(0xC0, 0x2A, 0x2A));
+        painter.drawText(util::layout::install_modal::warning_line(w),
+                         Qt::AlignHCenter | Qt::AlignVCenter, warn_message);
+    }
 }
 
 bool WineInstall::eventFilter(QObject* obj, QEvent* event)

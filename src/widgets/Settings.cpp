@@ -15,7 +15,6 @@
 #include "spdlog/spdlog.h"
 #include "core/wine/Shell.hpp"
 
-
 Settings::Settings(core::wine::Shell * shell, QWidget* parent) : ModalOverlay(parent), shell(shell)
 {
     set_keeps_chrome(false);
@@ -97,19 +96,16 @@ void Settings::paint_content(QPainter& painter)
     const QRect box = util::layout::settings::box_rect(w);
     painter.drawPixmap(box, util::assets::images[util::assets::Image::BoxSettings]);
 
-    // Title (text per tab)
     {
         QFont tf = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
         tf.setPixelSize(util::layout::scaled(util::layout::text::k_modal_header, w));
         tf.setWeight(QFont::Black);
         painter.setFont(tf);
         painter.setPen(QColor(0x4F, 0x17, 0x17));
-        const char* title = (active_tab == 1) ? "WINE SETTINGS" : (active_tab == 2) ? "ADVANCED SETTINGS": "LAUNCHER SETTINGS";
-        const QRect title_rect(box.left(), box.top() + util::layout::scaled(30, w), box.width(), util::layout::scaled(30, w));
-        painter.drawText(title_rect, Qt::AlignCenter, title);
+        const char* title = (active_tab == 1) ? "WINE SETTINGS" : (active_tab == 2) ? "ADVANCED SETTINGS" : "LAUNCHER SETTINGS";
+        painter.drawText(util::layout::settings::page_title(w), Qt::AlignCenter, title);
     }
 
-    // Tabs
     constexpr QColor active   {0xFB, 0xF6, 0xF0};
     constexpr QColor inactive {0xD8, 0xCD, 0xC0};
     constexpr QColor textCol  {0x4F, 0x17, 0x17};
@@ -118,7 +114,7 @@ void Settings::paint_content(QPainter& painter)
     f.setPixelSize(util::layout::scaled(util::layout::text::k_label, w));
     f.setWeight(QFont::Black);
     painter.setFont(f);
-    const int radius = util::layout::scaled(8, w);
+    const int radius = util::layout::settings::tab_radius(w);
 
     for (int i = 0; i < 3; ++i)
     {
@@ -127,7 +123,6 @@ void Settings::paint_content(QPainter& painter)
         const bool  on = i == active_tab;
         QPainterPath p;
 
-        // Round only the top corners so the bottom melds into the box.
         p.addRoundedRect(QRectF(r), radius, radius);
         painter.fillPath(p, on ? active : inactive);
         painter.setPen(on ? textCol : textCol.lighter(140));

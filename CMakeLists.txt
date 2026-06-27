@@ -60,7 +60,7 @@ set(LAUNCHER_SOURCES
         src/main.cpp
         src/MainWindow.cpp
         src/util/Assets.cpp
-        src/widgets/StartBox.cpp
+        src/widgets/Playtest.cpp
         src/widgets/Settings.cpp
         src/util/Layout.cpp
         src/widgets/LauncherSettings.cpp
@@ -69,7 +69,7 @@ set(LAUNCHER_SOURCES
         src/widgets/WineInstall.cpp
         src/util/ModalOverlay.cpp
         src/util/SimpleUtils.cpp
-        src/widgets/LauncherLog.cpp
+        src/util/LauncherLog.cpp
         src/widgets/AdvancedSettings.cpp
         src/core/Log.cpp
         src/core/wine/Shell.cpp
@@ -79,12 +79,14 @@ set(LAUNCHER_SOURCES
         src/widgets/GameInstall.cpp
         src/widgets/DownloadProgress.cpp
         src/widgets/PrefixProgress.cpp
+        src/core/wine/WineRegistry.cpp
+        src/util/ProgressBar.cpp
 )
 
 set(LAUNCHER_HEADERS
         include/MainWindow.hpp
         include/util/Assets.hpp
-        include/widgets/StartBox.hpp
+        include/widgets/Playtest.hpp
         include/widgets/Settings.hpp
         include/util/Layout.hpp
         include/widgets/LauncherSettings.hpp
@@ -106,6 +108,8 @@ set(LAUNCHER_HEADERS
         include/widgets/GameInstall.hpp
         include/widgets/DownloadProgress.hpp
         include/widgets/PrefixProgress.hpp
+        include/core/wine/WineRegistry.hpp
+        include/util/ProgressBar.hpp
 )
 
 # Resources (.qrc files)

@@ -31,6 +31,7 @@ class WineInstall : public util::modal_overlay::ModalOverlay
         void setup_buttons();
 
         QString game_path {};
+        QString warn_message {};
         QPushButton* close_button {};
         QPushButton* install_button {};
         QPushButton* cancel_button {};
