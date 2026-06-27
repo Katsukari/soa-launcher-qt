@@ -4,6 +4,7 @@
 #include <QStandardPaths>
 #include <QDir>
 #include <QFile>
+#include <QSaveFile>
 #include <QFileInfo>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -36,7 +37,8 @@ namespace util::config
         d = new Impl();
 
         const QString dir = QFileInfo(file_path()).absolutePath();
-        QDir().mkpath(dir);
+        if (!QDir().mkpath(dir))
+            SPDLOG_ERROR("config: could not create config directory {}", dir.toStdString());
 
         load();
         load_env();
@@ -100,8 +102,8 @@ namespace util::config
         const QJsonObject obj = QJsonObject::fromVariantMap(d->values);
         const QJsonDocument doc(obj);
 
-        QFile f(file_path());
-        if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+        QSaveFile f(file_path());
+        if (!f.open(QIODevice::WriteOnly))
         {
             SPDLOG_ERROR("config: cannot write {}", file_path().toStdString());
             return;
@@ -109,7 +111,8 @@ namespace util::config
 
         writing = true;
         f.write(doc.toJson(QJsonDocument::Indented));
-        f.close();
+        if (!f.commit())
+            SPDLOG_ERROR("config: failed to commit {}", file_path().toStdString());
 
         QTimer::singleShot(150, this, [this]() { writing = false; });
     }
@@ -147,8 +150,8 @@ namespace util::config
 
     void Config::save_env()
     {
-        QFile f(env_path());
-        if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text))
+        QSaveFile f(env_path());
+        if (!f.open(QIODevice::WriteOnly | QIODevice::Text))
         {
             SPDLOG_ERROR("config: cannot write .env at {}", env_path().toStdString());
             return;
@@ -160,10 +163,15 @@ namespace util::config
         out << "SOA_USER=" << d->username << "\n";
         out << "SOA_TOKEN=" << d->token << "\n";
         out << "SOA_USERNAME=" << d->display_name << "\n";
-        f.close();
+        out.flush();
 
-        // Owner-only permissions so others can't read the token.
-        f.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+        if (!f.commit())
+        {
+            SPDLOG_ERROR("config: failed to commit .env");
+            return;
+        }
+
+        QFile::setPermissions(env_path(), QFileDevice::ReadOwner | QFileDevice::WriteOwner);
 
         SPDLOG_DEBUG("config: wrote .env (auth)");
     }
@@ -176,16 +184,22 @@ namespace util::config
 
     void Config::probe_system_paths()
     {
-        auto probe_into = [this](const QString& key, const char* exe)
+        QStringList extra_dirs;
+#ifdef Q_OS_MACOS
+        extra_dirs << "/opt/homebrew/bin" << "/usr/local/bin";
+#endif
+        auto probe_into = [this, &extra_dirs](const QString& key, const QString& exe)
         {
-            if (d->values.value(key).toString().isEmpty())
+            if (!d->values.value(key).toString().isEmpty()) return;
+
+            QString found = QStandardPaths::findExecutable(exe);
+            if (found.isEmpty() && !extra_dirs.isEmpty())
+                found = QStandardPaths::findExecutable(exe, extra_dirs);
+
+            if (!found.isEmpty())
             {
-                const QString found = QStandardPaths::findExecutable(exe);
-                if (!found.isEmpty())
-                {
-                    d->values[key] = found;
-                    SPDLOG_DEBUG("config: probed {} at {}", exe, found.toStdString());
-                }
+                d->values[key] = found;
+                SPDLOG_DEBUG("config: probed {} at {}", exe.toStdString(), found.toStdString());
             }
         };
 
@@ -216,8 +230,6 @@ namespace util::config
 
         set_if_missing("game_id",   "4");
         set_if_missing("game_args", "");
-
-        set_if_missing("game_install_path", derive_game_path(default_prefix));
     }
 
     void Config::reload()

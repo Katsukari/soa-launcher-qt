@@ -12,6 +12,8 @@
 #include "widgets/WineSettings.hpp"
 #include "widgets/AdvancedSettings.hpp"
 #include "util/Layout.hpp"
+#include "util/SimpleUtils.hpp"
+#include "util/Colors.hpp"
 #include "spdlog/spdlog.h"
 #include "core/wine/Shell.hpp"
 
@@ -61,10 +63,7 @@ void Settings::setup_tabs()
 
     auto make_tab = [&](const int i)
     {
-        auto* b = new QPushButton(this);
-        b->setFlat(true);
-        b->setCursor(Qt::PointingHandCursor);
-        b->setStyleSheet("border:none; background:transparent;");
+        auto* b = util::simple_utils::make_flat_button(this);
         b->setGeometry(util::layout::settings::tab_rect(w, i));
         return b;
     };
@@ -101,7 +100,7 @@ void Settings::paint_content(QPainter& painter)
         tf.setPixelSize(util::layout::scaled(util::layout::text::k_modal_header, w));
         tf.setWeight(QFont::Black);
         painter.setFont(tf);
-        painter.setPen(QColor(0x4F, 0x17, 0x17));
+        painter.setPen(util::colors::k_text_maroon);
         const char* title = (active_tab == 1) ? "WINE SETTINGS" : (active_tab == 2) ? "ADVANCED SETTINGS" : "LAUNCHER SETTINGS";
         painter.drawText(util::layout::settings::page_title(w), Qt::AlignCenter, title);
     }

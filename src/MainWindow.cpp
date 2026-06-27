@@ -3,6 +3,7 @@
 #include "widgets/Settings.hpp"
 #include "util/Assets.hpp"
 #include "util/Layout.hpp"
+#include "util/SimpleUtils.hpp"
 #include "core/wine/Shell.hpp"
 #include "core/auth/AuthHandler.hpp"
 
@@ -39,19 +40,13 @@ void MainWindow::setup_window_buttons()
 {
     const QSize w = size();
 
-    close_button = new QPushButton(this);
-    close_button->setFlat(true);
-    close_button->setCursor(Qt::PointingHandCursor);
-    close_button->setStyleSheet("outline:none; border: none; background: transparent;");
+    close_button = util::simple_utils::make_flat_button(this);
     close_button->setIcon(QIcon(util::assets::images[util::assets::Image::CloseIcon]));
     close_button->setIconSize(util::layout::chrome::close_icon(w));
     close_button->setGeometry(util::layout::chrome::close(w));
     connect(close_button, &QPushButton::clicked, this, [this]() { close(); });
 
-    minimize_button = new QPushButton(this);
-    minimize_button->setFlat(true);
-    minimize_button->setCursor(Qt::PointingHandCursor);
-    minimize_button->setStyleSheet("outline:none; border:none; background:transparent; padding:0; margin:0;");
+    minimize_button = util::simple_utils::make_flat_button(this);
     minimize_button->setIcon(QIcon(util::assets::images[util::assets::Image::Minimize]));
     minimize_button->setIconSize(util::layout::chrome::minimize_icon(w));
     minimize_button->setGeometry(util::layout::chrome::minimize(w));

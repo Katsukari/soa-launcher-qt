@@ -1,6 +1,9 @@
 #include "widgets/DownloadProgress.hpp"
 #include "util/Assets.hpp"
 #include "util/Layout.hpp"
+#include "util/SimpleUtils.hpp"
+#include "util/Styles.hpp"
+#include "util/Colors.hpp"
 #include "util/Config.hpp"
 #include "util/ProgressBar.hpp"
 #include <QPainter>
@@ -80,10 +83,7 @@ void DownloadProgress::setup_buttons()
 {
     const QSize w = window()->size();
 
-    close_button = new QPushButton(this);
-    close_button->setFlat(true);
-    close_button->setCursor(Qt::PointingHandCursor);
-    close_button->setStyleSheet("border:none; background:transparent;");
+    close_button = util::simple_utils::make_flat_button(this);
     close_button->setIcon(QIcon(util::assets::images[util::assets::Image::CloseSettings]));
     close_button->setIconSize(dl::close_icon(w));
     close_button->setGeometry(dl::close(w));
@@ -95,40 +95,10 @@ void DownloadProgress::setup_buttons()
     });
     close_button->raise();
 
-    pause_button = new QPushButton(this);
-    pause_button->setFlat(true);
-    pause_button->setCursor(Qt::PointingHandCursor);
-    pause_button->setFocusPolicy(Qt::NoFocus);
-    pause_button->setStyleSheet("border:none; outline:none; background:transparent;");
-    pause_button->setIconSize(dl::pause_icon(w));
-    pause_button->setGeometry(dl::pause(w));
-    connect(pause_button, &QPushButton::clicked, this, [this]()
-    {
-        paused = !paused;
-        update_pause_icon();
-        update();
-    });
-    update_pause_icon();
-    pause_button->raise();
-
     log_button = new QPushButton("SHOW LOG", this);
     log_button->setCursor(Qt::PointingHandCursor);
     log_button->setFocusPolicy(Qt::NoFocus);
-    log_button->setStyleSheet(
-        "QPushButton"
-        "{"
-        "    background: transparent;"
-        "    border: none;"
-        "    outline: none;"
-        "    color: #2FB4E0;"
-        "    font-family: 'Inter';"
-        "    font-size: 13px;"
-        "    font-weight: bold;"
-        "    text-decoration: underline;"
-        "}"
-        "QPushButton:hover { color: #6FD4EF; }"
-        "QPushButton:focus { outline: none; border: none; }"
-    );
+    log_button->setStyleSheet(util::styles::k_link_blue);
     log_button->setGeometry(dl::log_button(w));
     connect(log_button, &QPushButton::clicked, this, []()
     {
@@ -136,12 +106,6 @@ void DownloadProgress::setup_buttons()
         LauncherLog::instance()->raise();
     });
     log_button->raise();
-}
-
-void DownloadProgress::update_pause_icon()
-{
-    const auto img = util::assets::Image::CloseIcon;
-    pause_button->setIcon(QIcon(util::assets::images[img]));
 }
 
 void DownloadProgress::showEvent(QShowEvent* event)
@@ -157,8 +121,6 @@ void DownloadProgress::showEvent(QShowEvent* event)
     file_count = 0;
     done       = false;
     failed     = false;
-    paused     = false;
-    update_pause_icon();
 
     start_download();
 }
@@ -228,26 +190,25 @@ void DownloadProgress::paint_content(QPainter& painter)
     title_font.setPixelSize(util::layout::scaled(util::layout::text::k_row_title, w));
     title_font.setWeight(QFont::Black);
     painter.setFont(title_font);
-    painter.setPen(QColor(0x4F, 0x17, 0x17));
+    painter.setPen(util::colors::k_text_maroon);
     painter.drawText(dl::title(w), Qt::AlignCenter, title_text);
 
     QFont label_font = util::assets::fonts[util::assets::Font::Inter];
     label_font.setPixelSize(util::layout::scaled(util::layout::text::k_body, w));
     label_font.setWeight(QFont::Medium);
     painter.setFont(label_font);
-    painter.setPen(QColor(0x9E, 0x8E, 0x7E));
+    painter.setPen(util::colors::k_text_label);
 
     const QRect info = dl::info_row(w);
     const qulonglong remaining = (total > received) ? (total - received) : 0;
 
     QString left_text;
-    if (paused)      left_text = "Paused";
-    else if (done)   left_text = "Finished";
-    else             left_text = "Time remaining: " + human_eta(remaining, speed);
+    if (done) left_text = "Finished";
+    else      left_text = "Time remaining: " + human_eta(remaining, speed);
 
     painter.drawText(info, Qt::AlignLeft | Qt::AlignVCenter, left_text);
     painter.drawText(info, Qt::AlignRight | Qt::AlignVCenter,
-                     "Download Speed: " + human_speed(paused ? 0 : speed));
+                     "Download Speed: " + human_speed(speed));
 
     util::progress_bar::draw(painter, dl::bar_rect(w), percent / 100.0);
 
@@ -255,6 +216,6 @@ void DownloadProgress::paint_content(QPainter& painter)
     pct_font.setPixelSize(util::layout::scaled(util::layout::text::k_label, w));
     pct_font.setWeight(QFont::DemiBold);
     painter.setFont(pct_font);
-    painter.setPen(failed ? QColor(0xC0, 0x2A, 0x2A) : QColor(0x4F, 0x17, 0x17));
+    painter.setPen(failed ? util::colors::k_warning : util::colors::k_text_maroon);
     painter.drawText(dl::under_row(w), Qt::AlignCenter, QString("%1%").arg(qBound(0, percent, 100)));
 }

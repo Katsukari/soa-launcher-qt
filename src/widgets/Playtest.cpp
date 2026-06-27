@@ -1,5 +1,6 @@
 #include "widgets/Playtest.hpp"
 #include "util/Layout.hpp"
+#include "util/SimpleUtils.hpp"
 #include "util/Config.hpp"
 #include "core/auth/AuthHandler.hpp"
 #include "core/wine/Shell.hpp"
@@ -129,10 +130,7 @@ void Playtest::setup_settings_button()
     const QSize w = window()->size();
     const QRect button = util::layout::playtest::settings_button(w);
 
-    settings_button = new QPushButton(this);
-    settings_button->setFlat(true);
-    settings_button->setCursor(Qt::PointingHandCursor);
-    settings_button->setStyleSheet("outline:none; border: none; background: transparent;");
+    settings_button = util::simple_utils::make_flat_button(this);
 
     const QPixmap scaled = util::assets::images[util::assets::Image::SettingsButton]
         .scaled(button.size(), Qt::KeepAspectRatio, Qt::SmoothTransformation);
@@ -330,17 +328,10 @@ bool Playtest::eventFilter(QObject* obj, QEvent* event)
     if (obj == download_button)
     {
         const auto& button = util::assets::buttons[util::assets::Button::DownloadGame];
-        switch (event->type())
-        {
-            case QEvent::Enter:              download_button->setIcon(QIcon(button.hover));   break;
-            case QEvent::Leave:              download_button->setIcon(QIcon(button.normal));  break;
-            case QEvent::MouseButtonPress:   download_button->setIcon(QIcon(button.clicked)); break;
-            case QEvent::MouseButtonRelease:
-                download_button->setIcon(QIcon(download_button->underMouse() ? button.hover : button.normal));
-                if (download_button->underMouse()) emit download_triggered();
-                break;
-            default: break;
-        }
+        util::simple_utils::apply_button_state(event, download_button, button.normal, button.hover, button.clicked);
+
+        if (event->type() == QEvent::MouseButtonRelease && download_button->underMouse())
+            emit download_triggered();
     }
     return QWidget::eventFilter(obj, event);
 }

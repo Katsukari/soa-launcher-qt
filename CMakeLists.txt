@@ -81,6 +81,8 @@ set(LAUNCHER_SOURCES
         src/widgets/PrefixProgress.cpp
         src/core/wine/WineRegistry.cpp
         src/util/ProgressBar.cpp
+        src/core/status/StatusReporter.cpp
+        src/core/status/StatusBus.cpp
 )
 
 set(LAUNCHER_HEADERS
@@ -110,6 +112,10 @@ set(LAUNCHER_HEADERS
         include/widgets/PrefixProgress.hpp
         include/core/wine/WineRegistry.hpp
         include/util/ProgressBar.hpp
+        include/util/Colors.hpp
+        include/core/status/Status.hpp
+        include/core/status/StatusReporter.hpp
+        include/core/status/StatusBus.hpp
 )
 
 # Resources (.qrc files)

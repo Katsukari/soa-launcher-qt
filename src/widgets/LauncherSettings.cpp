@@ -34,10 +34,7 @@ void LauncherSettings::setup_launch_on_startup_option()
                             "LAUNCH ON STARTUP",
                             "Automatically open the launcher when you log in to your computer.");
 
-    auto* slider = new QPushButton(this);
-    slider->setFlat(true);
-    slider->setCursor(Qt::PointingHandCursor);
-    slider->setStyleSheet("border:none; background:transparent;");
+    auto* slider = util::simple_utils::make_flat_button(this);
 
     const QRect sr = ls::slider_rect(w, y);
     const QSize ssz = sr.size();
@@ -87,10 +84,7 @@ void LauncherSettings::setup_run_connectivity_test_option()
                             "CONNECTIVITY CHECK",
                             "Diagnose issues connecting to the game and related servers.");
 
-    auto* button = new QPushButton(this);
-    button->setFlat(true);
-    button->setCursor(Qt::PointingHandCursor);
-    button->setStyleSheet("border:none; background:transparent;");
+    auto* button = util::simple_utils::make_flat_button(this);
 
     const QRect br = ls::run_check(w, y);
     button->setIcon(QIcon(util::assets::buttons[util::assets::Button::RunCheck].normal

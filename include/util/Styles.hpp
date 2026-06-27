@@ -1,9 +1,5 @@
 #pragma once
 
-// Shared Qt stylesheet strings for settings controls.
-// These were duplicated across LauncherSettings / WineSettings / AdvancedSettings;
-// kept in one place so the look of fields and buttons changes everywhere at once.
-
 namespace util::styles
 {
     inline constexpr const char* k_field =
@@ -17,7 +13,6 @@ namespace util::styles
         "    font-family: 'Inter';"
         "}";
 
-    // Neutral cream button (browse "...", GitHub, Show Log).
     inline constexpr const char* k_neutral_button =
         "QPushButton"
         "{"
@@ -31,7 +26,6 @@ namespace util::styles
         "}"
         "QPushButton:hover { background: #E6DCD0; }";
 
-    // Primary teal button (Generate)
     inline constexpr const char* k_primary_button =
         "QPushButton"
         "{"
@@ -44,4 +38,33 @@ namespace util::styles
         "    font-size: 11px;"
         "}"
         "QPushButton:hover { background: #4FC4EF; }";
+
+    inline constexpr const char* k_flat_transparent =
+        "border:none; outline:none; background:transparent;";
+
+    inline constexpr const char* k_link_blue =
+        "QPushButton"
+        "{"
+        "    background: transparent;"
+        "    border: none;"
+        "    outline: none;"
+        "    color: #2FB4E0;"
+        "    font-family: 'Inter';"
+        "    font-size: 13px;"
+        "    font-weight: bold;"
+        "    text-decoration: underline;"
+        "}"
+        "QPushButton:hover { color: #6FD4EF; }"
+        "QPushButton:focus { outline: none; border: none; }";
+
+    inline constexpr const char* k_link_blue_lg =
+        "QPushButton"
+        "{"
+        "    background: transparent;"
+        "    color: #2FB4E0;"
+        "    font-family: 'Inter';"
+        "    font-size: 15px;"
+        "    text-decoration: underline;"
+        "}"
+        "QPushButton:hover { color: #6FD4EF; outline: none; border: none; }";
 }

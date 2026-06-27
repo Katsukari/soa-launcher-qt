@@ -34,10 +34,7 @@ void WineSettings::setup_dxvk_option()
                             "USE DXVK",
                             "Translate Direct3D to Vulkan for better performance.");
 
-    auto* slider = new QPushButton(this);
-    slider->setFlat(true);
-    slider->setCursor(Qt::PointingHandCursor);
-    slider->setStyleSheet("border:none; background:transparent;");
+    auto* slider = util::simple_utils::make_flat_button(this);
     const QRect sr = ls::slider_rect(w, y);
     const QSize ssz = sr.size();
     slider->setIconSize(ssz);
