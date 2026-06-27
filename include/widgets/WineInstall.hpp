@@ -3,7 +3,7 @@
 
 #include "PrefixProgress.hpp"
 #include "util/ModalOverlay.hpp"
-#include "core/network/soa_bridge.h"
+#include "core/network/Courier.h"
 
 namespace core::wine
 {

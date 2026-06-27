@@ -1,5 +1,5 @@
-module SoaBridge
+module Soa_Courier
 {
-    header "../../../include/core/network/soa_bridge.h"
+    header "../../../include/core/network/Courier.h"
     export *
 }

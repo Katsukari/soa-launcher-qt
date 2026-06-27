@@ -3,7 +3,7 @@
 #include "util/ModalOverlay.hpp"
 #include <QString>
 
-#include "core/network/soa_bridge.h"
+#include "core/network/Courier.h"
 
 class QTimer;
 class QPushButton;
@@ -15,8 +15,8 @@ class DownloadProgress : public util::modal_overlay::ModalOverlay
         explicit DownloadProgress(QWidget* parent = nullptr);
         ~DownloadProgress() override;
 
-    signals:
-        void closed();
+        signals:
+            void closed();
         void download_finished(bool ok);
 
     protected:
@@ -27,14 +27,14 @@ class DownloadProgress : public util::modal_overlay::ModalOverlay
     private:
         void setup_buttons();
         void start_download();
-        void update_pause_icon();
 
         static QString human_size(qulonglong bytes);
         static QString human_speed(qulonglong bytes_per_sec);
         static QString human_eta(qulonglong remaining, qulonglong throughput);
 
-        soa_downloader* downloader {};
+        courier* downloader {};
 
+        courier_phase phase { courier_phase_preparing };
         QString status      { "Preparing download..." };
         int     percent     {0};
         qulonglong received {0};
@@ -44,9 +44,7 @@ class DownloadProgress : public util::modal_overlay::ModalOverlay
         int     file_count  {0};
         bool    done        {};
         bool    failed      {};
-        bool    paused      {};
 
         QPushButton* close_button {};
-        QPushButton* pause_button {};
         QPushButton* log_button {};
 };

@@ -5,7 +5,7 @@
 #include "util/Assets.hpp"
 #include "core/Log.hpp"
 #include "widgets/LauncherLog.hpp"
-#include "core/network/soa_bridge.h"
+#include "core/network/Courier.h"
 #include "core/auth/AuthHandler.hpp"
 
 // TODO list:

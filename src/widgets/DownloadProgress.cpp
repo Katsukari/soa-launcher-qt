@@ -10,14 +10,14 @@
 #include <QPushButton>
 #include <QRegularExpression>
 
-#include "core/network/DownloadBridge.hpp"
+#include "core/network/CourierBridge.hpp"
 #include "widgets/LauncherLog.hpp"
 #include "core/Log.hpp"
 #include <spdlog/spdlog.h>
 
 namespace dl = util::layout::progress_modal;
 using util::config::Config;
-using core::network::DownloadBridge;
+using core::network::CourierBridge;
 
 namespace
 {
@@ -29,9 +29,10 @@ DownloadProgress::DownloadProgress(QWidget* parent) : ModalOverlay(parent)
     setup_buttons();
     close_button->installEventFilter(this);
 
-    connect(&DownloadBridge::instance(), &DownloadBridge::progress, this,
-        [this](const QString& message, int pct, qulonglong rec, qulonglong tot, qulonglong tput)
+    connect(&CourierBridge::instance(), &CourierBridge::progress, this,
+        [this](courier_phase ph, const QString& message, int pct, qulonglong rec, qulonglong tot, qulonglong tput)
         {
+            phase    = ph;
             status   = message;
             percent  = pct;
             received = rec;
@@ -51,7 +52,7 @@ DownloadProgress::DownloadProgress(QWidget* parent) : ModalOverlay(parent)
             update();
         });
 
-    connect(&DownloadBridge::instance(), &DownloadBridge::finished, this,
+    connect(&CourierBridge::instance(), &CourierBridge::finished, this,
         [this](bool ok, const QString& message)
         {
             done    = ok;
@@ -73,8 +74,8 @@ DownloadProgress::~DownloadProgress()
 {
     if (downloader)
     {
-        soa_cancel(downloader);
-        soa_downloader_destroy(downloader);
+        courier_cancel(downloader);
+        courier_destroy(downloader);
         downloader = nullptr;
     }
 }
@@ -89,7 +90,7 @@ void DownloadProgress::setup_buttons()
     close_button->setGeometry(dl::close(w));
     connect(close_button, &QPushButton::clicked, this, [this]()
     {
-        if (downloader) soa_cancel(downloader);
+        if (downloader) courier_cancel(downloader);
         hide();
         emit closed();
     });
@@ -112,6 +113,7 @@ void DownloadProgress::showEvent(QShowEvent* event)
 {
     ModalOverlay::showEvent(event);
 
+    phase      = courier_phase_preparing;
     status     = "Preparing download...";
     percent    = 0;
     received   = 0;
@@ -136,15 +138,15 @@ void DownloadProgress::start_download()
 
     if (!downloader)
     {
-        downloader = soa_downloader_create(
+        downloader = courier_create(
             k_cdn_base,
-            DownloadBridge::progress_callback(),
-            DownloadBridge::done_callback(),
+            CourierBridge::progress_callback(),
+            CourierBridge::done_callback(),
             this);
     }
 
     SPDLOG_INFO("download: starting update to {}", install.toStdString());
-    soa_update(downloader, install.toUtf8().constData());
+    courier_update(downloader, install.toUtf8().constData());
 }
 
 QString DownloadProgress::human_size(qulonglong bytes)
@@ -179,12 +181,33 @@ void DownloadProgress::paint_content(QPainter& painter)
     painter.drawPixmap(dl::box_rect(w), util::assets::images[util::assets::Image::BoxDownload]);
 
     QString title_text;
-    if (file_count > 0)
-        title_text = QString("DOWNLOADING %1 OF %2 FILES").arg(file_index).arg(file_count);
-    else if (done)
+    if (done)
         title_text = "DOWNLOAD COMPLETE";
     else
-        title_text = "DOWNLOADING";
+    {
+        switch (phase)
+        {
+            case courier_phase_preparing:
+                title_text = "PREPARING";
+                break;
+            case courier_phase_checking:
+                title_text = file_count > 0
+                    ? QString("CHECKING %1 OF %2 FILES").arg(file_index).arg(file_count)
+                    : "CHECKING FILES";
+                break;
+            case courier_phase_verifying:
+                title_text = file_count > 0
+                    ? QString("VERIFYING %1 OF %2 FILES").arg(file_index).arg(file_count)
+                    : "VERIFYING FILES";
+                break;
+            case courier_phase_downloading:
+            default:
+                title_text = file_count > 0
+                    ? QString("DOWNLOADING %1 OF %2 FILES").arg(file_index).arg(file_count)
+                    : "DOWNLOADING";
+                break;
+        }
+    }
 
     QFont title_font = util::assets::fonts[util::assets::Font::EurostileBlack];
     title_font.setPixelSize(util::layout::scaled(util::layout::text::k_row_title, w));
@@ -203,12 +226,19 @@ void DownloadProgress::paint_content(QPainter& painter)
     const qulonglong remaining = (total > received) ? (total - received) : 0;
 
     QString left_text;
-    if (done) left_text = "Finished";
-    else      left_text = "Time remaining: " + human_eta(remaining, speed);
+    QString right_text;
+    if (done)
+    {
+        left_text = "Finished";
+    }
+    else if (phase == courier_phase_downloading)
+    {
+        left_text  = "Time remaining: " + human_eta(remaining, speed);
+        right_text = "Download Speed: " + human_speed(speed);
+    }
 
     painter.drawText(info, Qt::AlignLeft | Qt::AlignVCenter, left_text);
-    painter.drawText(info, Qt::AlignRight | Qt::AlignVCenter,
-                     "Download Speed: " + human_speed(speed));
+    painter.drawText(info, Qt::AlignRight | Qt::AlignVCenter, right_text);
 
     util::progress_bar::draw(painter, dl::bar_rect(w), percent / 100.0);
 
