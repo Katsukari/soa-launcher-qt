@@ -221,6 +221,7 @@ namespace util::config
         set_if_missing("wine_prefix",      default_prefix);
         set_if_missing("wine_arch",        "win64");
         set_if_missing("use_dxvk",         false);
+        set_if_missing("runtime_selected", false);
         set_if_missing("wine_args",        "");
         set_if_missing("rosetta_x87_path", "");
 
@@ -230,6 +231,7 @@ namespace util::config
 
         set_if_missing("game_id",   "4");
         set_if_missing("game_args", "");
+        set_if_missing("game_install_path", "");
     }
 
     void Config::reload()
@@ -244,6 +246,7 @@ namespace util::config
     QString Config::rosetta_x87_path() const  { return d->values.value("rosetta_x87_path").toString(); }
     QString Config::wine_arch() const         { const QString v = d->values.value("wine_arch").toString(); return v.isEmpty() ? "win64" : v; }
     bool    Config::use_dxvk() const          { return d->values.value("use_dxvk").toBool(); }
+    bool    Config::runtime_selected() const  { return d->values.value("runtime_selected").toBool(); }
     QString Config::wine_args() const         { return d->values.value("wine_args").toString(); }
 
     bool    Config::launch_on_startup() const { return d->values.value("launch_on_startup").toBool(); }
@@ -275,6 +278,7 @@ namespace util::config
     void Config::set_rosetta_x87_path(const QString& v)  { d->values["rosetta_x87_path"] = v;  save(); emit changed(); }
     void Config::set_wine_arch(const QString& v)         { d->values["wine_arch"] = v;         save(); emit changed(); }
     void Config::set_use_dxvk(bool v)                    { d->values["use_dxvk"] = v;          save(); emit changed(); }
+    void Config::set_runtime_selected(bool v)            { d->values["runtime_selected"] = v; save(); emit changed(); }
     void Config::set_wine_args(const QString& v)         { d->values["wine_args"] = v;         save(); emit changed(); }
 
     void Config::set_launch_on_startup(bool v)           { d->values["launch_on_startup"] = v; save(); emit changed(); }

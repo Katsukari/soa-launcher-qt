@@ -5,6 +5,7 @@ namespace core::state
     enum class View
     {
         Loading,
+        WineSelect,
         WineInstall,
         GameInstall,
         Playtest,
@@ -16,6 +17,7 @@ namespace core::state
         switch (v)
         {
             case View::Loading:     return "Loading";
+            case View::WineSelect:  return "WineSelect";
             case View::WineInstall: return "WineInstall";
             case View::GameInstall: return "GameInstall";
             case View::Playtest:    return "Playtest";

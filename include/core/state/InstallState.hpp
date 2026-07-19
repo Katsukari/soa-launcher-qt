@@ -1,7 +1,7 @@
 #pragma once
 
 #include <QObject>
-#include "Stage.hpp"
+#include "core/state/Stage.hpp"
 #include "core/status/Status.hpp"
 
 namespace core::state
@@ -25,7 +25,7 @@ namespace core::state
             void set_broken(bool v);
 
             signals:
-                void stage_changed(Stage now);
+                void stage_changed(core::state::Stage now);
 
         private:
             void on_reporter_changed(const QString& name, const status::Status& s);
@@ -34,15 +34,16 @@ namespace core::state
 
             bool probed         {false};
             bool broken         {false};
+            bool runtime_chosen {false};
             bool prefix_exists  {false};
             bool prefix_ready   {false};
             bool game_installed {false};
             bool update_needed  {false};
             bool authed         {false};
 
-            status::State wine_state    {status::State::Idle};
-            status::State courier_state {status::State::Idle};
-            status::State auth_state    {status::State::Idle};
+            core::status::State wine_state    {status::State::Idle};
+            core::status::State courier_state {status::State::Idle};
+            core::status::State auth_state    {status::State::Idle};
 
             Stage current {Stage::Probing};
     };

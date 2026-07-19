@@ -23,6 +23,7 @@ namespace util::config
         QString wine_arch() const;
         QString game_install_path() const;
         bool    use_dxvk() const;
+        bool    runtime_selected() const;
         QString wine_args() const;
 
         bool    launch_on_startup() const;
@@ -45,6 +46,7 @@ namespace util::config
         void set_game_install_path(const QString& v);
         void set_wine_arch(const QString& v);
         void set_use_dxvk(bool v);
+        void set_runtime_selected(bool v);  
         void set_wine_args(const QString& v);
 
         void set_launch_on_startup(bool v);

@@ -148,7 +148,7 @@ void WineInstall::start_install()
             installing = false;
         });
 
-    shell->setup_wine();
+    shell->setup();
 }
 
 void WineInstall::paint_content(QPainter& painter)

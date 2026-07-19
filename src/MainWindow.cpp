@@ -17,6 +17,7 @@
 #include "util/ModalOverlay.hpp"
 #include "widgets/WineInstall.hpp"
 #include "widgets/GameInstall.hpp"
+#include "widgets/WineSelectMenu.hpp"
 
 #include "core/state/InstallState.hpp"
 #include "core/state/ViewRouter.hpp"
@@ -44,6 +45,7 @@ MainWindow::MainWindow(QWidget* parent) : QWidget(parent)
     setup_playtest();
     setup_wine_install();
     setup_game_install();
+    setup_wine_select();
 
     connect(install_state, &core::state::InstallState::stage_changed,
             this, &MainWindow::on_stage_changed);
@@ -151,20 +153,31 @@ void MainWindow::setup_game_install()
     });
 }
 
+void MainWindow::setup_wine_select()
+{
+    wine_select = new WineSelectMenu(this);
+    wine_select->hide();
+
+    connect(wine_select, &WineSelectMenu::runtime_chosen, this, [this]()
+    {
+        close_overlay(wine_select);
+        install_state->probe();
+        open_for_current_stage();
+    });
+
+    connect(wine_select, &WineSelectMenu::closed, this, [this]()
+    {
+        on_overlay_closed(wine_select);
+    });
+}
+
 void MainWindow::open_for_current_stage()
 {
     const View v = core::state::view_for(install_state->stage());
 
-    if (v == View::WineInstall && !wine_install->isVisible())
-    {
-        wine_install->show_over(this);
-        on_overlay_opened(wine_install);
-    }
-    else if (v == View::GameInstall && !game_install->isVisible())
-    {
-        game_install->show_over(this);
-        on_overlay_opened(game_install);
-    }
+    if (v == View::WineSelect)       open_overlay(wine_select);
+    else if (v == View::WineInstall) open_overlay(wine_install);
+    else if (v == View::GameInstall) open_overlay(game_install);
 }
 
 void MainWindow::on_stage_changed(Stage s)
@@ -175,28 +188,28 @@ void MainWindow::on_stage_changed(Stage s)
 
     switch (v)
     {
+        case View::WineSelect:
+            close_overlay(wine_install);
+            close_overlay(game_install);
+            break;
+
         case View::WineInstall:
-            if (game_install->isVisible()) { game_install->hide(); on_overlay_closed(game_install); }
+            close_overlay(wine_select);
+            close_overlay(game_install);
             if (s == Stage::NeedsPrefix) break;
-            if (!wine_install->isVisible())
-            {
-                wine_install->show_over(this);
-                on_overlay_opened(wine_install);
-            }
+            open_overlay(wine_install);
             break;
 
         case View::GameInstall:
-            if (wine_install->isVisible()) { wine_install->hide(); on_overlay_closed(wine_install); }
-            if (!game_install->isVisible())
-            {
-                game_install->show_over(this);
-                on_overlay_opened(game_install);
-            }
+            close_overlay(wine_select);
+            close_overlay(wine_install);
+            open_overlay(game_install);
             break;
 
         case View::Playtest:
-            if (wine_install->isVisible()) { wine_install->hide(); on_overlay_closed(wine_install); }
-            if (game_install->isVisible()) { game_install->hide(); on_overlay_closed(game_install); }
+            close_overlay(wine_select);
+            close_overlay(wine_install);
+            close_overlay(game_install);
             break;
 
         case View::Loading:
@@ -228,6 +241,24 @@ void MainWindow::on_overlay_closed(util::modal_overlay::ModalOverlay *)
     close_button->show();
     minimize_button->show();
     update();
+}
+
+void MainWindow::open_overlay(util::modal_overlay::ModalOverlay * m)
+{
+    if (!m->isVisible())
+    {
+        m->show_over(this);
+        on_overlay_opened(m);
+    }
+}
+
+void MainWindow::close_overlay(util::modal_overlay::ModalOverlay * m)
+{
+    if (m->isVisible())
+    {
+        m->hide();
+        on_overlay_closed(m);
+    }
 }
 
 void MainWindow::paintEvent(QPaintEvent*)

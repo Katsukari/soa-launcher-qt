@@ -9,12 +9,26 @@
 #include <QPushButton>
 #include <QLineEdit>
 #include <QFileDialog>
+#include <QFileInfo>
+#include <functional>
 
 #include "core/wine/Shell.hpp"
 
 using util::config::Config;
 namespace ls = util::layout::settings;
 namespace wset = util::layout::wine_settings;
+
+namespace
+{
+    void sync_field(QLineEdit* field, std::function<QString()> getter)
+    {
+        QObject::connect(&Config::instance(), &Config::changed, field, [field, getter]()
+        {
+            if (!field->hasFocus())
+                field->setText(getter());
+        });
+    }
+}
 
 
 WineSettings::WineSettings(core::wine::Shell* shell_, QWidget* parent) : QWidget(parent), shell(shell_)
@@ -48,11 +62,17 @@ void WineSettings::setup_dxvk_option()
     };
     paint(Config::instance().use_dxvk());
 
-    connect(slider, &QPushButton::clicked, this, [paint]()
+    connect(slider, &QPushButton::clicked, this, [this, paint]()
     {
         const bool on = !Config::instance().use_dxvk();
         Config::instance().set_use_dxvk(on);
         paint(on);
+        shell->sync_dxvk();
+    });
+
+    connect(&Config::instance(), &Config::changed, slider, [paint]()
+    {
+        paint(Config::instance().use_dxvk());
     });
 }
 
@@ -68,6 +88,7 @@ void WineSettings::setup_prefix_option()
     field->setText(Config::instance().wine_prefix());
     field->setStyleSheet(util::styles::k_field);
     field->setGeometry(ls::field_rect(w, y));
+    sync_field(field, []() { return Config::instance().wine_prefix(); });
 
     auto* browse = new QPushButton("...", this);
     browse->setCursor(Qt::PointingHandCursor);
@@ -84,7 +105,8 @@ void WineSettings::setup_prefix_option()
     });
     connect(field, &QLineEdit::editingFinished, this, [field]()
     {
-        Config::instance().set_wine_prefix(field->text());
+        if (field->text() != Config::instance().wine_prefix())
+            Config::instance().set_wine_prefix(field->text());
     });
 }
 
@@ -94,30 +116,45 @@ void WineSettings::setup_wine_binary_option()
     const int y = wset::row(2);
     util::simple_utils::make_label_block(this, w, y,
                             "CUSTOM WINE / PROTON",
-                            "Path to a wine or proton binary. Blank uses system wine.");
+                            "A wine binary, or a Proton folder's \"proton\" script. Blank uses system wine.");
 
     auto* field = new QLineEdit(this);
     field->setPlaceholderText("system wine");
     field->setStyleSheet(util::styles::k_field);
     field->setGeometry(ls::field_rect(w, y));
     field->setText(Config::instance().wine_binary());
+    sync_field(field, []() { return Config::instance().wine_binary(); });
+
+    auto normalize = [](const QString& path) -> QString
+    {
+        const QFileInfo info(path);
+        if (info.isFile() && info.fileName() == "proton")
+            return info.absolutePath();
+        return path;
+    };
+
+    auto apply = [field, normalize](const QString& raw)
+    {
+        const QString path = normalize(raw);
+        if (path == Config::instance().wine_binary()) return;
+        Config::instance().set_wine_binary(path);
+        if (!path.isEmpty())
+            Config::instance().set_runtime_selected(true);
+        field->setText(path);
+    };
 
     auto* browse = new QPushButton("...", this);
     browse->setCursor(Qt::PointingHandCursor);
     browse->setStyleSheet(util::styles::k_neutral_button);
     browse->setGeometry(ls::browse_rect(w, y));
-    connect(browse, &QPushButton::clicked, this, [this, field]()
+    connect(browse, &QPushButton::clicked, this, [this, apply]()
     {
-        const QString file = QFileDialog::getOpenFileName(this, "Select Wine / Proton Binary");
-        if (!file.isEmpty())
-        {
-            Config::instance().set_wine_binary(file);
-            field->setText(file);
-        }
+        const QString file = QFileDialog::getOpenFileName(this, "Select Wine Binary or Proton Script");
+        if (!file.isEmpty()) apply(file);
     });
-    connect(field, &QLineEdit::editingFinished, this, [field]()
+    connect(field, &QLineEdit::editingFinished, this, [field, apply]()
     {
-        Config::instance().set_wine_binary(field->text());
+        apply(field->text());
     });
 }
 
@@ -134,6 +171,7 @@ void WineSettings::setup_tricks_option()
     field->setStyleSheet(util::styles::k_field);
     field->setGeometry(ls::field_rect(w, y));
     field->setText(Config::instance().winetricks_binary());
+    sync_field(field, []() { return Config::instance().winetricks_binary(); });
 
     auto* browse = new QPushButton("...", this);
     browse->setCursor(Qt::PointingHandCursor);
@@ -150,7 +188,8 @@ void WineSettings::setup_tricks_option()
     });
     connect(field, &QLineEdit::editingFinished, this, [field]()
     {
-        Config::instance().set_winetricks_binary(field->text());
+        if (field->text() != Config::instance().winetricks_binary())
+            Config::instance().set_winetricks_binary(field->text());
     });
 }
 
@@ -168,9 +207,11 @@ void WineSettings::setup_wine_args_option()
     field->setGeometry(ls::ctrl_pos(w, y).x(), ls::ctrl_pos(w, y).y(),
                        ls::ctrl_w(w), util::layout::scaled(34, w));
     field->setText(Config::instance().wine_args());
+    sync_field(field, []() { return Config::instance().wine_args(); });
 
     connect(field, &QLineEdit::editingFinished, this, [field]()
     {
-        Config::instance().set_wine_args(field->text());
+        if (field->text() != Config::instance().wine_args())
+            Config::instance().set_wine_args(field->text());
     });
 }

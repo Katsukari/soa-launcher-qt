@@ -1,4 +1,5 @@
 #pragma once
+
 #include <QMainWindow>
 #include "widgets/WineInstall.hpp"
 
@@ -22,6 +23,7 @@ class QLabel;
 class Playtest;
 class Settings;
 class GameInstall;
+class WineSelectMenu;
 class AuthHandler;
 
 class MainWindow : public QWidget
@@ -41,8 +43,11 @@ class MainWindow : public QWidget
         void setup_playtest();
         void setup_wine_install();
         void setup_game_install();
+        void setup_wine_select();
         void on_overlay_opened(util::modal_overlay::ModalOverlay * m);
         void on_overlay_closed(util::modal_overlay::ModalOverlay *);
+        void open_overlay(util::modal_overlay::ModalOverlay * m);
+        void close_overlay(util::modal_overlay::ModalOverlay * m);
         void on_stage_changed(core::state::Stage s);
         void open_for_current_stage();
         QPoint drag_offset;
@@ -53,6 +58,7 @@ class MainWindow : public QWidget
         Settings * settings = nullptr;
         WineInstall * wine_install = nullptr;
         GameInstall * game_install = nullptr;
+        WineSelectMenu * wine_select = nullptr;
         core::wine::Shell * shell {};
         AuthHandler * auth {};
         core::state::InstallState * install_state {};

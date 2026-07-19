@@ -9,4 +9,5 @@ class AdvancedSettings : public QWidget
 
     private:
         void setup_game_args_option();
+        void setup_game_path_option();
 };

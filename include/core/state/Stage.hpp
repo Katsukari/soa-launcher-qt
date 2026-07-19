@@ -5,6 +5,7 @@ namespace core::state
     enum class Stage
     {
         Probing,
+        NeedsRuntime,
         NeedsPrefix,
         PrefixBroken,
         SettingUpPrefix,
@@ -23,6 +24,7 @@ namespace core::state
         switch (s)
         {
             case Stage::Probing:         return "Probing";
+            case Stage::NeedsRuntime:    return "NeedsRuntime";
             case Stage::NeedsPrefix:     return "NeedsPrefix";
             case Stage::PrefixBroken:    return "PrefixBroken";
             case Stage::SettingUpPrefix: return "SettingUpPrefix";

@@ -200,7 +200,7 @@ namespace util::layout
 
     namespace advanced_settings
     {
-        int row(const int) { return k_row_single; }
+        int row(const int i) { return settings::row_y(i, 5, false); }
     }
 
     namespace dropdown

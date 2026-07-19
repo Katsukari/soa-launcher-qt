@@ -5,7 +5,7 @@ project(soa_launcher
         VERSION 0.1.0
 )
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -88,6 +88,7 @@ set(LAUNCHER_SOURCES
         src/core/status/StatusBus.cpp
         src/core/state/InstallState.cpp
         src/core/state/ViewRouter.cpp
+        src/widgets/WineSelectMenu.cpp
 )
 
 set(LAUNCHER_HEADERS
@@ -126,6 +127,7 @@ set(LAUNCHER_HEADERS
         include/core/state/Stage.hpp
         include/core/state/InstallState.hpp
         include/core/network/DownloadStatus.hpp
+        include/widgets/WineSelectMenu.hpp
 )
 
 set(LAUNCHER_RESOURCES

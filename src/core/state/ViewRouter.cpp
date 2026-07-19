@@ -8,6 +8,8 @@ namespace core::state
         {
             case Stage::Probing:         return View::Loading;
 
+            case Stage::NeedsRuntime:    return View::WineSelect;
+
             case Stage::NeedsPrefix:     return View::WineInstall;
             case Stage::PrefixBroken:    return View::WineInstall;
             case Stage::SettingUpPrefix: return View::WineInstall;
