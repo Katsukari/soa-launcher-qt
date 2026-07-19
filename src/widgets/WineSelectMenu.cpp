@@ -120,7 +120,7 @@ void WineSelectMenu::populate()
     lay->addStretch(1);
     list->setWidget(content);
 
-    const bool tricks = cw::tricks_available(cw::RuntimeType::Wine);
+    const bool tricks = cw::winetricks_available();
     tricks_status->setText(tricks
         ? "winetricks: ready"
         : "winetricks not found - required components will be installed manually");

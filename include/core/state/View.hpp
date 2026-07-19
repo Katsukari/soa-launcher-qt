@@ -8,7 +8,7 @@ namespace core::state
         WineSelect,
         WineInstall,
         GameInstall,
-        Playtest,
+        AliciaChooser,
         Error
     };
 
@@ -20,7 +20,7 @@ namespace core::state
             case View::WineSelect:  return "WineSelect";
             case View::WineInstall: return "WineInstall";
             case View::GameInstall: return "GameInstall";
-            case View::Playtest:    return "Playtest";
+            case View::AliciaChooser: return "AliciaChooser";
             case View::Error:       return "Error";
         }
         return "Loading";

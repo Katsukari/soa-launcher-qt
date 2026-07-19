@@ -5,6 +5,7 @@
 #include "util/Styles.hpp"
 #include "util/Colors.hpp"
 #include "util/Config.hpp"
+#include "core/game/GameVersion.hpp"
 #include "util/ProgressBar.hpp"
 #include <QPainter>
 #include <QPushButton>
@@ -19,11 +20,6 @@ using util::config::Config;
 using core::network::CourierBridge;
 using core::network::DownloadStatus;
 using core::status::State;
-
-namespace
-{
-    constexpr const char* k_cdn_base = "https://r2.storyofalicia.com/game";
-}
 
 DownloadProgress::DownloadProgress(QWidget* parent) : ModalOverlay(parent)
 {
@@ -101,18 +97,34 @@ void DownloadProgress::hideEvent(QHideEvent* event)
 
 void DownloadProgress::start_download()
 {
-    const QString install = Config::instance().game_install_path();
+    auto& config = Config::instance();
+    const auto version = config.game_version();
+    const auto& game = core::game::profile(version);
+    const QString install = config.game_install_path();
+
+    if (downloader)
+    {
+        courier_cancel(downloader);
+        courier_destroy(downloader);
+        downloader = nullptr;
+    }
+
+    downloader = courier_create(
+        game.cdn_base_url,
+        CourierBridge::progress_callback(),
+        CourierBridge::done_callback(),
+        this);
 
     if (!downloader)
     {
-        downloader = courier_create(
-            k_cdn_base,
-            CourierBridge::progress_callback(),
-            CourierBridge::done_callback(),
-            this);
+        SPDLOG_ERROR("download: failed to create courier for game {}", core::game::to_string(version).toStdString());
+        return;
     }
 
-    SPDLOG_INFO("download: starting update to {}", install.toStdString());
+    SPDLOG_INFO("download: starting game {} update from {} to {}",
+                core::game::to_string(version).toStdString(),
+                game.cdn_base_url,
+                install.toStdString());
     courier_update(downloader, install.toUtf8().constData());
 }
 

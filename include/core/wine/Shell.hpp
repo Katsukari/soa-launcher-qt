@@ -49,9 +49,17 @@ namespace core::wine
                 QString             program;
                 QStringList         args;
                 QProcessEnvironment env;
+                bool                inspect_components_after {false};
             };
             void run_setup(QVector<SetupCommand> commands);
             void advance_setup();
+            bool queue_missing_components();
+            bool required_components_present() const;
+            QStringList missing_component_packages() const;
+            QProcessEnvironment winetricks_environment() const;
+            command_result run_blocking_command(const QString& program, const QStringList& args,
+                                                const QProcessEnvironment& env) const;
+            bool apply_first_launch_settings();
 
             QProcess*             process {};
             command_result        current;

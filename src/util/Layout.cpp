@@ -48,27 +48,20 @@ namespace util::layout
 
     namespace chrome
     {
-        int logo_width(const QSize win) { return scaled(k_logo_width, win); }
-        int logo_top(const QSize win)   { return scaled(k_logo_top, win); }
-
-        QPoint logo_pos(const QSize win)
-        {
-            const QRect r = region::rect(win);
-            return { r.x() + (r.width() - logo_width(win)) / 2, logo_top(win) };
-        }
-
         QRect close(const QSize win)         { return scaled(k_close, win); }
         QSize close_icon(const QSize win)    { return scaled(k_close_icon, win); }
         QRect minimize(const QSize win)      { return scaled(k_minimize, win); }
         QSize minimize_icon(const QSize win) { return scaled(k_minimize_icon, win); }
 
-        QPoint pt_icon(const QSize win)   { return scaled(k_pt_icon, win); }
-        QPoint lock_icon(const QSize win) { return scaled(k_lock_icon, win); }
+        QRect playtest_button(const QSize win) { return scaled(k_playtest_button, win); }
+        QRect alicia_2_button(const QSize win) { return scaled(k_alicia_2_button, win); }
+        QPoint playtest_icon_offset(const QSize win) { return scaled(k_playtest_icon_offset, win); }
+        QPoint alicia_2_icon_offset(const QSize win) { return scaled(k_alicia_2_icon_offset, win); }
 
         QRect version(const QSize win) { return scaled(k_version, win); }
     }
 
-    namespace playtest
+    namespace alicia_chooser
     {
         QRect  rect(const QSize win)            { return scaled(k_rect, win); }
         QPoint pos(const QSize win)             { return rect(win).topLeft(); }

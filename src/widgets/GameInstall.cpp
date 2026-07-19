@@ -20,7 +20,7 @@ using util::config::Config;
 
 GameInstall::GameInstall(core::wine::Shell* shell_, QWidget* parent) : ModalOverlay(parent), shell(shell_)
 {
-    game_path = Config::instance().game_install_path();
+    refresh_game_path();
 
     setup_close_button();
     setup_buttons();
@@ -28,6 +28,13 @@ GameInstall::GameInstall(core::wine::Shell* shell_, QWidget* parent) : ModalOver
     close_button->installEventFilter(this);
     cancel_button->installEventFilter(this);
     install_button->installEventFilter(this);
+}
+
+void GameInstall::refresh_game_path()
+{
+    game_path = Config::instance().game_install_path();
+    show_warning = false;
+    update();
 }
 
 void GameInstall::setup_close_button()
@@ -86,7 +93,10 @@ void GameInstall::setup_buttons()
 
     connect(change_path_button, &QPushButton::clicked, this, [this]
     {
-        const QString dir = QFileDialog::getExistingDirectory(this, "Select Game Install Location");
+        const QString dir = QFileDialog::getExistingDirectory(
+            this,
+            "Select Game Install Location",
+            Config::instance().prefix_root());
         if (!dir.isEmpty())
         {
             Config::instance().set_game_install_path(dir);
@@ -101,10 +111,7 @@ void GameInstall::setup_buttons()
 
 bool GameInstall::path_inside_prefix() const
 {
-    const QString prefix = QDir(Config::instance().wine_prefix()).absolutePath();
-    const QString game   = QDir(game_path).absolutePath();
-
-    return game == prefix || game.startsWith(prefix + QDir::separator());
+    return Config::instance().path_inside_prefix(game_path);
 }
 
 void GameInstall::start_install()
@@ -117,7 +124,9 @@ void GameInstall::start_install()
 
     if (!path_inside_prefix())
     {
-        SPDLOG_ERROR("game install: chosen path is outside the wine prefix, refusing");
+        SPDLOG_ERROR("game install: chosen path {} is outside prefix root {}, refusing",
+                     game_path.toStdString(),
+                     Config::instance().prefix_root().toStdString());
         show_warning = true;
         update();
         return;

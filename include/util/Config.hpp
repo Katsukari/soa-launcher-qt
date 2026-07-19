@@ -4,6 +4,8 @@
 #include <QString>
 #include <QStringList>
 
+#include "core/game/GameVersion.hpp"
+
 class QFileSystemWatcher;
 
 namespace util::config
@@ -20,6 +22,7 @@ namespace util::config
         QString rosetta_x87_path() const;
 
         QString wine_prefix() const;
+        QString prefix_root() const;
         QString wine_arch() const;
         QString game_install_path() const;
         bool    use_dxvk() const;
@@ -30,6 +33,8 @@ namespace util::config
         QString after_game_start() const;
         QString launcher_size() const;
 
+        core::game::GameVersion game_version() const;
+
         QString game_id() const;
         QString game_args() const;
 
@@ -38,6 +43,7 @@ namespace util::config
         QString display_name() const;
         bool    has_auth() const;
         bool    game_installed() const;
+        bool    path_inside_prefix(const QString& path) const;
 
         void set_wine_binary(const QString& v);
         void set_winetricks_binary(const QString& v);
@@ -53,11 +59,14 @@ namespace util::config
         void set_after_game_start(const QString& v);
         void set_launcher_size(const QString& v);
 
+        void set_game_version(core::game::GameVersion v);
+
         void set_game_id(const QString& v);
         void set_game_args(const QString& v);
 
         void set_auth(const QString& username, const QString& token, const QString& display_name = {});
         void clear_auth();
+        bool reset_launcher_config();
 
         QString file_path() const;
         QString env_path() const;
@@ -78,7 +87,9 @@ namespace util::config
         void save_env();
         void apply_defaults();
         void probe_system_paths();
-        QString derive_game_path(const QString& prefix) const;
+        QString derive_game_path(const QString& prefix, core::game::GameVersion version) const;
+        QString normalize_game_path(const QString& path) const;
+        static QString game_install_path_key(core::game::GameVersion version);
 
         class Impl;
         Impl* d {};

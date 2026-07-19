@@ -19,9 +19,9 @@ namespace core::state
             case Stage::Downloading:     return View::GameInstall;
             case Stage::Updating:        return View::GameInstall;
 
-            case Stage::NeedsAuth:       return View::Playtest;
-            case Stage::Authenticating:  return View::Playtest;
-            case Stage::Ready:           return View::Playtest;
+            case Stage::NeedsAuth:       return View::AliciaChooser;
+            case Stage::Authenticating:  return View::AliciaChooser;
+            case Stage::Ready:           return View::AliciaChooser;
 
             case Stage::Broken:          return View::Error;
         }

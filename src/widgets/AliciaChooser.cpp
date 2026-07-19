@@ -1,4 +1,4 @@
-#include "widgets/Playtest.hpp"
+#include "widgets/AliciaChooser.hpp"
 #include "util/Layout.hpp"
 #include "util/SimpleUtils.hpp"
 #include "util/Config.hpp"
@@ -40,9 +40,9 @@ namespace
         "    background: transparent;"
         "    border: none;"
         "    color: #9E8E7E;"
-        "    font-family: 'Eurostile';"
-        "    font-weight: 800;"
-        "    font-size: 13px;"
+        "    font-family: 'Inter';"
+        "    font-weight: 700;"
+        "    font-size: 15px;"
         "}"
         "QPushButton:hover { color: #7E6E5E; }";
 
@@ -53,12 +53,16 @@ namespace
         "QCheckBox::indicator:checked { image: url(:/assets/checkbox-ticked.png); }";
 }
 
-Playtest::Playtest(AuthHandler* auth_, core::wine::Shell* shell_,
+AliciaChooser::AliciaChooser(AuthHandler* auth_, core::wine::Shell* shell_,
                    core::state::InstallState* install_state_, QWidget* parent)
-    : QWidget(parent), auth(auth_), shell(shell_), install_state(install_state_)
+    : QWidget(parent),
+      auth(auth_),
+      shell(shell_),
+      install_state(install_state_),
+      game_version(Config::instance().game_version())
 {
     const QSize w = window()->size();
-    setFixedSize(util::layout::playtest::box(w));
+    setFixedSize(util::layout::alicia_chooser::box(w));
 
     setup_title();
     setup_settings_button();
@@ -66,25 +70,35 @@ Playtest::Playtest(AuthHandler* auth_, core::wine::Shell* shell_,
     setup_login_state();
     setup_waiting_state();
     setup_signedin_state();
+    refresh_game_text();
 
     reset_path_button = new QPushButton("RESET INSTALLATION PATH", this);
     reset_path_button->setCursor(Qt::PointingHandCursor);
     reset_path_button->setFocusPolicy(Qt::NoFocus);
     reset_path_button->setStyleSheet(k_reset_link);
-    reset_path_button->setGeometry(util::layout::playtest::reset(w));
-    connect(reset_path_button, &QPushButton::clicked, this, []()
+    reset_path_button->setGeometry(util::layout::alicia_chooser::reset(w));
+    reset_path_button->setToolTip("Resets launcher settings and sign-in without deleting the prefix or games");
+    connect(reset_path_button, &QPushButton::clicked, this, [this]()
     {
-        Config::instance().set_game_install_path("");
+        emit reset_config_requested();
     });
 
     on_stage_changed(install_state->stage());
     connect(install_state, &core::state::InstallState::stage_changed,
-            this, &Playtest::on_stage_changed);
+            this, &AliciaChooser::on_stage_changed);
 }
 
-Playtest::State Playtest::state_for(Stage s)
+void AliciaChooser::set_game_version(const core::game::GameVersion version)
 {
-    switch (s)
+    if (game_version == version) return;
+
+    game_version = version;
+    refresh_game_text();
+}
+
+AliciaChooser::State AliciaChooser::state_for(const Stage stage)
+{
+    switch (stage)
     {
         case Stage::NeedsAuth:      return State::Login;
         case Stage::Authenticating: return State::Waiting;
@@ -93,9 +107,9 @@ Playtest::State Playtest::state_for(Stage s)
     }
 }
 
-void Playtest::on_stage_changed(Stage s)
+void AliciaChooser::on_stage_changed(const Stage stage)
 {
-    const State next = state_for(s);
+    const State next = state_for(stage);
 
     if (next == State::SignedIn)
     {
@@ -106,11 +120,11 @@ void Playtest::on_stage_changed(Stage s)
     set_state(next);
 }
 
-void Playtest::setup_title()
+void AliciaChooser::setup_title()
 {
     const QSize w = window()->size();
 
-    title_label = new QLabel("PLAYTEST", this);
+    title_label = new QLabel(this);
     title_label->setAlignment(Qt::AlignCenter);
 
     QFont title_font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
@@ -118,13 +132,13 @@ void Playtest::setup_title()
     title_font.setWeight(QFont::Black);
     title_label->setFont(title_font);
     title_label->setStyleSheet("color: #4F1717; background: transparent;");
-    title_label->setGeometry(util::layout::playtest::title(w));
+    title_label->setGeometry(util::layout::alicia_chooser::title(w));
 }
 
-void Playtest::setup_settings_button()
+void AliciaChooser::setup_settings_button()
 {
     const QSize w = window()->size();
-    const QRect button = util::layout::playtest::settings_button(w);
+    const QRect button = util::layout::alicia_chooser::settings_button(w);
 
     settings_button = util::simple_utils::make_flat_button(this);
 
@@ -137,14 +151,11 @@ void Playtest::setup_settings_button()
     connect(settings_button, &QPushButton::clicked, this, [this] { emit settings_requested(); });
 }
 
-void Playtest::setup_download_state()
+void AliciaChooser::setup_download_state()
 {
     const QSize w = window()->size();
 
     message_label = new QLabel(this);
-    message_label->setText(
-        "Welcome to Story of Alicia. To participate in the playtest, you\n"
-        "have to first create the wine prefix, and download the game.");
     message_label->setAlignment(Qt::AlignCenter);
     message_label->setWordWrap(true);
 
@@ -153,7 +164,7 @@ void Playtest::setup_download_state()
     msg_font.setWeight(QFont::Medium);
     message_label->setFont(msg_font);
     message_label->setStyleSheet("color: #4F1717; background: transparent; padding: 0px 12px;");
-    message_label->setGeometry(util::layout::playtest::message(w));
+    message_label->setGeometry(util::layout::alicia_chooser::message(w));
 
     download_button = new QPushButton(this);
     download_button->setFlat(true);
@@ -163,10 +174,10 @@ void Playtest::setup_download_state()
 
     const QPixmap& normal = util::assets::buttons[util::assets::Button::DownloadGame].normal;
 
-    const int bw = util::layout::playtest::dl_button_w(w);
+    const int bw = util::layout::alicia_chooser::dl_button_w(w);
     const int bh = qRound(bw * static_cast<double>(normal.height()) / normal.width());
-    const int bx = util::layout::playtest::dl_button_x(w);
-    const int by = util::layout::playtest::dl_button_y(w);
+    const int bx = util::layout::alicia_chooser::dl_button_x(w);
+    const int by = util::layout::alicia_chooser::dl_button_y(w);
 
     download_button->setIcon(QIcon(normal));
     download_button->setIconSize(QSize(bw, bh));
@@ -174,11 +185,11 @@ void Playtest::setup_download_state()
     download_button->installEventFilter(this);
 }
 
-void Playtest::setup_login_state()
+void AliciaChooser::setup_login_state()
 {
     const QSize w = window()->size();
 
-    const QRect dr = util::layout::playtest::discord_button(w);
+    const QRect dr = util::layout::alicia_chooser::discord_button(w);
     const QPixmap& discord_normal = util::assets::buttons[util::assets::Button::Discord].normal;
     const int dw = dr.width();
     const int dh = qRound(dw * static_cast<double>(discord_normal.height()) / discord_normal.width());
@@ -203,10 +214,10 @@ void Playtest::setup_login_state()
         "and service purposes. This data can be removed upon request by emailing "
         "<a href=\"mailto:dev@storyofalicia.com\" style=\"color:#2FB4E0;\">dev@storyofalicia.com</a>.");
     disclaimer_label->setStyleSheet(k_note_box);
-    disclaimer_label->setGeometry(util::layout::playtest::disclaimer(w));
+    disclaimer_label->setGeometry(util::layout::alicia_chooser::disclaimer(w));
 }
 
-void Playtest::setup_waiting_state()
+void AliciaChooser::setup_waiting_state()
 {
     const QSize w = window()->size();
 
@@ -217,7 +228,7 @@ void Playtest::setup_waiting_state()
     wf.setWeight(QFont::Black);
     waiting_title->setFont(wf);
     waiting_title->setStyleSheet("color: #4F1717; background: transparent;");
-    waiting_title->setGeometry(util::layout::playtest::waiting_title(w));
+    waiting_title->setGeometry(util::layout::alicia_chooser::waiting_title(w));
 
     steps_label = new QLabel(this);
     steps_label->setWordWrap(true);
@@ -227,32 +238,32 @@ void Playtest::setup_waiting_state()
         "<b>2.</b>&nbsp; On the website, tick the checkboxes and click <b>Enter the Game</b>.<br>"
         "<b>3.</b>&nbsp; The launcher will update automatically once done.");
     steps_label->setStyleSheet(k_note_box);
-    steps_label->setGeometry(util::layout::playtest::steps(w));
+    steps_label->setGeometry(util::layout::alicia_chooser::steps(w));
 }
 
-void Playtest::setup_signedin_state()
+void AliciaChooser::setup_signedin_state()
 {
     const QSize w = window()->size();
 
     check_bugs = new QCheckBox("I understand the game has bugs and is not the final version.", this);
     check_bugs->setCursor(Qt::PointingHandCursor);
     check_bugs->setStyleSheet(k_checkbox);
-    check_bugs->setGeometry(util::layout::playtest::check_bugs(w));
+    check_bugs->setGeometry(util::layout::alicia_chooser::check_bugs(w));
 
     check_rules = new QCheckBox(this);
     check_rules->setCursor(Qt::PointingHandCursor);
     check_rules->setStyleSheet(k_checkbox);
     check_rules->setText("I have read and will obey the server rules.");
-    check_rules->setGeometry(util::layout::playtest::check_rules(w));
+    check_rules->setGeometry(util::layout::alicia_chooser::check_rules(w));
 
     connect(check_bugs,  &QCheckBox::toggled, this, [this]() { refresh_enter_enabled(); });
     connect(check_rules, &QCheckBox::toggled, this, [this]() { refresh_enter_enabled(); });
 
     signed_in_label = new QLabel("  SIGNED IN", this);
     signed_in_label->setStyleSheet(k_banner_box);
-    signed_in_label->setGeometry(util::layout::playtest::signed_in_banner(w));
+    signed_in_label->setGeometry(util::layout::alicia_chooser::signed_in_banner(w));
 
-    const QRect er = util::layout::playtest::enter_button(w);
+    const QRect er = util::layout::alicia_chooser::enter_button(w);
     const QPixmap& enter_normal = util::assets::buttons[util::assets::Button::Enter].normal;
     const int ew = er.width();
     const int eh = qRound(ew * static_cast<double>(enter_normal.height()) / enter_normal.width());
@@ -269,14 +280,14 @@ void Playtest::setup_signedin_state()
     enter_button->installEventFilter(this);
 }
 
-void Playtest::set_state(State s)
+void AliciaChooser::set_state(const State next_state)
 {
-    state = s;
+    state = next_state;
     apply_state_visibility();
-    if (s == State::SignedIn) refresh_enter_enabled();
+    if (next_state == State::SignedIn) refresh_enter_enabled();
 }
 
-void Playtest::apply_state_visibility()
+void AliciaChooser::apply_state_visibility()
 {
     const bool download = state == State::Download;
     const bool login    = state == State::Login;
@@ -300,12 +311,25 @@ void Playtest::apply_state_visibility()
     reset_path_button->setVisible(!download);
 }
 
-void Playtest::refresh_enter_enabled()
+void AliciaChooser::refresh_enter_enabled()
 {
     enter_button->setEnabled(check_bugs->isChecked() && check_rules->isChecked());
 }
 
-void Playtest::paintEvent(QPaintEvent* event)
+void AliciaChooser::refresh_game_text()
+{
+    const bool alicia_2 = game_version == core::game::GameVersion::Alicia2;
+
+    title_label->setText(alicia_2 ? "STORY OF ALICIA 2.0 PLAYTEST" : "PLAYTEST");
+    message_label->setText(
+        alicia_2
+            ? "Welcome to Story of Alicia 2.0. To participate in the playtest, you\n"
+              "have to first download the game."
+            : "Welcome to Story of Alicia. To participate in the playtest, you\n"
+              "have to first download the game.");
+}
+
+void AliciaChooser::paintEvent(QPaintEvent* event)
 {
     Q_UNUSED(event);
     const QSize w = window()->size();
@@ -316,11 +340,11 @@ void Playtest::paintEvent(QPaintEvent* event)
     painter.drawPixmap(rect(), util::assets::images[util::assets::Image::BoxCard]);
 
     if (state == State::Download)
-        painter.drawPixmap(util::layout::playtest::message(w),
+        painter.drawPixmap(util::layout::alicia_chooser::message(w),
                            util::assets::images[util::assets::Image::BoxNote2]);
 }
 
-bool Playtest::eventFilter(QObject* obj, QEvent* event)
+bool AliciaChooser::eventFilter(QObject* obj, QEvent* event)
 {
     if (obj == download_button)
     {

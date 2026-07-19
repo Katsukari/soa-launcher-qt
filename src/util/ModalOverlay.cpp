@@ -1,76 +1,108 @@
 #include "util/ModalOverlay.hpp"
+
+#include "core/game/GameVersion.hpp"
 #include "util/Assets.hpp"
+#include "util/Config.hpp"
 #include "util/Layout.hpp"
 
+#include <QGraphicsBlurEffect>
+#include <QGraphicsPixmapItem>
+#include <QGraphicsScene>
 #include <QPainter>
 #include <QPainterPath>
-#include <QGraphicsScene>
-#include <QGraphicsPixmapItem>
-#include <QGraphicsBlurEffect>
 
 namespace util::modal_overlay
 {
     namespace
     {
-        QPixmap blur_pixmap(const QPixmap & src, const qreal radius)
+        QPixmap blur_pixmap(const QPixmap& source, const qreal radius)
         {
             QGraphicsScene scene;
-            auto* item = new QGraphicsPixmapItem(src);
+            auto* item = new QGraphicsPixmapItem(source);
             auto* blur = new QGraphicsBlurEffect;
             blur->setBlurRadius(radius);
             item->setGraphicsEffect(blur);
             scene.addItem(item);
 
-            QPixmap out(src.size());
-            out.fill(QColor(0xEA, 0xF2, 0xF7));
-            QPainter p(&out);
-            p.setRenderHint(QPainter::SmoothPixmapTransform);
-            scene.render(&p, QRectF(), QRectF(src.rect()));
-            return out;
+            QPixmap output(source.size());
+            output.fill(QColor(0xEA, 0xF2, 0xF7));
+            QPainter painter(&output);
+            painter.setRenderHint(QPainter::SmoothPixmapTransform);
+            scene.render(&painter, QRectF(), QRectF(source.rect()));
+            return output;
+        }
+
+        void draw_version_button(QPainter& painter, const QSize window_size,
+                                 const QRect button_rect, const QPixmap& frame,
+                                 const QPixmap& icon, const QPoint icon_offset)
+        {
+            const QSize icon_size = layout::scaled(icon.size(), window_size);
+            painter.drawPixmap(button_rect.topLeft() + icon_offset,
+                               icon.scaled(icon_size, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+            painter.drawPixmap(button_rect, frame);
         }
     }
 
-    ModalOverlay::ModalOverlay(QWidget* parent) : QWidget(parent)
+    ModalOverlay::ModalOverlay(QWidget* parent)
+        : QWidget(parent)
     {
         setFixedSize(window()->size());
     }
 
     void ModalOverlay::show_over(QWidget* background)
     {
-        const QPixmap snap = background->grab();
-        blurred_bg = blur_pixmap(snap, layout::scaled(10, size()));
+        const QPixmap snapshot = background->grab();
+        blurred_bg = blur_pixmap(snapshot, layout::scaled(10, size()));
         show();
         raise();
     }
 
     void ModalOverlay::paint_frames(QPainter& painter) const
     {
-        const QSize w = window()->size();
+        const QSize window_size = window()->size();
 
-        const QPixmap left = assets::images[assets::Image::LeftFrame].scaledToHeight(height(), Qt::SmoothTransformation);
+        const QPixmap left = assets::images[assets::Image::LeftFrame]
+            .scaledToHeight(height(), Qt::SmoothTransformation);
         painter.drawPixmap(0, 0, left);
 
-        const QPixmap right = assets::images[assets::Image::RightFrame].scaledToHeight(height(), Qt::SmoothTransformation);
+        const QPixmap right = assets::images[assets::Image::RightFrame]
+            .scaledToHeight(height(), Qt::SmoothTransformation);
         painter.drawPixmap(width() - right.width(), 0, right);
 
-        painter.drawPixmap(layout::chrome::pt_icon(w),   assets::images[assets::Image::IconPT]);
-        painter.drawPixmap(layout::chrome::lock_icon(w), assets::images[assets::Image::IconLock]);
+        const core::game::GameVersion version = config::Config::instance().game_version();
+        const QPixmap& active = assets::images[assets::Image::VersionFrameActive];
+        const QPixmap& inactive = assets::images[assets::Image::VersionFrameInactive];
+
+        draw_version_button(
+            painter,
+            window_size,
+            layout::chrome::playtest_button(window_size),
+            version == core::game::GameVersion::Playtest ? active : inactive,
+            assets::images[assets::Image::VersionIconPlaytest],
+            layout::chrome::playtest_icon_offset(window_size));
+
+        draw_version_button(
+            painter,
+            window_size,
+            layout::chrome::alicia_2_button(window_size),
+            version == core::game::GameVersion::Alicia2 ? active : inactive,
+            assets::images[assets::Image::VersionIconAlicia2],
+            layout::chrome::alicia_2_icon_offset(window_size));
     }
 
     void ModalOverlay::paintEvent(QPaintEvent*)
     {
-        const QSize w = window()->size();
+        const QSize window_size = window()->size();
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing);
         painter.setRenderHint(QPainter::SmoothPixmapTransform);
 
-        // Frosted backdrop (shared by every overlay)
         if (!blurred_bg.isNull())
         {
-            const QRect bg = layout::region::rect(w);
-            const int radius = layout::scaled(layout::region::k_radius, w);
+            const QRect background_rect = layout::region::rect(window_size);
+            const int radius = layout::scaled(layout::region::k_radius, window_size);
             QPainterPath clip;
-            clip.addRoundedRect(QRectF(bg), radius, radius);
+            clip.addRoundedRect(QRectF(background_rect), radius, radius);
             painter.setClipPath(clip);
 
             painter.drawPixmap(rect(), blurred_bg);
@@ -79,10 +111,7 @@ namespace util::modal_overlay
             painter.setClipping(false);
         }
 
-        // Frames + sidebar icons, sharp on top of the blur - only if this overlay keeps chrome
         if (keep_chrome) paint_frames(painter);
-
-        // Subclass draws its box + contents on top
         paint_content(painter);
     }
 }

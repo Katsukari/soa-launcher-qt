@@ -13,7 +13,8 @@ namespace util::assets
 {
     enum class Image
     {
-        Background,
+        BackgroundPlaytest,
+        BackgroundAlicia2,
         BackgroundBox,
         BoxCard,
         BoxDisclaimer,
@@ -45,9 +46,10 @@ namespace util::assets
         RightFrame,
         RulesFrame,
         SignedInAs,
-        Logo,
-        IconLock,
-        IconPT,
+        VersionFrameActive,
+        VersionFrameInactive,
+        VersionIconPlaytest,
+        VersionIconAlicia2,
         SettingsButton,
     };
 

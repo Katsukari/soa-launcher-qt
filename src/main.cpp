@@ -1,13 +1,17 @@
 #include <QApplication>
+#include <QFileOpenEvent>
+#include <utility>
 #include <QLocalServer>
 #include <QLocalSocket>
+
 #include "MainWindow.hpp"
-#include <spdlog/spdlog.h>
-#include "util/Assets.hpp"
 #include "core/Log.hpp"
-#include "widgets/LauncherLog.hpp"
-#include "core/network/Courier.h"
 #include "core/auth/AuthHandler.hpp"
+#include "core/network/Courier.h"
+#include "util/Assets.hpp"
+#include "widgets/LauncherLog.hpp"
+
+#include <spdlog/spdlog.h>
 
 namespace
 {
@@ -15,18 +19,61 @@ namespace
 
     QString soa_url_from_args(const QStringList& args)
     {
-        for (const QString& a : args)
-            if (a.startsWith("soa://"))
-                return a;
+        for (const QString& arg : args)
+        {
+            if (arg.startsWith("soa://"))
+                return arg;
+        }
+
         return {};
     }
+
+    class LauncherApplication final : public QApplication
+    {
+        Q_OBJECT
+
+        public:
+            LauncherApplication(int& argc, char** argv)
+                : QApplication(argc, argv)
+            {
+            }
+
+            QString take_pending_url()
+            {
+                return std::exchange(pending_url, {});
+            }
+
+        signals:
+            void soa_url_opened(const QString& url);
+
+        protected:
+            bool event(QEvent* event) override
+            {
+                if (event->type() != QEvent::FileOpen)
+                    return QApplication::event(event);
+
+                const auto* open_event = static_cast<QFileOpenEvent*>(event);
+                const QString url = open_event->url().toString();
+                if (!url.startsWith("soa://"))
+                    return QApplication::event(event);
+
+                pending_url = url;
+                emit soa_url_opened(url);
+                return true;
+            }
+
+        private:
+            QString pending_url;
+    };
 }
 
 int main(int argc, char *argv[])
 {
-    QApplication app(argc, argv);
+    LauncherApplication app(argc, argv);
 
-    const QString url = soa_url_from_args(app.arguments());
+    QString url = soa_url_from_args(app.arguments());
+    if (url.isEmpty())
+        url = app.take_pending_url();
 
     QLocalSocket probe;
     probe.connectToServer(k_instance_key);
@@ -55,28 +102,36 @@ int main(int argc, char *argv[])
     MainWindow window;
     window.show();
 
-    QObject::connect(&server, &QLocalServer::newConnection, &window, [&server, &window]()
+    const auto handle_url = [&window](const QString& incoming)
+    {
+        if (incoming.startsWith("soa://"))
+            window.auth_handler()->handle_url(incoming);
+
+        window.setWindowState((window.windowState() & ~Qt::WindowMinimized) | Qt::WindowActive);
+        window.show();
+        window.raise();
+        window.activateWindow();
+    };
+
+    QObject::connect(&app, &LauncherApplication::soa_url_opened, &window, handle_url);
+
+    QObject::connect(&server, &QLocalServer::newConnection, &window, [&server, handle_url]()
     {
         QLocalSocket* client = server.nextPendingConnection();
-        if (!client) return;
+        if (!client)
+            return;
 
-        QObject::connect(client, &QLocalSocket::readyRead, &window, [client, &window]()
+        QObject::connect(client, &QLocalSocket::readyRead, client, [client, handle_url]()
         {
-            const QString incoming = QString::fromUtf8(client->readAll());
-            if (incoming.startsWith("soa://"))
-                window.auth_handler()->handle_url(incoming);
-
-            window.setWindowState((window.windowState() & ~Qt::WindowMinimized) | Qt::WindowActive);
-            window.show();
-            window.raise();
-            window.activateWindow();
-
+            handle_url(QString::fromUtf8(client->readAll()));
             client->deleteLater();
         });
     });
 
     if (!url.isEmpty())
-        window.auth_handler()->handle_url(url);
+        handle_url(url);
 
     return QApplication::exec();
 }
+
+#include "main.moc"

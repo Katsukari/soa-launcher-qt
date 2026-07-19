@@ -1,48 +1,70 @@
 #include "MainWindow.hpp"
-#include "widgets/Playtest.hpp"
-#include "widgets/Settings.hpp"
-#include "util/Assets.hpp"
-#include "util/Layout.hpp"
-#include "util/SimpleUtils.hpp"
-#include "core/wine/Shell.hpp"
+
 #include "core/auth/AuthHandler.hpp"
-
-#include <QPushButton>
-#include <QLabel>
-#include <QPainter>
-#include <QPainterPath>
-#include <QMouseEvent>
-#include <QWindow>
-
-#include "util/ModalOverlay.hpp"
-#include "widgets/WineInstall.hpp"
-#include "widgets/GameInstall.hpp"
-#include "widgets/WineSelectMenu.hpp"
-
 #include "core/state/InstallState.hpp"
 #include "core/state/ViewRouter.hpp"
-#include "core/state/Stage.hpp"
-#include "core/state/View.hpp"
+#include "core/wine/Shell.hpp"
+#include "util/Assets.hpp"
+#include "util/Config.hpp"
+#include "util/Layout.hpp"
+#include "util/ModalOverlay.hpp"
+#include "util/SimpleUtils.hpp"
+#include "widgets/AliciaChooser.hpp"
+#include "widgets/GameInstall.hpp"
+#include "widgets/Settings.hpp"
+#include "widgets/WineInstall.hpp"
+#include "widgets/WineSelectMenu.hpp"
 
+#include <QLabel>
+#include <QMouseEvent>
+#include <QMessageBox>
+#include <QPainter>
+#include <QPainterPath>
+#include <QPushButton>
+#include <QWindow>
+
+using core::game::GameVersion;
 using core::state::Stage;
 using core::state::View;
+using util::config::Config;
 
-MainWindow::MainWindow(QWidget* parent) : QWidget(parent)
+namespace
+{
+    QPixmap make_version_button(const QSize window_size, const QRect button_rect,
+                                const QPixmap& frame, const QPixmap& icon,
+                                const QPoint icon_offset)
+    {
+        QPixmap composed(button_rect.size());
+        composed.fill(Qt::transparent);
+
+        QPainter painter(&composed);
+        painter.setRenderHint(QPainter::SmoothPixmapTransform);
+
+        const QSize icon_size = util::layout::scaled(icon.size(), window_size);
+        painter.drawPixmap(icon_offset, icon.scaled(icon_size, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+        painter.drawPixmap(QRect(QPoint(0, 0), button_rect.size()), frame);
+
+        return composed;
+    }
+}
+
+MainWindow::MainWindow(QWidget* parent)
+    : QWidget(parent),
+      game_version(Config::instance().game_version())
 {
     setWindowFlags(Qt::FramelessWindowHint);
     setFixedSize(util::layout::win::k_default);
     setAttribute(Qt::WA_TranslucentBackground);
 
     shell = new core::wine::Shell(this);
-    auth  = new AuthHandler(shell, this);
-
+    auth = new AuthHandler(shell, this);
     install_state = new core::state::InstallState(this);
 
     setup_window_buttons();
-    setup_logo();
     setup_version_label();
     setup_settings();
-    setup_playtest();
+    setup_alicia_chooser();
+    setup_game_selector();
     setup_wine_install();
     setup_game_install();
     setup_wine_select();
@@ -55,50 +77,40 @@ MainWindow::MainWindow(QWidget* parent) : QWidget(parent)
 
 void MainWindow::setup_window_buttons()
 {
-    const QSize w = size();
+    const QSize window_size = size();
 
     close_button = util::simple_utils::make_flat_button(this);
     close_button->setIcon(QIcon(util::assets::images[util::assets::Image::CloseIcon]));
-    close_button->setIconSize(util::layout::chrome::close_icon(w));
-    close_button->setGeometry(util::layout::chrome::close(w));
-    connect(close_button, &QPushButton::clicked, this, [this]() { close(); });
+    close_button->setIconSize(util::layout::chrome::close_icon(window_size));
+    close_button->setGeometry(util::layout::chrome::close(window_size));
+    connect(close_button, &QPushButton::clicked, this, [this]()
+    {
+        close();
+    });
 
     minimize_button = util::simple_utils::make_flat_button(this);
     minimize_button->setIcon(QIcon(util::assets::images[util::assets::Image::Minimize]));
-    minimize_button->setIconSize(util::layout::chrome::minimize_icon(w));
-    minimize_button->setGeometry(util::layout::chrome::minimize(w));
-    connect(minimize_button, &QPushButton::clicked, this, [this]() { showMinimized(); });
-}
-
-void MainWindow::setup_logo()
-{
-    const QSize w = size();
-    const int width = util::layout::chrome::logo_width(w);
-
-    const QPixmap scaled = util::assets::images[util::assets::Image::Logo]
-        .scaledToWidth(width, Qt::SmoothTransformation);
-
-    auto* logo = new QLabel(this);
-    logo->setPixmap(scaled);
-    logo->setStyleSheet("background: transparent;");
-
-    const QPoint pos = util::layout::chrome::logo_pos(w);
-    logo->setGeometry(pos.x(), pos.y(), width, scaled.height());
+    minimize_button->setIconSize(util::layout::chrome::minimize_icon(window_size));
+    minimize_button->setGeometry(util::layout::chrome::minimize(window_size));
+    connect(minimize_button, &QPushButton::clicked, this, [this]()
+    {
+        showMinimized();
+    });
 }
 
 void MainWindow::setup_version_label()
 {
-    const QSize w = size();
-    const auto version_label = new QLabel("VERSION 0.1.0", this);
+    const QSize window_size = size();
+    auto* version_label = new QLabel("VERSION 0.1.0", this);
 
-    QFont f = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
-    f.setPixelSize(util::layout::scaled(util::layout::text::k_version, w));
-    f.setWeight(QFont::Black);
-    f.setLetterSpacing(QFont::PercentageSpacing, 108);
-    version_label->setFont(f);
-    version_label->setStyleSheet("color: #E4E8EA; background: transparent;");
+    QFont font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
+    font.setPixelSize(util::layout::scaled(util::layout::text::k_version, window_size));
+    font.setWeight(QFont::Black);
+    font.setLetterSpacing(QFont::PercentageSpacing, 108);
+    version_label->setFont(font);
+    version_label->setStyleSheet("color: #747B82; background: transparent;");
     version_label->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-    version_label->setGeometry(util::layout::chrome::version(w));
+    version_label->setGeometry(util::layout::chrome::version(window_size));
 }
 
 void MainWindow::setup_settings()
@@ -106,30 +118,80 @@ void MainWindow::setup_settings()
     settings = new Settings(shell, this);
     settings->move(0, 0);
     settings->hide();
-}
-
-void MainWindow::setup_playtest()
-{
-    wine_install = new WineInstall(shell, this);
-    const QSize w = size();
-    playtest = new Playtest(auth, shell, install_state, this);
-    playtest->move(util::layout::playtest::pos(w));
-
-    connect(playtest, &Playtest::settings_requested, this, [this]()
-    {
-        on_overlay_opened(settings);
-        settings->show_over(this);
-    });
-
-    connect(playtest, &Playtest::download_triggered, this, [this]()
-    {
-        open_for_current_stage();
-    });
 
     connect(settings, &Settings::closed, this, [this]()
     {
         on_overlay_closed(settings);
     });
+}
+
+void MainWindow::setup_alicia_chooser()
+{
+    wine_install = new WineInstall(shell, this);
+
+    const QSize window_size = size();
+    alicia_chooser = new AliciaChooser(auth, shell, install_state, this);
+    alicia_chooser->set_game_version(game_version);
+    alicia_chooser->move(util::layout::alicia_chooser::pos(window_size));
+
+    connect(alicia_chooser, &AliciaChooser::settings_requested, this, [this]()
+    {
+        on_overlay_opened(settings);
+        settings->show_over(this);
+    });
+
+    connect(alicia_chooser, &AliciaChooser::download_triggered, this, [this]()
+    {
+        open_for_current_stage();
+    });
+
+    connect(alicia_chooser, &AliciaChooser::reset_config_requested, this, [this]()
+    {
+        const auto answer = QMessageBox::question(
+            this,
+            "Reset Launcher Config",
+            "This resets launcher settings and signs you out.\n\n"
+            "The Wine prefix and both game installations will not be deleted.",
+            QMessageBox::Yes | QMessageBox::Cancel,
+            QMessageBox::Cancel);
+
+        if (answer != QMessageBox::Yes) return;
+
+        Config::instance().reset_launcher_config();
+        game_version = Config::instance().game_version();
+        alicia_chooser->set_game_version(game_version);
+        game_install->refresh_game_path();
+        refresh_game_selector();
+        install_state->probe();
+        update();
+    });
+}
+
+void MainWindow::setup_game_selector()
+{
+    const QSize window_size = size();
+
+    playtest_button = util::simple_utils::make_flat_button(this);
+    playtest_button->setCursor(Qt::PointingHandCursor);
+    playtest_button->setFocusPolicy(Qt::NoFocus);
+    playtest_button->setAccessibleName("Story of Alicia Playtest");
+    playtest_button->setGeometry(util::layout::chrome::playtest_button(window_size));
+    connect(playtest_button, &QPushButton::clicked, this, [this]()
+    {
+        set_game_version(GameVersion::Playtest);
+    });
+
+    alicia_2_button = util::simple_utils::make_flat_button(this);
+    alicia_2_button->setCursor(Qt::PointingHandCursor);
+    alicia_2_button->setFocusPolicy(Qt::NoFocus);
+    alicia_2_button->setAccessibleName("Story of Alicia 2.0");
+    alicia_2_button->setGeometry(util::layout::chrome::alicia_2_button(window_size));
+    connect(alicia_2_button, &QPushButton::clicked, this, [this]()
+    {
+        set_game_version(GameVersion::Alicia2);
+    });
+
+    refresh_game_selector();
 }
 
 void MainWindow::setup_wine_install()
@@ -171,22 +233,92 @@ void MainWindow::setup_wine_select()
     });
 }
 
-void MainWindow::open_for_current_stage()
+void MainWindow::set_game_version(const GameVersion version)
 {
-    const View v = core::state::view_for(install_state->stage());
+    if (game_version == version) return;
 
-    if (v == View::WineSelect)       open_overlay(wine_select);
-    else if (v == View::WineInstall) open_overlay(wine_install);
-    else if (v == View::GameInstall) open_overlay(game_install);
+    game_version = version;
+    Config::instance().set_game_version(version);
+    alicia_chooser->set_game_version(version);
+    game_install->refresh_game_path();
+    refresh_game_selector();
+    install_state->probe();
+    update();
 }
 
-void MainWindow::on_stage_changed(Stage s)
+void MainWindow::refresh_game_selector()
 {
-    const View v = core::state::view_for(s);
-    if (v == last_view) return;
-    last_view = v;
+    const QSize window_size = size();
+    const QRect playtest_rect = util::layout::chrome::playtest_button(window_size);
+    const QRect alicia_2_rect = util::layout::chrome::alicia_2_button(window_size);
 
-    switch (v)
+    const QPixmap& active = util::assets::images[util::assets::Image::VersionFrameActive];
+    const QPixmap& inactive = util::assets::images[util::assets::Image::VersionFrameInactive];
+    const QPixmap& playtest_icon = util::assets::images[util::assets::Image::VersionIconPlaytest];
+    const QPixmap& alicia_2_icon = util::assets::images[util::assets::Image::VersionIconAlicia2];
+
+    const QPixmap playtest_pixmap = make_version_button(
+        window_size,
+        playtest_rect,
+        game_version == GameVersion::Playtest ? active : inactive,
+        playtest_icon,
+        util::layout::chrome::playtest_icon_offset(window_size));
+
+    const QPixmap alicia_2_pixmap = make_version_button(
+        window_size,
+        alicia_2_rect,
+        game_version == GameVersion::Alicia2 ? active : inactive,
+        alicia_2_icon,
+        util::layout::chrome::alicia_2_icon_offset(window_size));
+
+    QIcon playtest_icon_set;
+    playtest_icon_set.addPixmap(playtest_pixmap, QIcon::Normal);
+    playtest_icon_set.addPixmap(playtest_pixmap, QIcon::Disabled);
+
+    QIcon alicia_2_icon_set;
+    alicia_2_icon_set.addPixmap(alicia_2_pixmap, QIcon::Normal);
+    alicia_2_icon_set.addPixmap(alicia_2_pixmap, QIcon::Disabled);
+
+    playtest_button->setIcon(playtest_icon_set);
+    playtest_button->setIconSize(playtest_rect.size());
+    alicia_2_button->setIcon(alicia_2_icon_set);
+    alicia_2_button->setIconSize(alicia_2_rect.size());
+}
+
+void MainWindow::set_game_switching_enabled(const Stage stage)
+{
+    const bool enabled =
+        stage != Stage::SettingUpPrefix &&
+        stage != Stage::Downloading &&
+        stage != Stage::Updating &&
+        stage != Stage::Authenticating;
+
+    playtest_button->setEnabled(enabled);
+    alicia_2_button->setEnabled(enabled);
+}
+
+void MainWindow::open_for_current_stage()
+{
+    const View view = core::state::view_for(install_state->stage());
+
+    if (view == View::WineSelect) open_overlay(wine_select);
+    else if (view == View::WineInstall) open_overlay(wine_install);
+    else if (view == View::GameInstall)
+    {
+        game_install->refresh_game_path();
+        open_overlay(game_install);
+    }
+}
+
+void MainWindow::on_stage_changed(const Stage stage)
+{
+    set_game_switching_enabled(stage);
+
+    const View view = core::state::view_for(stage);
+    if (view == last_view) return;
+    last_view = view;
+
+    switch (view)
     {
         case View::WineSelect:
             close_overlay(wine_install);
@@ -196,7 +328,7 @@ void MainWindow::on_stage_changed(Stage s)
         case View::WineInstall:
             close_overlay(wine_select);
             close_overlay(game_install);
-            if (s == Stage::NeedsPrefix) break;
+            if (stage == Stage::NeedsPrefix) break;
             open_overlay(wine_install);
             break;
 
@@ -206,7 +338,7 @@ void MainWindow::on_stage_changed(Stage s)
             open_overlay(game_install);
             break;
 
-        case View::Playtest:
+        case View::AliciaChooser:
             close_overlay(wine_select);
             close_overlay(wine_install);
             close_overlay(game_install);
@@ -218,9 +350,9 @@ void MainWindow::on_stage_changed(Stage s)
     }
 }
 
-void MainWindow::on_overlay_opened(util::modal_overlay::ModalOverlay * m)
+void MainWindow::on_overlay_opened(util::modal_overlay::ModalOverlay* overlay)
 {
-    if (m->keeps_chrome())
+    if (overlay->keeps_chrome())
     {
         chrome_hidden = false;
         close_button->raise();
@@ -235,7 +367,7 @@ void MainWindow::on_overlay_opened(util::modal_overlay::ModalOverlay * m)
     update();
 }
 
-void MainWindow::on_overlay_closed(util::modal_overlay::ModalOverlay *)
+void MainWindow::on_overlay_closed(util::modal_overlay::ModalOverlay*)
 {
     chrome_hidden = false;
     close_button->show();
@@ -243,37 +375,41 @@ void MainWindow::on_overlay_closed(util::modal_overlay::ModalOverlay *)
     update();
 }
 
-void MainWindow::open_overlay(util::modal_overlay::ModalOverlay * m)
+void MainWindow::open_overlay(util::modal_overlay::ModalOverlay* overlay)
 {
-    if (!m->isVisible())
+    if (!overlay->isVisible())
     {
-        m->show_over(this);
-        on_overlay_opened(m);
+        overlay->show_over(this);
+        on_overlay_opened(overlay);
     }
 }
 
-void MainWindow::close_overlay(util::modal_overlay::ModalOverlay * m)
+void MainWindow::close_overlay(util::modal_overlay::ModalOverlay* overlay)
 {
-    if (m->isVisible())
+    if (overlay->isVisible())
     {
-        m->hide();
-        on_overlay_closed(m);
+        overlay->hide();
+        on_overlay_closed(overlay);
     }
 }
 
 void MainWindow::paintEvent(QPaintEvent*)
 {
-    const QSize w = size();
+    const QSize window_size = size();
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
     painter.setRenderHint(QPainter::SmoothPixmapTransform);
 
-    const QRect bg = util::layout::region::rect(w);
-    const int radius = util::layout::scaled(util::layout::region::k_radius, w);
+    const QRect background_rect = util::layout::region::rect(window_size);
+    const int radius = util::layout::scaled(util::layout::region::k_radius, window_size);
     QPainterPath path;
-    path.addRoundedRect(bg, radius, radius);
+    path.addRoundedRect(background_rect, radius, radius);
     painter.setClipPath(path);
-    painter.drawPixmap(bg, util::assets::images[util::assets::Image::Background]);
+
+    const util::assets::Image background = game_version == GameVersion::Alicia2
+        ? util::assets::Image::BackgroundAlicia2
+        : util::assets::Image::BackgroundPlaytest;
+    painter.drawPixmap(background_rect, util::assets::images[background]);
     painter.setClipping(false);
 
     if (!chrome_hidden)
@@ -285,9 +421,6 @@ void MainWindow::paintEvent(QPaintEvent*)
         const QPixmap right = util::assets::images[util::assets::Image::RightFrame]
             .scaledToHeight(height(), Qt::SmoothTransformation);
         painter.drawPixmap(width() - right.width(), 0, right);
-
-        painter.drawPixmap(util::layout::chrome::pt_icon(w),   util::assets::images[util::assets::Image::IconPT]);
-        painter.drawPixmap(util::layout::chrome::lock_icon(w), util::assets::images[util::assets::Image::IconLock]);
     }
 }
 

@@ -8,6 +8,7 @@
 #include <QSet>
 
 #include "core/Log.hpp"
+#include "util/Config.hpp"
 #include <spdlog/spdlog.h>
 
 namespace core::wine
@@ -23,10 +24,13 @@ namespace core::wine
         const QFileInfo info(path);
         if (ok) *ok = info.exists();
 
+        if (info.isFile() && info.fileName().compare(QStringLiteral("proton"), Qt::CaseInsensitive) == 0)
+            return RuntimeType::Proton;
+
         if (info.isDir())
         {
             const QDir dir(path);
-            if (dir.exists("proton"))
+            if (dir.exists("proton") || dir.exists("proton_dist.tar"))
                 return RuntimeType::Proton;
             if (dir.exists("files/bin/wine") || dir.exists("dist/bin/wine") ||
                 dir.exists("bin/wine") || dir.exists("Contents/Resources/wine/bin/wine") ||
@@ -200,24 +204,36 @@ namespace core::wine
     }
     QString winetricks_path()
     {
+        const QString configured = util::config::Config::instance().winetricks_binary();
+        if (!configured.isEmpty())
+        {
+            if (QFileInfo(configured).isAbsolute())
+                return QFileInfo::exists(configured) ? configured : QString {};
+
+            const QString found = QStandardPaths::findExecutable(configured);
+            if (!found.isEmpty()) return found;
+        }
+
         return QStandardPaths::findExecutable("winetricks");
     }
 
-    QString protontricks_path()
+    QString umu_path()
     {
-        return QStandardPaths::findExecutable("protontricks");
+        QString found = QStandardPaths::findExecutable("umu-run");
+        if (!found.isEmpty()) return found;
+
+        const QString local = QDir::home().filePath(".local/bin/umu-run");
+        return QFileInfo::exists(local) ? local : QString {};
     }
 
-    QString required_tricks_tool(RuntimeType type)
+    bool winetricks_available()
     {
-        return type == RuntimeType::Proton ? QStringLiteral("protontricks")
-                                           : QStringLiteral("winetricks");
-    }
-
-    bool tricks_available(RuntimeType type)
-    {
-        if (type == RuntimeType::Proton)
-            return !protontricks_path().isEmpty();
         return !winetricks_path().isEmpty();
     }
+
+    bool umu_available()
+    {
+        return !umu_path().isEmpty();
+    }
+
 }

@@ -63,7 +63,7 @@ set(LAUNCHER_SOURCES
         src/main.cpp
         src/MainWindow.cpp
         src/util/Assets.cpp
-        src/widgets/Playtest.cpp
+        src/widgets/AliciaChooser.cpp
         src/widgets/Settings.cpp
         src/util/Layout.cpp
         src/widgets/LauncherSettings.cpp
@@ -94,7 +94,7 @@ set(LAUNCHER_SOURCES
 set(LAUNCHER_HEADERS
         include/MainWindow.hpp
         include/util/Assets.hpp
-        include/widgets/Playtest.hpp
+        include/widgets/AliciaChooser.hpp
         include/widgets/Settings.hpp
         include/util/Layout.hpp
         include/widgets/LauncherSettings.hpp
@@ -127,6 +127,7 @@ set(LAUNCHER_HEADERS
         include/core/state/Stage.hpp
         include/core/state/InstallState.hpp
         include/core/network/DownloadStatus.hpp
+        include/core/game/GameVersion.hpp
         include/widgets/WineSelectMenu.hpp
 )
 
@@ -159,6 +160,7 @@ if(APPLE)
             MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
             MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
             MACOSX_BUNDLE_GUI_IDENTIFIER "com.storyofalicia.launcher"
+            MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/packaging/macos/Info.plist.in"
     )
 endif()
 

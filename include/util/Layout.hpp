@@ -95,62 +95,59 @@ namespace util::layout
 
     namespace chrome
     {
-        inline constexpr int   k_logo_width = 390;
-        inline constexpr int   k_logo_top   = 62;
-
         inline constexpr QRect k_close         {1315, 40, 40, 40};
         inline constexpr QSize k_close_icon    {35, 35};
         inline constexpr QRect k_minimize      {1270, 37, 50, 50};
         inline constexpr QSize k_minimize_icon {50, 50};
 
-        inline constexpr QPoint k_pt_icon   {56, 495};
-        inline constexpr QPoint k_lock_icon {58, 613};
+        inline constexpr QRect k_playtest_button {56, 495, 113, 113};
+        inline constexpr QRect k_alicia_2_button {58, 613, 113, 113};
+        inline constexpr QPoint k_playtest_icon_offset {10, 10};
+        inline constexpr QPoint k_alicia_2_icon_offset {12, 8};
 
         inline constexpr QRect k_version =
             anchor_bottom_right(region::k_default, 35, 33, {245, 20});
-
-        int    logo_width(QSize win);
-        int    logo_top(QSize win);
-        QPoint logo_pos(QSize win);
 
         QRect  close(QSize win);
         QSize  close_icon(QSize win);
         QRect  minimize(QSize win);
         QSize  minimize_icon(QSize win);
 
-        QPoint pt_icon(QSize win);
-        QPoint lock_icon(QSize win);
+        QRect playtest_button(QSize win);
+        QRect alicia_2_button(QSize win);
+        QPoint playtest_icon_offset(QSize win);
+        QPoint alicia_2_icon_offset(QSize win);
 
         QRect  version(QSize win);
     }
 
-    namespace playtest
+    namespace alicia_chooser
     {
-        inline constexpr QSize k_box        {620, 320};
-        inline constexpr int   k_top_offset = 350;
+        inline constexpr QSize k_box        {640, 360};
+        inline constexpr int   k_top_offset = 365;
         inline constexpr QRect k_rect = hcenter_in_region(k_box, k_top_offset);
 
         inline constexpr QRect k_title {0, 38, k_box.width(), 30};
         inline constexpr QRect k_settings_button =
             anchor_top_right({0, 0, k_box.width(), k_box.height()}, 25, 23, {37, 37});
-        inline constexpr QRect k_reset {0, 272, k_box.width(), 22};
+        inline constexpr QRect k_reset {0, 305, k_box.width(), 34};
 
-        inline constexpr QRect k_message {90, 103, 440, 70};
-        inline constexpr int   k_dl_button_x = 90;
-        inline constexpr int   k_dl_button_y = 198;
-        inline constexpr int   k_dl_button_w = 440;
+        inline constexpr QRect k_message {95, 92, 430, 70};
+        inline constexpr int   k_dl_button_x = 104;
+        inline constexpr int   k_dl_button_y = 187;
+        inline constexpr int   k_dl_button_w = 432;
 
         inline constexpr QSize k_discord_icon   {24, 24};
-        inline constexpr QRect k_discord_button  {90, 100, 440, 56};
-        inline constexpr QRect k_disclaimer      {90, 164, 440, 100};
+        inline constexpr QRect k_discord_button  {104, 100, 432, 56};
+        inline constexpr QRect k_disclaimer      {105, 174, 430, 102};
 
         inline constexpr QRect k_waiting_title {0, 100, k_box.width(), 28};
-        inline constexpr QRect k_steps         {90, 148, 440, 104};
+        inline constexpr QRect k_steps         {85, 148, 470, 121};
 
-        inline constexpr QRect k_check_bugs       {95, 88,  440, 24};
-        inline constexpr QRect k_check_rules      {95, 116, 440, 24};
-        inline constexpr QRect k_signed_in_banner {90, 148, 440, 46};
-        inline constexpr QRect k_enter_button     {90, 206, 440, 52};
+        inline constexpr QRect k_check_bugs       {100, 88,  440, 24};
+        inline constexpr QRect k_check_rules      {100, 116, 440, 24};
+        inline constexpr QRect k_signed_in_banner {105, 148, 430, 48};
+        inline constexpr QRect k_enter_button     {104, 209, 432, 67};
 
         QRect  rect(QSize win);
         QPoint pos(QSize win);

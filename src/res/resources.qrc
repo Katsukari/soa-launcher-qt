@@ -1,15 +1,17 @@
 <RCC>
     <qresource prefix="/">
         <!-- Images -->
-        <file>../../assets/bg.png</file>
-        <file>../../assets/PT ICON.png</file>
+        <file>../../assets/BG1.0.png</file>
+        <file>../../assets/BG2.0.png</file>
+        <file>../../assets/ver-frame-active.png</file>
+        <file>../../assets/ver-frame-inactive-aligned.png</file>
+        <file>../../assets/ver-icon-2.0.png</file>
+        <file>../../assets/ver-icon-pt.png</file>
         <file>../../assets/bg-box1.png</file>
-        <file>../../assets/2.0 ICON.png</file>
         <file>../../assets/Minimize.png</file>
         <file>../../assets/box-card.png</file>
         <file>../../assets/box-note.png</file>
         <file>../../assets/checkbox.png</file>
-        <file>../../assets/soa-logo.png</file>
         <file>../../assets/box-modal.png</file>
         <file>../../assets/box-note2.png</file>
         <file>../../assets/box-update.png</file>

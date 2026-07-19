@@ -13,6 +13,7 @@
 #include <QTextStream>
 
 #include "core/Log.hpp"
+#include "core/wine/WineRegistry.hpp"
 #include <spdlog/spdlog.h>
 
 namespace util::config
@@ -176,10 +177,25 @@ namespace util::config
         SPDLOG_DEBUG("config: wrote .env (auth)");
     }
 
-    QString Config::derive_game_path(const QString& prefix) const
+    QString Config::game_install_path_key(const core::game::GameVersion version)
     {
-        const QString user = qEnvironmentVariable("USER", QDir::homePath().section('/', -1));
-        return QDir(prefix).filePath(QString("drive_c/users/%1/AppData/Roaming/Story Of Alicia/game").arg(user));
+        return version == core::game::GameVersion::Alicia2
+            ? QStringLiteral("game_install_path_2_0")
+            : QStringLiteral("game_install_path_1_0");
+    }
+
+    QString Config::derive_game_path(const QString& prefix, const core::game::GameVersion version) const
+    {
+        const bool proton =
+            core::wine::WineRegistry::identify(wine_binary()) == core::wine::RuntimeType::Proton;
+        const QString user = proton
+            ? QStringLiteral("steamuser")
+            : qEnvironmentVariable("USER", QDir::homePath().section('/', -1));
+
+        const QString game_folder = QString::fromLatin1(core::game::profile(version).default_install_directory);
+
+        return QDir(prefix).filePath(
+            QStringLiteral("drive_c/users/%1/AppData/Roaming/%2/game").arg(user, game_folder));
     }
 
     void Config::probe_system_paths()
@@ -229,9 +245,15 @@ namespace util::config
         set_if_missing("after_game_start",  "keep");
         set_if_missing("launcher_size",     "1400x846");
 
-        set_if_missing("game_id",   "4");
+        set_if_missing("game_version", "1.0");
+
+        set_if_missing("game_id", QString::fromLatin1(core::game::profile(game_version()).launch_game_id));
         set_if_missing("game_args", "");
-        set_if_missing("game_install_path", "");
+
+        const QString legacy_game_path = d->values.value("game_install_path").toString();
+        set_if_missing("game_install_path_1_0", legacy_game_path);
+        set_if_missing("game_install_path_2_0", "");
+        d->values.remove("game_install_path");
     }
 
     void Config::reload()
@@ -253,7 +275,18 @@ namespace util::config
     QString Config::after_game_start() const  { const QString v = d->values.value("after_game_start").toString(); return v.isEmpty() ? "keep" : v; }
     QString Config::launcher_size() const     { const QString v = d->values.value("launcher_size").toString(); return v.isEmpty() ? "1400x846" : v; }
 
-    QString Config::game_id() const           { const QString v = d->values.value("game_id").toString(); return v.isEmpty() ? "4" : v; }
+    core::game::GameVersion Config::game_version() const
+    {
+        return core::game::game_version_from_string(d->values.value("game_version").toString());
+    }
+
+    QString Config::game_id() const
+    {
+        const QString v = d->values.value("game_id").toString();
+        return v.isEmpty()
+            ? QString::fromLatin1(core::game::profile(game_version()).launch_game_id)
+            : v;
+    }
     QString Config::game_args() const         { return d->values.value("game_args").toString(); }
 
     QString Config::wine_prefix() const
@@ -262,10 +295,71 @@ namespace util::config
         return v.isEmpty() ? QDir(QDir::homePath()).filePath("soa-launcher") : v;
     }
 
+    QString Config::prefix_root() const
+    {
+        const QString configured = QDir::cleanPath(QFileInfo(wine_prefix()).absoluteFilePath());
+        const QFileInfo configured_info(configured);
+
+        if (configured_info.fileName().compare(QStringLiteral("pfx"), Qt::CaseInsensitive) == 0)
+            return configured;
+
+        const QString proton_pfx = QDir(configured).filePath(QStringLiteral("pfx"));
+        const bool proton =
+            core::wine::WineRegistry::identify(wine_binary()) == core::wine::RuntimeType::Proton;
+
+        if (proton || QFileInfo::exists(proton_pfx))
+            return proton_pfx;
+
+        return configured;
+    }
+
+    QString Config::normalize_game_path(const QString& path) const
+    {
+        if (path.isEmpty())
+            return {};
+
+        const QString candidate = QDir::cleanPath(QFileInfo(path).absoluteFilePath());
+        const QString root = QDir::cleanPath(QFileInfo(prefix_root()).absoluteFilePath());
+
+        if (candidate == root || candidate.startsWith(root + QDir::separator()))
+            return candidate;
+
+        const QString compat_root = QDir::cleanPath(QFileInfo(wine_prefix()).absoluteFilePath());
+        if (root != compat_root &&
+            (candidate == compat_root || candidate.startsWith(compat_root + QDir::separator())))
+        {
+            const QString relative = QDir(compat_root).relativeFilePath(candidate);
+            const QString fixed = relative == QStringLiteral(".")
+                ? root
+                : QDir(root).filePath(relative);
+
+            SPDLOG_INFO("config: corrected Proton game path {} -> {}",
+                        candidate.toStdString(), fixed.toStdString());
+            return QDir::cleanPath(fixed);
+        }
+
+        return candidate;
+    }
+
     QString Config::game_install_path() const
     {
-        const QString v = d->values.value("game_install_path").toString();
-        return v.isEmpty() ? derive_game_path(wine_prefix()) : v;
+        const core::game::GameVersion version = game_version();
+        const QString stored = d->values.value(game_install_path_key(version)).toString();
+        const QString path = stored.isEmpty()
+            ? derive_game_path(prefix_root(), version)
+            : stored;
+
+        return normalize_game_path(path);
+    }
+
+    bool Config::path_inside_prefix(const QString& path) const
+    {
+        const QString candidate = normalize_game_path(path);
+        if (candidate.isEmpty())
+            return false;
+
+        const QString root = QDir::cleanPath(QFileInfo(prefix_root()).absoluteFilePath());
+        return candidate == root || candidate.startsWith(root + QDir::separator());
     }
 
     QString Config::username() const          { return d->username; }
@@ -285,6 +379,13 @@ namespace util::config
     void Config::set_after_game_start(const QString& v)  { d->values["after_game_start"] = v;  save(); emit changed(); }
     void Config::set_launcher_size(const QString& v)     { d->values["launcher_size"] = v;     save(); emit changed(); }
 
+    void Config::set_game_version(const core::game::GameVersion v)
+    {
+        d->values["game_version"] = core::game::to_string(v);
+        save();
+        emit changed();
+    }
+
     void Config::set_game_id(const QString& v)           { d->values["game_id"] = v;           save(); emit changed(); }
     void Config::set_game_args(const QString& v)         { d->values["game_args"] = v;         save(); emit changed(); }
 
@@ -297,7 +398,7 @@ namespace util::config
 
     void Config::set_game_install_path(const QString& v)
     {
-        d->values["game_install_path"] = v;
+        d->values[game_install_path_key(game_version())] = normalize_game_path(v);
         save();
         emit changed();
     }
@@ -306,7 +407,12 @@ namespace util::config
     {
         const QDir dir(game_install_path());
         if (!dir.exists()) return false;
-        return !dir.isEmpty(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot);
+
+        const auto& game = core::game::profile(game_version());
+        const QFileInfo version_file(dir.filePath(QString::fromLatin1(game.install_marker_file)));
+        const QFileInfo game_exe(dir.filePath(QString::fromLatin1(game.executable_name)));
+
+        return version_file.isFile() && version_file.size() > 0 && game_exe.isFile();
     }
 
     void Config::set_auth(const QString& username, const QString& token, const QString& display_name)
@@ -325,5 +431,32 @@ namespace util::config
         d->display_name.clear();
         save_env();
         emit changed();
+    }
+
+    bool Config::reset_launcher_config()
+    {
+        writing = true;
+
+        if (watcher)
+            watcher->removePath(file_path());
+
+        const bool config_removed = !QFileInfo::exists(file_path()) || QFile::remove(file_path());
+        const bool env_removed = !QFileInfo::exists(env_path()) || QFile::remove(env_path());
+
+        d->values.clear();
+        d->username.clear();
+        d->token.clear();
+        d->display_name.clear();
+
+        apply_defaults();
+        save();
+
+        if (watcher && !watcher->files().contains(file_path()))
+            watcher->addPath(file_path());
+
+        SPDLOG_INFO("config: reset launcher config without deleting prefix or game files");
+        emit changed();
+
+        return config_removed && env_removed;
     }
 }

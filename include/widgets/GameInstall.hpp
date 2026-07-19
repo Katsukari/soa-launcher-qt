@@ -14,6 +14,7 @@ class GameInstall : public util::modal_overlay::ModalOverlay
     Q_OBJECT
     public:
         explicit GameInstall(core::wine::Shell* shell, QWidget* parent = nullptr);
+        void refresh_game_path();
         signals:
             void closed();
     protected:

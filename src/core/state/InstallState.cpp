@@ -1,11 +1,15 @@
-#include "../../../include/core/state/InstallState.hpp"
+#include "core/state/InstallState.hpp"
 #include "core/status/StatusBus.hpp"
 #include "core/status/StatusReporter.hpp"
 #include "util/Config.hpp"
 #include "core/wine/WineRegistry.hpp"
+
 #include "core/Log.hpp"
 #include <spdlog/spdlog.h>
 #include <QDir>
+#include <QFile>
+#include <QFileInfo>
+
 namespace core::state
 {
     namespace
@@ -13,6 +17,47 @@ namespace core::state
         const QString k_reporter_wine    = "wine";
         const QString k_reporter_courier = "courier";
         const QString k_reporter_auth    = "auth";
+
+        bool prefix_setup_complete(const QString& prefix, const QString& runtime)
+        {
+            QFile marker(QDir(prefix).filePath(".soa-prefix-ready"));
+            if (!marker.open(QIODevice::ReadOnly | QIODevice::Text))
+                return false;
+
+            const QString version = QString::fromUtf8(marker.readLine()).trimmed();
+            const QString marker_runtime = QString::fromUtf8(marker.readLine()).trimmed();
+            return version == "1" && marker_runtime == runtime;
+        }
+
+        bool prefix_is_win64(const QString& prefix)
+        {
+            QFile registry(QDir(prefix).filePath("system.reg"));
+            if (!registry.open(QIODevice::ReadOnly | QIODevice::Text))
+                return false;
+
+            return QString::fromUtf8(registry.readLine()).contains("win64", Qt::CaseInsensitive);
+        }
+
+        bool component_dll_exists(const QString& prefix, const QString& name)
+        {
+            const QString windows = QDir(prefix).filePath("drive_c/windows");
+            const QString dll_dir = QDir(windows).filePath(
+                prefix_is_win64(prefix) ? "syswow64" : "system32");
+            return QFileInfo::exists(QDir(dll_dir).filePath(name));
+        }
+
+        bool required_components_present(const QString& prefix, bool proton)
+        {
+            if (!component_dll_exists(prefix, "d3dx9_43.dll")
+                || !component_dll_exists(prefix, "d3dcompiler_47.dll"))
+            {
+                return false;
+            }
+
+            return proton
+                || (component_dll_exists(prefix, "msvcp140.dll")
+                    && component_dll_exists(prefix, "vcruntime140.dll"));
+        }
     }
     using core::status::State;
     using core::status::Status;
@@ -29,16 +74,17 @@ namespace core::state
     void InstallState::probe()
     {
         auto& cfg = util::config::Config::instance();
-        const QString prefix = cfg.wine_prefix();
+        const QString prefix = cfg.prefix_root();
 
         runtime_chosen = cfg.runtime_selected();
 
-        const bool proton =
-            core::wine::WineRegistry::identify(cfg.wine_binary()) == core::wine::RuntimeType::Proton;
-        const QString root = proton ? QDir(prefix).filePath("pfx") : prefix;
+        const bool proton = core::wine::WineRegistry::identify(cfg.wine_binary())
+            == core::wine::RuntimeType::Proton;
 
-        prefix_exists = !prefix.isEmpty() && QDir(root).exists("drive_c");
-        prefix_ready  = prefix_exists && QDir(root).exists("drive_c/windows/system32/d3dx9_43.dll");
+        prefix_exists = !prefix.isEmpty() && QDir(prefix).exists("drive_c");
+        prefix_ready = prefix_exists
+            && prefix_setup_complete(prefix, cfg.wine_binary())
+            && required_components_present(prefix, proton);
         game_installed = cfg.game_installed();
         authed         = cfg.has_auth();
         update_needed  = false;
@@ -66,10 +112,13 @@ namespace core::state
     {
         if (!probed) return Stage::Probing;
         if (broken)  return Stage::Broken;
+
+        // each step depends on the previous one being healthy
+        if (!runtime_chosen)              return Stage::NeedsRuntime;
         if (wine_state == State::Working) return Stage::SettingUpPrefix;
-        if (!runtime_chosen && !prefix_exists) return Stage::NeedsRuntime;
         if (!prefix_exists)               return Stage::NeedsPrefix;
         if (!prefix_ready)                return Stage::PrefixBroken;
+
         if (courier_state == State::Working)
             return game_installed ? Stage::Updating : Stage::Downloading;
         if (!game_installed)              return Stage::NeedsDownload;

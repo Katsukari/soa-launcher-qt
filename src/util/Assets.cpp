@@ -13,7 +13,8 @@ namespace util::assets
     {
         const std::initializer_list<std::pair<Image, QString>> defs =
         {
-            {Image::Background,          "bg.png"},
+            {Image::BackgroundPlaytest,  "BG1.0.png"},
+            {Image::BackgroundAlicia2,   "BG2.0.png"},
             {Image::BackgroundBox,       "bg-box1.png"},
             {Image::BoxCard,             "box-card.png"},
             {Image::BoxDisclaimer,       "box-disclaimer.png"},
@@ -45,9 +46,10 @@ namespace util::assets
             {Image::RightFrame,          "right-frame.png"},
             {Image::RulesFrame,          "rules-frame.png"},
             {Image::SignedInAs,          "signed-in-as.png"},
-            {Image::Logo,                "soa-logo.png"},
-            {Image::IconLock,            "2.0 ICON.png"},
-            {Image::IconPT,              "PT ICON.png"},
+            {Image::VersionFrameActive,   "ver-frame-active.png"},
+            {Image::VersionFrameInactive, "ver-frame-inactive-aligned.png"},
+            {Image::VersionIconPlaytest,  "ver-icon-pt.png"},
+            {Image::VersionIconAlicia2,   "ver-icon-2.0.png"},
             {Image::SettingsButton, "Settings Button.png"},
         };
 

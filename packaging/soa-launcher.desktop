@@ -2,7 +2,8 @@
 Type=Application
 Name=Story Of Alicia
 Comment=Story Of Alicia game launcher
-Exec=soa_launcher
+Exec=soa_launcher %u
 Icon=soa-launcher
 Categories=Game;
 Terminal=false
+MimeType=x-scheme-handler/soa;

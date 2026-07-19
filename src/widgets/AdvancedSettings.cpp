@@ -22,28 +22,36 @@ void AdvancedSettings::setup_game_path_option()
     util::simple_utils::make_label_block(this, w, y,
                             "GAME INSTALL PATH",
                             "Where the game is installed. Leave blank to use the default location.");
-    auto* field = new QLineEdit(this);
-    field->setText(Config::instance().game_install_path());
-    field->setStyleSheet(util::styles::k_field);
-    field->setGeometry(ls::field_rect(w, y));
+    game_path_field = new QLineEdit(this);
+    game_path_field->setText(Config::instance().game_install_path());
+    game_path_field->setStyleSheet(util::styles::k_field);
+    game_path_field->setGeometry(ls::field_rect(w, y));
 
     auto* browse = new QPushButton("...", this);
     browse->setCursor(Qt::PointingHandCursor);
     browse->setStyleSheet(util::styles::k_neutral_button);
     browse->setGeometry(ls::browse_rect(w, y));
-    connect(browse, &QPushButton::clicked, this, [this, field]()
+    connect(browse, &QPushButton::clicked, this, [this]()
     {
-        const QString dir = QFileDialog::getExistingDirectory(this, "Select Game Folder");
+        const QString dir = QFileDialog::getExistingDirectory(
+            this,
+            "Select Game Folder",
+            Config::instance().prefix_root());
         if (!dir.isEmpty())
         {
-            field->setText(dir);
+            game_path_field->setText(dir);
             Config::instance().set_game_install_path(dir);
         }
     });
-    connect(field, &QLineEdit::editingFinished, this, [field]()
+    connect(game_path_field, &QLineEdit::editingFinished, this, [this]()
     {
-        if (field->text() != Config::instance().game_install_path())
-            Config::instance().set_game_install_path(field->text());
+        if (game_path_field->text() != Config::instance().game_install_path())
+            Config::instance().set_game_install_path(game_path_field->text());
+    });
+    connect(&Config::instance(), &Config::changed, game_path_field, [this]()
+    {
+        if (!game_path_field->hasFocus())
+            game_path_field->setText(Config::instance().game_install_path());
     });
 }
 void AdvancedSettings::setup_game_args_option()

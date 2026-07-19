@@ -19,15 +19,15 @@ namespace core::wine
     };
 
     QString winetricks_path();
-    QString protontricks_path();
-    QString required_tricks_tool(RuntimeType type);
-    bool    tricks_available(RuntimeType type);
+    QString umu_path();
+    bool    winetricks_available();
+    bool    umu_available();
 
     class WineRegistry
     {
-        public:
-            static QVector<WineInstall> scan();
-            static QVector<QString>& extra_search_dirs();
-            static RuntimeType identify(const QString& path, bool* ok = nullptr);
+    public:
+        static QVector<WineInstall> scan();
+        static QVector<QString>& extra_search_dirs();
+        static RuntimeType identify(const QString& path, bool* ok = nullptr);
     };
 }

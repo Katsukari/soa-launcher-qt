@@ -110,11 +110,10 @@ void WineInstall::start_install()
     const QString wine_path = Config::instance().wine_binary();
     const core::wine::RuntimeType type = core::wine::WineRegistry::identify(wine_path);
 
-    if (!core::wine::tricks_available(type))
+    if (type == core::wine::RuntimeType::Proton && !core::wine::umu_available())
     {
-        const QString tool = core::wine::required_tricks_tool(type);
-        warn_message = "Missing " + tool + ". Install it and try again.";
-        SPDLOG_ERROR("install blocked: {} not found on PATH", tool.toStdString());
+        warn_message = "Missing umu-run. Proton requires UMU to run without Steam.";
+        SPDLOG_ERROR("install blocked: umu-run not found");
         update();
         return;
     }
