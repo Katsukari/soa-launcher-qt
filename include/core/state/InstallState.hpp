@@ -20,18 +20,10 @@ namespace core::state
 
         [[nodiscard]] Stage stage() const { return current; }
         [[nodiscard]] QString error_message() const { return last_error; }
-        [[nodiscard]] QString warning_message() const { return last_warning; }
 
         void probe();
         void dismiss_error();
-        void clear_warning();
 
-        void set_prefix_exists(bool value);
-        void set_prefix_ready(bool value);
-        void set_game_installed(bool value);
-        void set_update_needed(bool value);
-        void set_authed(bool value);
-        void set_broken(bool value);
 
     signals:
         void stage_changed(core::state::Stage now);
@@ -52,7 +44,6 @@ namespace core::state
         bool probed {};
         bool prerequisites_confirmed {};
         bool rules_accepted {};
-        bool broken {};
         bool runtime_chosen {};
         bool prefix_exists {};
         bool prefix_ready {};
@@ -66,7 +57,6 @@ namespace core::state
         core::status::State wine_state {status::State::Idle};
         core::status::State auth_state {status::State::Idle};
         QString wine_phase;
-        QString auth_phase;
         QString last_error;
         QString last_warning;
         QString checked_update_key;

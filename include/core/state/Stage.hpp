@@ -21,8 +21,7 @@ namespace core::state
         Launching,
         Running,
         Ready,
-        Failed,
-        Broken
+        Failed
     };
 
     inline const char* to_string(const Stage stage)
@@ -47,7 +46,6 @@ namespace core::state
             case Stage::Running:         return "Running";
             case Stage::Ready:           return "Ready";
             case Stage::Failed:          return "Failed";
-            case Stage::Broken:          return "Broken";
         }
         return "Probing";
     }

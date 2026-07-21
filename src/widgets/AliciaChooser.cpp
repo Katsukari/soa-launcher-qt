@@ -162,7 +162,6 @@ void AliciaChooser::on_stage_changed(const Stage stage)
         case Stage::Updating:        message = QStringLiteral("Updating and verifying game files..."); break;
         case Stage::NeedsRules:      message = QStringLiteral("The game is installed. Review and accept the playtest rules before signing in."); break;
         case Stage::Failed:          message = install_state->error_message(); break;
-        case Stage::Broken:          message = QStringLiteral("The launcher detected an invalid installation state."); break;
         default: break;
     }
     if (!message.isEmpty())

@@ -1,8 +1,8 @@
 #pragma once
 #include <QWidget>
 
-// I know having the namespace also named modal_overlay is duplication,
-// but I want to extend this class later so it wont be a simple class.
+
+
 namespace util::modal_overlay
 {
     class ModalOverlay : public QWidget
@@ -18,6 +18,8 @@ namespace util::modal_overlay
             void closed();
 
     protected:
+
+
         virtual void paint_content(QPainter& painter) = 0;
         void set_keeps_chrome(const bool v) { keep_chrome = v; }
         void paintEvent(QPaintEvent* event) override;

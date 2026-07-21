@@ -120,8 +120,9 @@ MainWindow::MainWindow(QWidget* parent)
             || (repair_progress && repair_progress->isVisible()))
             return;
         QMessageBox box(QMessageBox::Critical, QStringLiteral("Launcher Error"), message,
-                        QMessageBox::Retry | QMessageBox::Ignore, this);
-        box.setInformativeText(QStringLiteral("The launcher log has been opened with diagnostic details."));
+                        QMessageBox::Ok, this);
+        box.setInformativeText(QStringLiteral(
+            "The launcher log has been opened with diagnostic details. Close this message, then retry the action."));
         box.exec();
         install_state->dismiss_error();
     });
@@ -207,6 +208,13 @@ void MainWindow::setup_settings()
         repair_files->refresh();
         open_overlay(repair_files);
     });
+    connect(settings, &Settings::launcher_size_changed,
+            this, &MainWindow::launcher_size_change_requested);
+}
+
+void MainWindow::open_launcher_settings()
+{
+    open_overlay(settings);
 }
 
 

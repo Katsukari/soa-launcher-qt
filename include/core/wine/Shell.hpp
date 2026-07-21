@@ -144,7 +144,6 @@ namespace core::wine
         std::function<void(const command_result&)> completion_handler;
         bool terminal_emitted {};
         CommandOutcome forced_outcome {CommandOutcome::Success};
-        int output_lines_this_chunk {};
 
         QVector<SetupCommand> setup_queue;
         int setup_index {-1};

@@ -8,7 +8,6 @@ extern "C" {
 #endif
 
 void soa_log(int level, const char* message);
-void soa_ping(void);
 
 typedef struct courier courier;
 

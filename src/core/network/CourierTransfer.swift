@@ -92,8 +92,8 @@ private final class StreamingDownloadDelegate: NSObject, URLSessionDataDelegate,
             completionHandler(.cancel)
             return
         } else if (200...299).contains(status) {
-            // A server may ignore Range and return 200. In that case restart this
-            // file cleanly instead of appending a full response to partial data.
+
+
             resumed = false
             received = 0
             try? FileManager.default.removeItem(at: destination)

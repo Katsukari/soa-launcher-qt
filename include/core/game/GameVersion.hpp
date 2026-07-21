@@ -15,6 +15,7 @@ namespace core::game
         const char* display_name;
         const char* cdn_base_url;
         const char* default_install_directory;
+        const char* default_install_subdirectory;
         const char* executable_name;
         const char* install_marker_file;
         const char* launch_game_id;
@@ -30,6 +31,7 @@ namespace core::game
         "Alicia",
         "https://r2.storyofalicia.com/game",
         "Story Of Alicia",
+        "game",
         "Alicia.exe",
         "version.json",
         "4",
@@ -45,6 +47,7 @@ namespace core::game
         "Alicia 2.0",
         "https://r2.storyofalicia.com/game2",
         "Story Of Alicia 2.0",
+        "game",
         "Alicia.exe",
         "version.json",
         "4",

@@ -16,8 +16,6 @@ namespace core::status
             const Status& status() const { return current; }
             const QString& reporter_name() const { return name; }
 
-            bool is_working() const { return current.state == State::Working; }
-
             signals:
                 void status_changed(const Status & now);
 

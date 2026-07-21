@@ -1,41 +1,23 @@
 #include "core/system/SystemProfile.hpp"
 
+#include <QtGlobal>
+
+#if defined(Q_OS_LINUX)
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QProcess>
 #include <QRegularExpression>
 #include <QStandardPaths>
-#include <QSysInfo>
+#include <QString>
 #include <QStringList>
+#endif
 
 namespace core::system
 {
+#if defined(Q_OS_LINUX)
     namespace
     {
-        QString read_first_value(const QString& path, const QStringList& keys)
-        {
-            QFile file(path);
-            if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
-                return {};
-
-            while (!file.atEnd())
-            {
-                const QString line = QString::fromUtf8(file.readLine()).trimmed();
-                const int separator = line.indexOf(QLatin1Char(':'));
-                if (separator <= 0)
-                    continue;
-
-                const QString key = line.left(separator).trimmed();
-                for (const QString& candidate : keys)
-                {
-                    if (key.compare(candidate, Qt::CaseInsensitive) == 0)
-                        return line.mid(separator + 1).trimmed();
-                }
-            }
-            return {};
-        }
-
         QString run_command(const QString& program, const QStringList& arguments,
                             const int timeout_ms)
         {
@@ -68,17 +50,14 @@ namespace core::system
                 return GpuVendor::Amd;
             if (lower.contains(QStringLiteral("intel")) || lower.contains(QStringLiteral("8086")))
                 return GpuVendor::Intel;
-            if (lower.contains(QStringLiteral("apple")) || lower.contains(QStringLiteral("106b")))
-                return GpuVendor::Apple;
             return GpuVendor::Unknown;
         }
 
-#if defined(Q_OS_LINUX)
-        void detect_linux_gpu(SystemProfile& profile)
+        GpuVendor detect_linux_gpu_vendor()
         {
             const QString lspci = QStandardPaths::findExecutable(QStringLiteral("lspci"));
-            const QString output = run_command(lspci,
-                {QStringLiteral("-mm"), QStringLiteral("-nn")}, 3000);
+            const QString output = run_command(
+                lspci, {QStringLiteral("-mm"), QStringLiteral("-nn")}, 3000);
             for (const QString& line : output.split(QLatin1Char('\n'), Qt::SkipEmptyParts))
             {
                 const QString lower = line.toLower();
@@ -89,13 +68,10 @@ namespace core::system
                     continue;
                 }
 
-                profile.gpu_name = line.simplified();
-                profile.gpu_vendor = vendor_from_text(line);
-                break;
+                const GpuVendor vendor = vendor_from_text(line);
+                if (vendor != GpuVendor::Unknown)
+                    return vendor;
             }
-
-            if (profile.gpu_vendor != GpuVendor::Unknown)
-                return;
 
             QDir drm(QStringLiteral("/sys/class/drm"));
             const QRegularExpression card_pattern(QStringLiteral(R"(^card\d+$)"));
@@ -108,15 +84,12 @@ namespace core::system
                 if (!vendor_file.open(QIODevice::ReadOnly | QIODevice::Text))
                     continue;
 
-                const QString vendor_id = QString::fromUtf8(vendor_file.readAll()).trimmed();
-                const GpuVendor vendor = vendor_from_text(vendor_id);
-                if (vendor == GpuVendor::Unknown)
-                    continue;
-
-                profile.gpu_vendor = vendor;
-                profile.gpu_name = gpu_vendor_name(vendor) + QStringLiteral(" graphics");
-                break;
+                const GpuVendor vendor = vendor_from_text(
+                    QString::fromUtf8(vendor_file.readAll()).trimmed());
+                if (vendor != GpuVendor::Unknown)
+                    return vendor;
             }
+            return GpuVendor::Unknown;
         }
 
         bool linux_vulkan_likely()
@@ -130,94 +103,30 @@ namespace core::system
             for (const QString& root : roots)
             {
                 const QDir dir(root);
-                if (dir.exists() && !dir.entryList({QStringLiteral("*.json")}, QDir::Files).isEmpty())
+                if (dir.exists()
+                    && !dir.entryList({QStringLiteral("*.json")}, QDir::Files).isEmpty())
+                {
                     return true;
+                }
             }
 
             return !QStandardPaths::findExecutable(QStringLiteral("vulkaninfo")).isEmpty()
                 || QFileInfo::exists(QStringLiteral("/usr/lib/libvulkan.so.1"))
                 || QFileInfo::exists(QStringLiteral("/usr/lib64/libvulkan.so.1"))
-                || QFileInfo::exists(QStringLiteral("/usr/lib/x86_64-linux-gnu/libvulkan.so.1"));
+                || QFileInfo::exists(
+                    QStringLiteral("/usr/lib/x86_64-linux-gnu/libvulkan.so.1"));
         }
-#endif
-
-#if defined(Q_OS_MACOS)
-        void detect_macos_gpu(SystemProfile& profile)
-        {
-            const QString profiler = QStringLiteral("/usr/sbin/system_profiler");
-            const QString output = run_command(profiler,
-                {QStringLiteral("SPDisplaysDataType")}, 7000);
-            for (const QString& raw : output.split(QLatin1Char('\n'), Qt::SkipEmptyParts))
-            {
-                const QString line = raw.trimmed();
-                if (line.startsWith(QStringLiteral("Chipset Model:"), Qt::CaseInsensitive))
-                {
-                    profile.gpu_name = line.section(QLatin1Char(':'), 1).trimmed();
-                    profile.gpu_vendor = vendor_from_text(profile.gpu_name);
-                    if (profile.gpu_vendor == GpuVendor::Unknown
-                        && profile.gpu_name.contains(QStringLiteral("Apple"), Qt::CaseInsensitive))
-                    {
-                        profile.gpu_vendor = GpuVendor::Apple;
-                    }
-                    break;
-                }
-            }
-        }
-
-        bool macos_vulkan_likely()
-        {
-            return QFileInfo::exists(QStringLiteral("/opt/homebrew/lib/libMoltenVK.dylib"))
-                || QFileInfo::exists(QStringLiteral("/usr/local/lib/libMoltenVK.dylib"));
-        }
-#endif
     }
-
-    QString gpu_vendor_name(const GpuVendor vendor)
-    {
-        switch (vendor)
-        {
-            case GpuVendor::Amd:     return QStringLiteral("AMD");
-            case GpuVendor::Nvidia:  return QStringLiteral("NVIDIA");
-            case GpuVendor::Intel:   return QStringLiteral("Intel");
-            case GpuVendor::Apple:   return QStringLiteral("Apple");
-            case GpuVendor::Unknown: return QStringLiteral("Unknown");
-        }
-        return QStringLiteral("Unknown");
-    }
+#endif
 
     SystemProfile detect_system_profile()
     {
         SystemProfile profile;
-        profile.os_name = QSysInfo::prettyProductName().trimmed();
-        if (profile.os_name.isEmpty())
-            profile.os_name = QSysInfo::productType();
 
-#if defined(Q_OS_LINUX)
-        profile.cpu_name = read_first_value(QStringLiteral("/proc/cpuinfo"),
-            {QStringLiteral("model name"), QStringLiteral("Hardware"), QStringLiteral("Processor")});
-        detect_linux_gpu(profile);
-        profile.vulkan_likely = linux_vulkan_likely();
-#elif defined(Q_OS_MACOS)
-        profile.cpu_name = run_command(QStringLiteral("/usr/sbin/sysctl"),
-            {QStringLiteral("-n"), QStringLiteral("machdep.cpu.brand_string")}, 3000);
-        if (profile.cpu_name.isEmpty())
-        {
-            profile.cpu_name = run_command(QStringLiteral("/usr/sbin/sysctl"),
-                {QStringLiteral("-n"), QStringLiteral("hw.model")}, 3000);
-        }
-        detect_macos_gpu(profile);
-        profile.vulkan_likely = macos_vulkan_likely();
-#else
-        profile.cpu_name = QSysInfo::currentCpuArchitecture();
-#endif
-
-        if (profile.cpu_name.isEmpty())
-            profile.cpu_name = QSysInfo::currentCpuArchitecture();
-        if (profile.gpu_name.isEmpty())
-            profile.gpu_name = gpu_vendor_name(profile.gpu_vendor) == QStringLiteral("Unknown")
-                ? QStringLiteral("Could not identify graphics hardware")
-                : gpu_vendor_name(profile.gpu_vendor) + QStringLiteral(" graphics");
-
-        return profile;
+        #if defined(Q_OS_LINUX)
+                profile.gpu_vendor = detect_linux_gpu_vendor();
+                profile.vulkan_likely = linux_vulkan_likely();
+        #endif
+                return profile;
     }
 }

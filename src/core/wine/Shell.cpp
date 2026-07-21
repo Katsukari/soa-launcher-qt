@@ -613,11 +613,11 @@ namespace core::wine
         }
 
         QVector<SetupCommand> commands;
-        // Valve Proton is a verb-based wrapper, not a conventional CLI program.
-        // `runinprefix` invokes Proton's own Wine binary inside STEAM_COMPAT_DATA_PATH
-        // and is the appropriate mode for Wine utilities such as wineboot. The actual
-        // prefix-creation command is also the runtime probe, so avoid a redundant
-        // `proton --version`/bundled-Wine probe before it.
+
+
+
+
+
         commands.push_back({QStringLiteral("Creating Proton prefix..."), proton_binary(),
                             {QStringLiteral("runinprefix"), QStringLiteral("wineboot"),
                              QStringLiteral("--init")},

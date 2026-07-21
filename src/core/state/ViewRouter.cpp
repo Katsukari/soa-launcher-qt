@@ -38,7 +38,6 @@ namespace core::state
                 return View::AliciaChooser;
 
             case Stage::Failed:
-            case Stage::Broken:
                 return View::Error;
         }
         return View::Loading;

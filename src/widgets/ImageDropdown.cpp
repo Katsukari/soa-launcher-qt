@@ -4,6 +4,7 @@
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QPoint>
 
 #include <utility>
 
@@ -26,21 +27,57 @@ ImageDropdown::ImageDropdown(QStringList options, QWidget* parent)
     setFixedSize(dd::box(window()->size()));
 }
 
+QRect ImageDropdown::closed_rect() const
+{
+    const QSize w = window()->size();
+    const QSize box = dd::box(w);
+    if (!open || !opens_upward)
+        return dd::closed_rect(w);
+    const QSize total = dd::total_size(w, items.size());
+    return {0, total.height() - box.height(), box.width(), box.height()};
+}
+
 QRect ImageDropdown::option_rect(const int slot) const
 {
-    return dd::option_rect(window()->size(), slot);
+    if (!open || !opens_upward)
+        return dd::option_rect(window()->size(), slot);
+    const QSize w = window()->size();
+    const QSize box = dd::box(w);
+    const int step = dd::option_h(w) - dd::option_overlap(w);
+    return {0, slot * step, box.width(), dd::option_h(w)};
+}
+
+void ImageDropdown::set_open_upwards(const bool value)
+{
+    if (open)
+        set_open(false);
+    opens_upward = value;
 }
 
 void ImageDropdown::set_open(const bool value)
 {
-    if (!isEnabled())
+    if (!isEnabled() || open == value)
         return;
-    open = value;
-    setFixedSize(open
-        ? dd::total_size(window()->size(), items.size())
-        : dd::box(window()->size()));
-    if (open)
+
+    const QSize w = window()->size();
+    const QSize box = dd::box(w);
+    if (value)
+    {
+        closed_position = pos();
+        const QSize total = dd::total_size(w, items.size());
+        open = true;
+        if (opens_upward)
+            move(closed_position.x(), closed_position.y() - total.height() + box.height());
+        setFixedSize(total);
         raise();
+    }
+    else
+    {
+        open = false;
+        setFixedSize(box);
+        if (opens_upward)
+            move(closed_position);
+    }
     update();
 }
 
@@ -63,7 +100,7 @@ void ImageDropdown::select_relative(const int delta)
 
 void ImageDropdown::mousePressEvent(QMouseEvent* event)
 {
-    if (dd::closed_rect(window()->size()).contains(event->pos()))
+    if (closed_rect().contains(event->pos()))
     {
         setFocus(Qt::MouseFocusReason);
         set_open(!open);
@@ -161,14 +198,14 @@ void ImageDropdown::paintEvent(QPaintEvent*)
         }
     }
 
-    const QRect closed = dd::closed_rect(w);
+    const QRect closed = closed_rect();
     painter.drawPixmap(closed, dropdown_px);
     painter.setPen(text_col);
     painter.drawText(closed.adjusted(pad, 0, -pad, -lip),
                      Qt::AlignVCenter | Qt::AlignLeft, items.value(current));
 
     painter.setPen(QPen(QColor(0xA8, 0x90, 0x78), util::layout::scaled(2, w)));
-    const QPoint center = dd::chevron_center(w);
+    const QPoint center = dd::chevron_center(w) + QPoint(0, closed.top());
     const int arm = dd::chevron_arm(w);
     if (open)
     {

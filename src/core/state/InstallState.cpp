@@ -237,17 +237,6 @@ namespace core::state
         probe();
     }
 
-    void InstallState::clear_warning()
-    {
-        set_warning({});
-    }
-
-    void InstallState::set_prefix_exists(const bool value) { if (prefix_exists != value) { prefix_exists = value; recompute(); } }
-    void InstallState::set_prefix_ready(const bool value) { if (prefix_ready != value) { prefix_ready = value; recompute(); } }
-    void InstallState::set_game_installed(const bool value) { if (game_installed != value) { game_installed = value; recompute(); } }
-    void InstallState::set_update_needed(const bool value) { if (update_needed != value) { update_needed = value; recompute(); } }
-    void InstallState::set_authed(const bool value) { if (authed != value) { authed = value; recompute(); } }
-    void InstallState::set_broken(const bool value) { if (broken != value) { broken = value; recompute(); } }
 
     void InstallState::on_reporter_changed(const QString& name, const Status& status)
     {
@@ -259,7 +248,6 @@ namespace core::state
         else if (name == k_reporter_auth)
         {
             auth_state = status.state;
-            auth_phase = status.phase;
         }
         else
         {
@@ -289,7 +277,6 @@ namespace core::state
     {
         if (!probed) return Stage::Probing;
         if (!last_error.isEmpty()) return Stage::Failed;
-        if (broken) return Stage::Broken;
         if (!prerequisites_confirmed) return Stage::NeedsPrerequisites;
         if (!runtime_chosen) return Stage::NeedsRuntime;
 

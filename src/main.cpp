@@ -9,10 +9,12 @@
 #include <QLocalSocket>
 #include <QLockFile>
 #include <QStandardPaths>
+#include <QScreen>
 #include <QThread>
 #include <QTimer>
 #include <QUrl>
 
+#include <functional>
 #include <utility>
 
 #include "MainWindow.hpp"
@@ -166,7 +168,7 @@ int main(int argc, char* argv[])
     instance_lock.setStaleLockTime(0);
     if (!instance_lock.tryLock(0))
     {
-        // The primary may still be between taking the lock and opening its socket.
+
         for (int attempt = 0; attempt < 20; ++attempt)
         {
             QThread::msleep(100);
@@ -182,7 +184,6 @@ int main(int argc, char* argv[])
     SPDLOG_INFO("Version: {}", SOA_LAUNCHER_VERSION);
     util::assets::load_all();
     SPDLOG_DEBUG("loaded all assets successfully");
-    soa_ping();
 
     QLocalServer::removeServer(server_key);
     QLocalServer server;
@@ -192,12 +193,68 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    MainWindow window;
-    window.show();
+    MainWindow* window = nullptr;
+    std::function<void()> rebuild_window;
+
+    const auto attach_window = [&](MainWindow* created)
+    {
+        QObject::connect(created, &MainWindow::launcher_size_change_requested, &app, [&]()
+        {
+            QTimer::singleShot(0, &app, [&]()
+            {
+                rebuild_window();
+            });
+        });
+    };
+
+    rebuild_window = [&]()
+    {
+        MainWindow* previous = window;
+        QPoint center;
+        if (previous)
+            center = previous->frameGeometry().center();
+        else if (QScreen* primary = QGuiApplication::primaryScreen())
+            center = primary->availableGeometry().center();
+
+        auto* replacement = new MainWindow;
+        attach_window(replacement);
+        QRect geometry(QPoint(0, 0), replacement->size());
+        geometry.moveCenter(center);
+        QScreen* screen = QGuiApplication::screenAt(center);
+        if (!screen)
+            screen = QGuiApplication::primaryScreen();
+        if (screen)
+        {
+            const QRect available = screen->availableGeometry();
+            if (geometry.left() < available.left())
+                geometry.moveLeft(available.left());
+            if (geometry.top() < available.top())
+                geometry.moveTop(available.top());
+            if (geometry.right() > available.right())
+                geometry.moveRight(available.right());
+            if (geometry.bottom() > available.bottom())
+                geometry.moveBottom(available.bottom());
+        }
+        replacement->move(geometry.topLeft());
+        replacement->show();
+        replacement->open_launcher_settings();
+        window = replacement;
+
+        if (previous)
+        {
+            previous->hide();
+            previous->deleteLater();
+        }
+    };
+
+    window = new MainWindow;
+    attach_window(window);
+    window->show();
 
     const auto handle_command = [&window](const QJsonObject& command)
     {
-        if (command.value(QStringLiteral("version")).toInt() != 1
+        if (!window
+            || command.value(QStringLiteral("version")).toInt() != 1
             || command.value(QStringLiteral("command")).toString() != QStringLiteral("activate"))
         {
             return;
@@ -205,15 +262,15 @@ int main(int argc, char* argv[])
 
         const QString incoming = command.value(QStringLiteral("url")).toString();
         if (is_auth_url(incoming))
-            window.auth_handler()->handle_url(incoming);
+            window->auth_handler()->handle_url(incoming);
 
-        window.setWindowState((window.windowState() & ~Qt::WindowMinimized) | Qt::WindowActive);
-        window.show();
-        window.raise();
-        window.activateWindow();
+        window->setWindowState((window->windowState() & ~Qt::WindowMinimized) | Qt::WindowActive);
+        window->show();
+        window->raise();
+        window->activateWindow();
     };
 
-    QObject::connect(&app, &LauncherApplication::soa_url_opened, &window,
+    QObject::connect(&app, &LauncherApplication::soa_url_opened, &app,
                      [&handle_command](const QString& incoming)
     {
         handle_command(QJsonObject{
@@ -223,7 +280,7 @@ int main(int argc, char* argv[])
         });
     });
 
-    QObject::connect(&server, &QLocalServer::newConnection, &window,
+    QObject::connect(&server, &QLocalServer::newConnection, &app,
                      [&server, &handle_command]()
     {
         while (QLocalSocket* client = server.nextPendingConnection())
@@ -276,7 +333,7 @@ int main(int argc, char* argv[])
 
     if (!url.isEmpty())
     {
-        QTimer::singleShot(0, &window, [&handle_command, url]()
+        QTimer::singleShot(0, &app, [&handle_command, url]()
         {
             handle_command(QJsonObject{
                 {QStringLiteral("version"), 1},

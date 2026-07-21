@@ -61,7 +61,6 @@ namespace
         if (runtime.type == core::wine::RuntimeType::Wine)
         {
             if (name == QStringLiteral("system wine")) return 10000;
-            if (name.contains(QStringLiteral("cachyos"))) return 9000;
             return 8000;
         }
 
@@ -232,7 +231,6 @@ bool PrerequisitesIntro::recommended_dxvk() const
     return false;
 #else
     return system_profile.vulkan_likely
-        && system_profile.gpu_vendor != core::system::GpuVendor::Apple
         && system_profile.gpu_vendor != core::system::GpuVendor::Unknown;
 #endif
 }
@@ -250,7 +248,7 @@ QStringList PrerequisitesIntro::missing_requirements(const core::wine::RuntimeTy
     if (type == core::wine::RuntimeType::Proton && !umu_ready)
         missing << QStringLiteral("UMU");
 
-    // Prefix components are installed through Winetricks for both runtimes.
+
     if (!winetricks_ready)
         missing << QStringLiteral("Winetricks");
 
@@ -345,10 +343,6 @@ void PrerequisitesIntro::apply_recommendation()
         return;
 
     auto& config = util::config::Config::instance();
-    config.set_setup_runtime_preference(
-        runtime_type == core::wine::RuntimeType::Proton
-            ? QStringLiteral("proton") : QStringLiteral("wine"));
-    config.set_setup_pc_age(QStringLiteral("unknown"));
     config.set_use_dxvk(recommended_dxvk());
     config.set_wine_binary(runtime->path);
     config.set_runtime_selected(true);

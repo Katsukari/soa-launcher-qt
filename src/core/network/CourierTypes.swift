@@ -6,8 +6,8 @@ func log(_ level: Int32, _ message: String)
     message.withCString { soa_log(level, $0) }
 }
 
-/// Prevent manifest-controlled names from inserting fake lines or terminal
-/// control characters into launcher diagnostics.
+
+
 func logSafe(_ value: String) -> String
 {
     value.unicodeScalars.map { scalar in

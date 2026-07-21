@@ -23,6 +23,7 @@ class Settings : public util::modal_overlay::ModalOverlay
 
     signals:
         void repair_requested();
+        void launcher_size_changed();
 
     protected:
         void paint_content(QPainter& painter) override;
@@ -32,9 +33,13 @@ class Settings : public util::modal_overlay::ModalOverlay
         void setup_pages();
         void setup_tabs();
         void set_tab(int index);
-        int  active_tab {};
+        void update_panel_geometry();
+        int active_tab {};
+        bool launcher_panel_expanded {};
 
-        QPushButton * close_button {};
-        QStackedWidget * stack {};
+        QPushButton* close_button {};
+        QPushButton* tab_buttons[3] {};
+        QStackedWidget* stack {};
+        LauncherSettings* launcher_settings {};
         core::wine::Shell * shell {};
 };

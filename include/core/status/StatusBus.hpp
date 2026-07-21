@@ -21,7 +21,6 @@ namespace core::status
             void unregister_reporter(StatusReporter* r);
 
             bool any_working() const;
-            QVector<StatusReporter*> reporters() const { return items; }
             StatusReporter* find(const QString& name) const;
 
             signals:

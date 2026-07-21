@@ -29,9 +29,9 @@ namespace core::wine
         const auto match = expression.match(header);
         if (!match.hasMatch())
         {
-            // Some Wine builds omit or relocate the header marker. A syswow64
-            // directory is still a reliable indication that the prefix contains
-            // the 32-bit side of a 64-bit prefix.
+
+
+
             if (QFileInfo::exists(QDir(prefix).filePath(QStringLiteral("drive_c/windows/syswow64"))))
                 return PrefixArchitecture::Win64;
             return PrefixArchitecture::Unknown;
@@ -70,9 +70,9 @@ namespace core::wine
             }
         }
 
-        // Wine itself ships d3d9.dll, so file existence alone cannot prove that
-        // DXVK is active. Launcher-managed DXVK is installed through Winetricks
-        // and therefore must be recorded in winetricks.log.
+
+
+
         return false;
     }
 

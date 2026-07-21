@@ -4,7 +4,6 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QStandardPaths>
-#include <QProcessEnvironment>
 #include <QSet>
 
 #include "core/Log.hpp"
@@ -45,10 +44,15 @@ namespace core::wine
 
             for (const QString& relative : {
                      QStringLiteral("files/bin/wine"),
+                     QStringLiteral("files/bin/wine64"),
                      QStringLiteral("dist/bin/wine"),
+                     QStringLiteral("dist/bin/wine64"),
                      QStringLiteral("bin/wine"),
+                     QStringLiteral("bin/wine64"),
                      QStringLiteral("Contents/Resources/wine/bin/wine"),
-                     QStringLiteral("Contents/SharedSupport/CrossOver/bin/wine")})
+                     QStringLiteral("Contents/Resources/wine/bin/wine64"),
+                     QStringLiteral("Contents/SharedSupport/CrossOver/bin/wine"),
+                     QStringLiteral("Contents/SharedSupport/CrossOver/bin/wine64")})
             {
                 const QFileInfo wine(dir.filePath(relative));
                 if (wine.isFile())
@@ -90,13 +94,34 @@ namespace core::wine
             out.push_back(wi);
         }
 
+        QString runtime_name_for_path(const QString& path)
+        {
+            const int app_suffix = path.indexOf(QStringLiteral(".app/"), 0, Qt::CaseInsensitive);
+            if (app_suffix >= 0)
+                return QFileInfo(path.left(app_suffix + 4)).baseName();
+            if (path.contains(QStringLiteral("game-porting-toolkit"), Qt::CaseInsensitive))
+                return QStringLiteral("Game Porting Toolkit");
+            if (path.startsWith(QStringLiteral("/opt/homebrew/"))
+                || path.startsWith(QStringLiteral("/usr/local/")))
+            {
+                return QStringLiteral("Homebrew Wine");
+            }
+            const QString name = QFileInfo(path).completeBaseName();
+            return name.isEmpty() ? QStringLiteral("Wine") : name;
+        }
+
         QString wine_in(const QString& folder)
         {
             for (const QString& rel : { QStringLiteral("/files/bin/wine"),
+                                        QStringLiteral("/files/bin/wine64"),
                                         QStringLiteral("/dist/bin/wine"),
+                                        QStringLiteral("/dist/bin/wine64"),
                                         QStringLiteral("/bin/wine"),
+                                        QStringLiteral("/bin/wine64"),
                                         QStringLiteral("/Contents/Resources/wine/bin/wine"),
-                                        QStringLiteral("/Contents/SharedSupport/CrossOver/bin/wine") })
+                                        QStringLiteral("/Contents/Resources/wine/bin/wine64"),
+                                        QStringLiteral("/Contents/SharedSupport/CrossOver/bin/wine"),
+                                        QStringLiteral("/Contents/SharedSupport/CrossOver/bin/wine64") })
             {
                 const QFileInfo candidate(folder + rel);
                 if (candidate.isFile() && candidate.isExecutable()) return candidate.absoluteFilePath();
@@ -114,12 +139,12 @@ namespace core::wine
                 const QString folder = entry.absoluteFilePath();
                 if (QFileInfo::exists(folder + "/proton"))
                 {
-                    add_install(out, seen, folder, RuntimeType::Proton, entry.fileName());
+                    add_install(out, seen, folder, RuntimeType::Proton, entry.completeBaseName());
                     continue;
                 }
                 const QString wine = wine_in(folder);
                 if (!wine.isEmpty())
-                    add_install(out, seen, wine, RuntimeType::Wine, entry.fileName());
+                    add_install(out, seen, wine, RuntimeType::Wine, entry.completeBaseName());
             }
         }
 
@@ -131,7 +156,6 @@ namespace core::wine
             dirs << "/Applications"
                  << home() + "/Applications"
                  << home() + "/Library/Application Support/com.isaacmarovitz.Whisky/Libraries"
-                 << home() + "/Library/Application Support/CrossOver/Bottles"
                  << "/opt/homebrew/Caskroom"
                  << "/usr/local/Caskroom";
 #else
@@ -157,17 +181,27 @@ namespace core::wine
         {
             QStringList bins;
 #if defined(Q_OS_MACOS)
+            const QStringList application_roots {QStringLiteral("/Applications"),
+                                                  home() + QStringLiteral("/Applications")};
             bins << "/opt/homebrew/bin/wine"
                  << "/opt/homebrew/bin/wine64"
                  << "/usr/local/bin/wine"
                  << "/usr/local/bin/wine64"
-                 << "/Applications/Wine Stable.app/Contents/Resources/wine/bin/wine"
-                 << "/Applications/Wine Staging.app/Contents/Resources/wine/bin/wine"
-                 << "/Applications/Wine Devel.app/Contents/Resources/wine/bin/wine"
-                 << "/Applications/CrossOver.app/Contents/SharedSupport/CrossOver/bin/wine"
-                 << "/Applications/Whisky.app/Contents/Resources/Libraries/Wine/bin/wine"
                  << "/usr/local/opt/game-porting-toolkit/bin/wine64"
                  << "/opt/homebrew/opt/game-porting-toolkit/bin/wine64";
+            for (const QString& root : application_roots)
+            {
+                bins << root + "/Wine Stable.app/Contents/Resources/wine/bin/wine"
+                     << root + "/Wine Stable.app/Contents/Resources/wine/bin/wine64"
+                     << root + "/Wine Staging.app/Contents/Resources/wine/bin/wine"
+                     << root + "/Wine Staging.app/Contents/Resources/wine/bin/wine64"
+                     << root + "/Wine Devel.app/Contents/Resources/wine/bin/wine"
+                     << root + "/Wine Devel.app/Contents/Resources/wine/bin/wine64"
+                     << root + "/CrossOver.app/Contents/SharedSupport/CrossOver/bin/wine"
+                     << root + "/CrossOver.app/Contents/SharedSupport/CrossOver/bin/wine64"
+                     << root + "/Whisky.app/Contents/Resources/Libraries/Wine/bin/wine"
+                     << root + "/Whisky.app/Contents/Resources/Libraries/Wine/bin/wine64";
+            }
 #endif
             return bins;
         }
@@ -185,7 +219,7 @@ namespace core::wine
             add_install(out, seen, system_wine, RuntimeType::Wine, QStringLiteral("System Wine"));
 
         for (const QString& bin : direct_binaries())
-            add_install(out, seen, bin, RuntimeType::Wine, QFileInfo(bin).dir().dirName());
+            add_install(out, seen, bin, RuntimeType::Wine, runtime_name_for_path(bin));
 
         for (const QString& dir : runtime_search_dirs())
         {

@@ -40,10 +40,15 @@ class MainWindow : public QWidget
 public:
     explicit MainWindow(QWidget* parent = nullptr);
 
+    void open_launcher_settings();
+
     [[nodiscard]] AuthHandler* auth_handler() const
     {
         return auth;
     }
+
+signals:
+    void launcher_size_change_requested();
 
 protected:
     void paintEvent(QPaintEvent* event) override;

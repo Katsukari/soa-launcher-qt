@@ -89,8 +89,8 @@ extension Courier
         let journalURL = installRoot.appendingPathComponent(journalFileName)
         let backupRootRaw = installRoot.appendingPathComponent(backupDirectoryName, isDirectory: true)
         guard manager.fileExists(atPath: journalURL.path) else {
-            // A staging directory without a commit journal contains resumable downloads.
-            // Only a backup directory is stale when there is no active journal.
+
+
             try? removeIfPresent(backupRootRaw)
             return
         }

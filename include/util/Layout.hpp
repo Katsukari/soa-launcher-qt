@@ -176,10 +176,12 @@ namespace util::layout
 
     namespace settings
     {
-        inline constexpr QSize k_box {630, 555};
+        inline constexpr QSize k_box {630, 570};
+        inline constexpr QSize k_box_expanded {630, 620};
         inline constexpr QSize k_close_icon {13, 13};
         inline constexpr QSize k_close_hit {22, 22};
-        inline constexpr int   k_margin_top = 69;
+        inline constexpr int   k_margin_top = 45;
+        inline constexpr int   k_margin_top_expanded = 25;
         inline constexpr int   k_header_gap = 60;
         inline constexpr int   k_row_gap = 50;
         inline constexpr int   k_padding = 37;
@@ -189,9 +191,6 @@ namespace util::layout
         inline constexpr int   k_tab_gap    = 6;
         inline constexpr int   k_tab_inset  = 40;
         inline constexpr int   k_tab_overlap = 4;
-
-        inline constexpr QRect k_rect  = center_in_region(k_box, 0, k_margin_top);
-        inline constexpr QRect k_close = anchor_top_right(k_rect, 27, 22, k_close_hit);
 
         inline constexpr QRect k_page_title {0, 34, k_box.width(), 30};
         inline constexpr int   k_control_col = 227;
@@ -215,9 +214,9 @@ namespace util::layout
         inline constexpr int   k_browse_w   = 34;
         inline constexpr int   k_input_gap  = 6;
 
-        QRect box_rect(QSize win);
-        QSize box(QSize win);
-        QRect close(QSize win);
+        QRect box_rect(QSize win, bool expanded = false);
+        QSize box(QSize win, bool expanded = false);
+        QRect close(QSize win, bool expanded = false);
         QSize close_icon(QSize win);
         int   header_gap(QSize win);
         int   row_gap(QSize win);
@@ -229,7 +228,7 @@ namespace util::layout
         int   tab_gap(QSize win);
         int   tab_inset(QSize win);
         int   tab_overlap(QSize win);
-        QRect tab_rect(QSize win, int i);
+        QRect tab_rect(QSize win, int i, bool expanded = false);
         int   tab_radius(QSize win);
 
         QRect row_title(QSize win, int y);
@@ -239,7 +238,7 @@ namespace util::layout
         QPoint ctrl_pos(QSize win, int y);
         QRect run_check(QSize win, int y);
         QRect slider_rect(QSize win, int y);
-        QRect page_title(QSize win);
+        QRect page_title(QSize win, bool expanded = false);
 
         int   row_y(int index, int count, bool has_footer = false);
         QRect field_rect(QSize win, int y);
@@ -248,13 +247,10 @@ namespace util::layout
 
     namespace launcher_settings
     {
-        inline constexpr int   k_footer_y    = 500;
-        inline constexpr QSize k_footer_btn  {110, 30};
-        inline constexpr int   k_footer_gap  = 10;
-
-        int   row(int i);
-        QRect footer_left(QSize win);
-        QRect footer_right(QSize win);
+        int   row(int i, bool expanded = false);
+        QRect connectivity_results(QSize win);
+        QRect connectivity_text(QSize win);
+        QRect copy_report(QSize win);
     }
 
     namespace wine_settings

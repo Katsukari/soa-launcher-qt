@@ -12,22 +12,22 @@ class RulesAgreement : public util::modal_overlay::ModalOverlay
 {
     Q_OBJECT
 
-public:
-    explicit RulesAgreement(QWidget* parent = nullptr);
+    public:
+        explicit RulesAgreement(QWidget* parent = nullptr);
 
-signals:
-    void accepted();
+    signals:
+        void accepted();
 
-protected:
-    void paint_content(QPainter& painter) override;
-    void showEvent(QShowEvent* event) override;
-    bool eventFilter(QObject* object, QEvent* event) override;
+    protected:
+        void paint_content(QPainter& painter) override;
+        void showEvent(QShowEvent* event) override;
+        bool eventFilter(QObject* object, QEvent* event) override;
 
-private:
-    void setup_controls();
-    void update_agree_button();
+    private:
+        void setup_controls();
+        void update_agree_button();
 
-    QTextBrowser* rules_text {};
-    QCheckBox* accepted_box {};
-    QPushButton* agree_button {};
+        QTextBrowser* rules_text {};
+        QCheckBox* accepted_box {};
+        QPushButton* agree_button {};
 };

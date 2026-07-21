@@ -206,7 +206,7 @@ namespace util::config
             return has_auth();
         }
 
-        // Backward-compatible migration from the original KEY=value format.
+
         const QString text = QString::fromUtf8(contents);
         for (const QString& rawLine : text.split(QLatin1Char('\n')))
         {
@@ -328,9 +328,12 @@ namespace util::config
         const QString user = proton
             ? QStringLiteral("steamuser")
             : qEnvironmentVariable("USER", QDir::homePath().section(QLatin1Char('/'), -1));
-        const QString folder = QString::fromLatin1(core::game::profile(version).default_install_directory);
-        return QDir(prefix).filePath(
-            QStringLiteral("drive_c/users/%1/AppData/Roaming/%2/game").arg(user, folder));
+        const auto& game_profile = core::game::profile(version);
+        const QString folder = QString::fromLatin1(game_profile.default_install_directory);
+        const QString subdirectory = QString::fromLatin1(game_profile.default_install_subdirectory);
+        const QString roaming = QDir(prefix).filePath(
+            QStringLiteral("drive_c/users/%1/AppData/Roaming/%2").arg(user, folder));
+        return subdirectory.isEmpty() ? roaming : QDir(roaming).filePath(subdirectory);
     }
 
     void Config::probe_system_paths()
@@ -371,8 +374,8 @@ namespace util::config
 
         if (!hadProtonRoot && runtime_is_proton())
         {
-            // Older builds stored the active runtime path in wine_prefix. Preserve
-            // that Proton selection while creating an independent Wine prefix.
+
+
             d->values[QStringLiteral("proton_compat_data_root")] =
                 normalize_proton_compat_root(legacyPrefix);
             d->values[QStringLiteral("wine_prefix")] = defaultPrefix;
@@ -387,11 +390,8 @@ namespace util::config
         setIfMissing(QStringLiteral("use_dxvk"), false);
         setIfMissing(QStringLiteral("runtime_selected"), false);
         setIfMissing(QStringLiteral("wine_args"), QString());
-        setIfMissing(QStringLiteral("rosetta_x87_path"), QString());
         setIfMissing(QStringLiteral("prerequisites_confirmed"), false);
         setIfMissing(QStringLiteral("setup_assistant_version"), 0);
-        setIfMissing(QStringLiteral("setup_runtime_preference"), QStringLiteral("recommended"));
-        setIfMissing(QStringLiteral("setup_pc_age"), QStringLiteral("unknown"));
         setIfMissing(QStringLiteral("rules_accepted"), false);
         setIfMissing(QStringLiteral("keep_signed_in"), false);
         setIfMissing(QStringLiteral("launch_on_startup"), false);
@@ -405,6 +405,9 @@ namespace util::config
         setIfMissing(QStringLiteral("game_install_path_2_0"), QString());
         d->values.remove(QStringLiteral("game_install_path"));
         d->values.remove(QStringLiteral("game_id"));
+        d->values.remove(QStringLiteral("rosetta_x87_path"));
+        d->values.remove(QStringLiteral("setup_runtime_preference"));
+        d->values.remove(QStringLiteral("setup_pc_age"));
 
         d->values[QStringLiteral("wine_prefix")] = normalize_wine_prefix(
             d->values.value(QStringLiteral("wine_prefix")).toString());
@@ -435,14 +438,8 @@ namespace util::config
         emit changed();
     }
 
-    void Config::reload()
-    {
-        reload_from_disk();
-    }
-
     QString Config::wine_binary() const { return d->values.value(QStringLiteral("wine_binary")).toString(); }
     QString Config::winetricks_binary() const { return d->values.value(QStringLiteral("winetricks_binary")).toString(); }
-    QString Config::rosetta_x87_path() const { return d->values.value(QStringLiteral("rosetta_x87_path")).toString(); }
     QString Config::wine_arch() const
     {
         const QString value = d->values.value(QStringLiteral("wine_arch")).toString();
@@ -455,18 +452,6 @@ namespace util::config
     {
         return d->values.value(QStringLiteral("prerequisites_confirmed")).toBool()
             && d->values.value(QStringLiteral("setup_assistant_version")).toInt() >= 1;
-    }
-    QString Config::setup_runtime_preference() const
-    {
-        const QString value = d->values.value(QStringLiteral("setup_runtime_preference")).toString().toLower();
-        return value == QStringLiteral("wine") || value == QStringLiteral("proton")
-            ? value : QStringLiteral("recommended");
-    }
-    QString Config::setup_pc_age() const
-    {
-        const QString value = d->values.value(QStringLiteral("setup_pc_age")).toString().toLower();
-        return value == QStringLiteral("older") || value == QStringLiteral("modern")
-            ? value : QStringLiteral("unknown");
     }
     bool Config::rules_accepted() const { return d->values.value(QStringLiteral("rules_accepted")).toBool(); }
     bool Config::keep_signed_in() const { return d->values.value(QStringLiteral("keep_signed_in")).toBool(); }
@@ -486,11 +471,6 @@ namespace util::config
     {
         return core::game::game_version_from_string(
             d->values.value(QStringLiteral("game_version")).toString());
-    }
-
-    QString Config::game_id() const
-    {
-        return QString::fromLatin1(core::game::profile(game_version()).launch_game_id);
     }
 
     QString Config::game_args() const
@@ -555,13 +535,16 @@ namespace util::config
         if (path_has_prefix(candidate, prefix))
             return candidate;
 
-        const QString compat = absolute_clean_path(proton_compat_data_root());
-        if (compat != prefix && path_has_prefix(candidate, compat))
+        if (runtime_is_proton())
         {
-            const QString relative = QDir(compat).relativeFilePath(candidate);
-            return relative == QStringLiteral(".")
-                ? prefix
-                : QDir::cleanPath(QDir(prefix).filePath(relative));
+            const QString compat = absolute_clean_path(proton_compat_data_root());
+            if (compat != prefix && path_has_prefix(candidate, compat))
+            {
+                const QString relative = QDir(compat).relativeFilePath(candidate);
+                return relative == QStringLiteral(".")
+                    ? prefix
+                    : QDir::cleanPath(QDir(prefix).filePath(relative));
+            }
         }
         return candidate;
     }
@@ -609,8 +592,6 @@ namespace util::config
         save(); emit changed();
     }
     void Config::set_winetricks_binary(const QString& value) { d->values[QStringLiteral("winetricks_binary")] = value; save(); emit changed(); }
-    void Config::set_rosetta_x87_path(const QString& value) { d->values[QStringLiteral("rosetta_x87_path")] = value; save(); emit changed(); }
-    void Config::set_wine_arch(const QString& value) { d->values[QStringLiteral("wine_arch")] = value; save(); emit changed(); }
     void Config::set_use_dxvk(const bool value) { d->values[QStringLiteral("use_dxvk")] = value; save(); emit changed(); }
     void Config::set_runtime_selected(const bool value) { d->values[QStringLiteral("runtime_selected")] = value; save(); emit changed(); }
     void Config::set_wine_args(const QString& value) { d->values[QStringLiteral("wine_args")] = value; save(); emit changed(); }
@@ -619,20 +600,6 @@ namespace util::config
         d->values[QStringLiteral("prerequisites_confirmed")] = value;
         if (value)
             d->values[QStringLiteral("setup_assistant_version")] = 1;
-        save(); emit changed();
-    }
-    void Config::set_setup_runtime_preference(const QString& value)
-    {
-        const QString normalized = value == QStringLiteral("wine") || value == QStringLiteral("proton")
-            ? value : QStringLiteral("recommended");
-        d->values[QStringLiteral("setup_runtime_preference")] = normalized;
-        save(); emit changed();
-    }
-    void Config::set_setup_pc_age(const QString& value)
-    {
-        const QString normalized = value == QStringLiteral("older") || value == QStringLiteral("modern")
-            ? value : QStringLiteral("unknown");
-        d->values[QStringLiteral("setup_pc_age")] = normalized;
         save(); emit changed();
     }
     void Config::set_rules_accepted(const bool value) { d->values[QStringLiteral("rules_accepted")] = value; save(); emit changed(); }
@@ -677,12 +644,6 @@ namespace util::config
         save(); emit changed();
     }
 
-    void Config::forget_game_install_path()
-    {
-        d->values[game_install_path_key(game_version())] = QString();
-        save(); emit changed();
-    }
-
     bool Config::game_installed() const
     {
         const QDir directory(game_install_path());
@@ -709,16 +670,6 @@ namespace util::config
         {
             SPDLOG_WARN("config: could not clear old saved credentials for this session-only login");
         }
-        emit changed();
-    }
-
-    void Config::clear_auth()
-    {
-        d->username.clear();
-        d->token.clear();
-        d->display_name.clear();
-        if (!clear_saved_credentials())
-            SPDLOG_WARN("config: could not fully clear the platform credential store");
         emit changed();
     }
 

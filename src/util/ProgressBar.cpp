@@ -14,9 +14,9 @@ namespace util::progress_bar
 
         if (fraction <= 0.0 || bar.isEmpty()) return;
 
-        // The artwork has a 9 px horizontal frame and a 1 px vertical frame at
-        // its native 430x19 size. Keep the fill inside that frame instead of
-        // stretching it over the decorative border.
+
+
+
         const int inset_x = qMax(1, qRound(9.0 * bar.width() / 430.0));
         const int inset_y = qMax(1, qRound(1.0 * bar.height() / 19.0));
         const QRect fill_area = bar.adjusted(inset_x, inset_y, -inset_x, -inset_y);

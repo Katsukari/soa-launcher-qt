@@ -90,9 +90,28 @@ namespace util::layout
 
     namespace settings
     {
-        QRect box_rect(const QSize win)   { return scaled(k_rect, win); }
-        QSize box(const QSize win)        { return scaled(k_box, win); }
-        QRect close(const QSize win)      { return scaled(k_close, win); }
+        QRect base_box_rect(const bool expanded)
+        {
+            const QSize target = expanded ? k_box_expanded : k_box;
+            const int offset = expanded ? k_margin_top_expanded : k_margin_top;
+            return center_in_region(target, 0, offset);
+        }
+
+        QRect box_rect(const QSize win, const bool expanded)
+        {
+            return scaled(base_box_rect(expanded), win);
+        }
+
+        QSize box(const QSize win, const bool expanded)
+        {
+            return scaled(expanded ? k_box_expanded : k_box, win);
+        }
+
+        QRect close(const QSize win, const bool expanded)
+        {
+            return scaled(anchor_top_right(base_box_rect(expanded), 27, 22, k_close_hit), win);
+        }
+
         QSize close_icon(const QSize win) { return scaled(k_close_icon, win); }
         int   header_gap(const QSize win) { return scaled(k_header_gap, win); }
         int   row_gap(const QSize win)    { return scaled(k_row_gap, win); }
@@ -105,12 +124,15 @@ namespace util::layout
         int   tab_inset(const QSize win)  { return scaled(k_tab_inset, win); }
         int   tab_overlap(const QSize win){ return scaled(k_tab_overlap, win); }
 
-        QRect page_title(QSize win) { return scaled(k_page_title.translated(k_rect.topLeft()), win); }
+        QRect page_title(const QSize win, const bool expanded)
+        {
+            return scaled(k_page_title.translated(base_box_rect(expanded).topLeft()), win);
+        }
         int   tab_radius(const QSize win) { return scaled(k_tab_radius, win); }
 
-        QRect tab_rect(const QSize win, int i)
+        QRect tab_rect(const QSize win, int i, const bool expanded)
         {
-            const QRect box = box_rect(win);
+            const QRect box = box_rect(win, expanded);
             const QSize t   = tab(win);
             const int   x   = box.left() + tab_inset(win) + i * (t.width() + tab_gap(win));
             const int   y   = box.top() - t.height() + tab_overlap(win);
@@ -167,22 +189,34 @@ namespace util::layout
 
     namespace launcher_settings
     {
-        int row(const int i)
+        int row(const int i, const bool expanded)
         {
-            static constexpr int ys[4] = { 78, 184, 290, 396 };
-            return (i >= 0 && i < 4) ? ys[i] : ys[0];
+            static constexpr int collapsed[4] = {72, 176, 280, 400};
+            static constexpr int open[4] = {72, 176, 280, 475};
+            if (i < 0 || i >= 4)
+                return collapsed[0];
+            return expanded ? open[i] : collapsed[i];
         }
 
-        QRect footer_left(QSize win)
+        QRect connectivity_results(QSize win)
         {
-            return scaled(QRect(settings::k_text_x, k_footer_y,
-                                k_footer_btn.width(), k_footer_btn.height()), win);
+            return scaled(QRect{settings::k_text_x, 358, 556, 104}, win);
         }
 
-        QRect footer_right(QSize win)
+        QRect connectivity_text(QSize win)
         {
-            const int x = settings::k_text_x + k_footer_btn.width() + k_footer_gap;
-            return scaled(QRect(x, k_footer_y, k_footer_btn.width(), k_footer_btn.height()), win);
+            const QRect panel = connectivity_results(win);
+            const int inset = scaled(12, win);
+            return QRect{inset, scaled(8, win),
+                         panel.width() - inset * 2, panel.height() - scaled(34, win)};
+        }
+
+        QRect copy_report(QSize win)
+        {
+            const QRect panel = connectivity_results(win);
+            return QRect{panel.width() - scaled(116, win),
+                         panel.height() - scaled(27, win),
+                         scaled(104, win), scaled(18, win)};
         }
     }
 

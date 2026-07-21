@@ -99,7 +99,7 @@ void LauncherLog::append_line(int level, const QString& text)
             output->verticalScrollBar()->setValue(output->verticalScrollBar()->maximum());
     }
 
-    constexpr int k_error_level = 4; // spdlog::level::err
+    constexpr int k_error_level = 4;
     if (level >= k_error_level)
     {
         showNormal();

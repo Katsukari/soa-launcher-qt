@@ -32,7 +32,16 @@ void Settings::setup_pages()
     stack->setGeometry(util::layout::settings::box_rect(w));
     stack->setStyleSheet("background: transparent;");
 
-    stack->addWidget(new LauncherSettings(stack));
+    launcher_settings = new LauncherSettings(stack);
+    stack->addWidget(launcher_settings);
+    connect(launcher_settings, &LauncherSettings::launcher_size_changed,
+            this, &Settings::launcher_size_changed);
+    connect(launcher_settings, &LauncherSettings::connectivity_panel_changed,
+            this, [this](const bool expanded)
+    {
+        launcher_panel_expanded = expanded;
+        update_panel_geometry();
+    });
     stack->addWidget(new WineSettings(shell, stack));
     auto* advanced = new AdvancedSettings(stack);
     stack->addWidget(advanced);
@@ -68,12 +77,13 @@ void Settings::setup_tabs()
     {
         auto* b = util::simple_utils::make_flat_button(this);
         b->setGeometry(util::layout::settings::tab_rect(w, i));
+        tab_buttons[i] = b;
         return b;
     };
 
-    auto tab_general  = make_tab(0);
-    auto tab_wine     = make_tab(1);
-    auto tab_advanced = make_tab(2);
+    auto* tab_general = make_tab(0);
+    auto* tab_wine = make_tab(1);
+    auto* tab_advanced = make_tab(2);
     tab_general->setAccessibleName(QStringLiteral("Launcher settings tab"));
     tab_wine->setAccessibleName(QStringLiteral("Wine settings tab"));
     tab_advanced->setAccessibleName(QStringLiteral("Advanced settings tab"));
@@ -92,13 +102,29 @@ void Settings::set_tab(const int index)
 {
     active_tab = index;
     stack->setCurrentIndex(index);
+    update_panel_geometry();
+}
+
+void Settings::update_panel_geometry()
+{
+    const QSize w = size();
+    const bool expanded = active_tab == 0 && launcher_panel_expanded;
+    stack->setGeometry(util::layout::settings::box_rect(w, expanded));
+    close_button->setGeometry(util::layout::settings::close(w, expanded));
+    for (int i = 0; i < 3; ++i)
+    {
+        if (tab_buttons[i])
+            tab_buttons[i]->setGeometry(util::layout::settings::tab_rect(w, i, expanded));
+    }
+    close_button->raise();
     update();
 }
 
 void Settings::paint_content(QPainter& painter)
 {
     const QSize w = size();
-    const QRect box = util::layout::settings::box_rect(w);
+    const bool expanded = active_tab == 0 && launcher_panel_expanded;
+    const QRect box = util::layout::settings::box_rect(w, expanded);
     painter.drawPixmap(box, util::assets::images[util::assets::Image::BoxSettings]);
 
     {
@@ -108,7 +134,7 @@ void Settings::paint_content(QPainter& painter)
         painter.setFont(tf);
         painter.setPen(util::colors::k_text_maroon);
         const char* title = (active_tab == 1) ? "WINE SETTINGS" : (active_tab == 2) ? "ADVANCED SETTINGS" : "LAUNCHER SETTINGS";
-        painter.drawText(util::layout::settings::page_title(w), Qt::AlignCenter, title);
+        painter.drawText(util::layout::settings::page_title(w, expanded), Qt::AlignCenter, title);
     }
 
     constexpr QColor active   {0xFB, 0xF6, 0xF0};
@@ -124,7 +150,7 @@ void Settings::paint_content(QPainter& painter)
     for (int i = 0; i < 3; ++i)
     {
         const char* labels[] = { "LAUNCHER", "WINE", "ADVANCED" };
-        const QRect r = util::layout::settings::tab_rect(w, i);
+        const QRect r = util::layout::settings::tab_rect(w, i, expanded);
         const bool  on = i == active_tab;
         QPainterPath p;
 

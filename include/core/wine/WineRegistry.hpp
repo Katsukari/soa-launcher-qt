@@ -25,9 +25,9 @@ namespace core::wine
 
     class WineRegistry
     {
-    public:
-        static QVector<WineInstall> scan();
-        static QVector<QString>& extra_search_dirs();
-        static RuntimeType identify(const QString& path, bool* ok = nullptr);
+        public:
+            static QVector<WineInstall> scan();
+            static QVector<QString>& extra_search_dirs();
+            static RuntimeType identify(const QString& path, bool* ok = nullptr);
     };
 }

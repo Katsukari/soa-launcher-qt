@@ -10,6 +10,8 @@
     <string>${MACOSX_BUNDLE_EXECUTABLE_NAME}</string>
     <key>CFBundleIdentifier</key>
     <string>com.storyofalicia.launcher</string>
+    <key>CFBundleIconFile</key>
+    <string>soa-launcher.icns</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
@@ -33,6 +35,8 @@
             </array>
         </dict>
     </array>
+    <key>LSMinimumSystemVersion</key>
+    <string>${CMAKE_OSX_DEPLOYMENT_TARGET}</string>
     <key>NSHighResolutionCapable</key>
     <true/>
 </dict>

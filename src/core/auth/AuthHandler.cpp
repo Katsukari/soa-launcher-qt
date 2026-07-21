@@ -102,7 +102,7 @@ namespace
             return;
         }
 
-        // Do not block launcher startup on desktop database helpers.
+
         if (!QProcess::startDetached(
                 xdg_mime,
                 {QStringLiteral("default"), desktop_name, QStringLiteral("x-scheme-handler/soa")}))

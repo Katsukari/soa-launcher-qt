@@ -21,7 +21,6 @@ namespace core::network
 
             void begin_operation(qulonglong operation_id);
             void clear_operation(qulonglong operation_id = 0);
-            [[nodiscard]] bool has_operation(qulonglong operation_id) const { return active_operations.contains(operation_id); }
             void report(const DownloadStatus& ds);
 
         signals:

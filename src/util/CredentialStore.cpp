@@ -192,8 +192,8 @@ namespace util::credentials
 #elif defined(Q_OS_LINUX)
         if (secret_tool().isEmpty())
             return false;
-        // secret-tool has no dedicated delete command on all distributions. Storing
-        // an empty value makes lookup unusable; the fallback file is deleted separately.
+
+
         return run_secret_tool(
             {QStringLiteral("clear"), QStringLiteral("service"), QString::fromLatin1(k_service),
              QStringLiteral("account"), QString::fromLatin1(k_account)}, {}, nullptr);
