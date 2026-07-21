@@ -227,7 +227,10 @@ if(BUILD_TESTS)
             Qt6::Widgets
             Qt6::Test
             spdlog::spdlog
-            soa_network
+    )
+
+    set_target_properties(launcher_tests PROPERTIES
+            LINKER_LANGUAGE CXX
     )
 
     target_compile_definitions(launcher_tests PRIVATE SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE)
