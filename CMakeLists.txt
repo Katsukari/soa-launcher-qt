@@ -42,7 +42,7 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(spdlog)
 
-add_library(soa_network STATIC
+add_library(soa_network SHARED
         src/core/network/Courier.swift
         src/core/network/CourierUpdate.swift
         src/core/network/CourierDownload.swift
@@ -60,6 +60,12 @@ target_compile_options(soa_network PRIVATE
 )
 
 target_include_directories(soa_network PRIVATE include)
+
+set_target_properties(soa_network PROPERTIES
+        AUTOMOC OFF
+        AUTORCC OFF
+        AUTOUIC OFF
+)
 
 set(LAUNCHER_SOURCES
         src/main.cpp
@@ -165,14 +171,23 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
         soa_network
 )
 
+set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE CXX)
+
 target_compile_definitions(${PROJECT_NAME} PRIVATE
         SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE
         SOA_LAUNCHER_VERSION="${PROJECT_VERSION}"
 )
 
+include(GNUInstallDirs)
+
 if(APPLE)
     find_library(SECURITY_FRAMEWORK Security REQUIRED)
     target_link_libraries(${PROJECT_NAME} PRIVATE ${SECURITY_FRAMEWORK})
+
+    set_target_properties(soa_network PROPERTIES
+            MACOSX_RPATH TRUE
+            INSTALL_NAME_DIR "@rpath"
+    )
 
     set_target_properties(${PROJECT_NAME} PROPERTIES
             MACOSX_BUNDLE TRUE
@@ -181,15 +196,34 @@ if(APPLE)
             MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
             MACOSX_BUNDLE_GUI_IDENTIFIER "com.storyofalicia.launcher"
             MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/packaging/macos/Info.plist.in"
+            BUILD_RPATH "@executable_path/../Frameworks"
+            INSTALL_RPATH "@executable_path/../Frameworks"
+    )
+
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory
+                    "$<TARGET_BUNDLE_DIR:${PROJECT_NAME}>/Contents/Frameworks"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "$<TARGET_FILE:soa_network>"
+                    "$<TARGET_BUNDLE_DIR:${PROJECT_NAME}>/Contents/Frameworks/$<TARGET_FILE_NAME:soa_network>"
+            VERBATIM
+    )
+else()
+    set_target_properties(${PROJECT_NAME} PROPERTIES
+            INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}"
     )
 endif()
-
-include(GNUInstallDirs)
 
 install(TARGETS ${PROJECT_NAME}
         BUNDLE  DESTINATION .
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
+
+if(NOT APPLE)
+    install(TARGETS soa_network
+            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    )
+endif()
 
 if(NOT APPLE)
     install(FILES packaging/soa-launcher.desktop
@@ -229,9 +263,7 @@ if(BUILD_TESTS)
             spdlog::spdlog
     )
 
-    set_target_properties(launcher_tests PROPERTIES
-            LINKER_LANGUAGE CXX
-    )
+    set_target_properties(launcher_tests PROPERTIES LINKER_LANGUAGE CXX)
 
     target_compile_definitions(launcher_tests PRIVATE SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE)
 
