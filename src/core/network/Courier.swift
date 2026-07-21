@@ -1,68 +1,110 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 import Soa_Courier
 
 final class Courier
-	{
+{
+    let cdnBaseURL: String
+    let onProgress: courier_progress_cb
+    let onDone: courier_done_cb
+    let ctx: UnsafeMutableRawPointer?
+    let sessionConfiguration: URLSessionConfiguration
 
-	let cdnBaseURL: String
-	let onProgress: courier_progress_cb
-	let onDone: courier_done_cb
-	let ctx: UnsafeMutableRawPointer?
+    private var task: Task<Void, Never>?
+    private let generationLock = NSLock()
+    private let instanceID: UInt64 = UInt64.random(in: 1...UInt64(UInt32.max))
+    private var generation: UInt64 = 0
+    private var currentOperationID: UInt64 = 0
 
-	private var task: Task<Void, Never>?
+    init(cdnBaseURL: String,
+         onProgress: @escaping courier_progress_cb,
+         onDone: @escaping courier_done_cb,
+         ctx: UnsafeMutableRawPointer?)
+    {
+        self.cdnBaseURL = cdnBaseURL.hasSuffix("/")
+            ? String(cdnBaseURL.dropLast())
+            : cdnBaseURL
+        self.onProgress = onProgress
+        self.onDone = onDone
+        self.ctx = ctx
 
-	init(cdnBaseURL: String,
-	onProgress: @escaping courier_progress_cb,
-	onDone: @escaping courier_done_cb,
-	ctx: UnsafeMutableRawPointer?)
-		{
-		self.cdnBaseURL = cdnBaseURL.hasSuffix("/")
-		? String(cdnBaseURL.dropLast())
-		: cdnBaseURL
-		self.onProgress = onProgress
-		self.onDone = onDone
-		self.ctx = ctx
-	}
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 30
+        config.timeoutIntervalForResource = 60 * 60
+        config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        config.httpMaximumConnectionsPerHost = 2
+        self.sessionConfiguration = config
+    }
 
-	func reportProgress(_ phase: courier_phase,
-	_ message: String,
-	_ percent: Int,
-	_ received: UInt64,
-	_ total: UInt64,
-	_ throughput: UInt64,
-	_ fileIndex: Int,
-	_ fileCount: Int)
-		{
-		message.withCString { c in
-			onProgress(phase, c, Int32(percent), received, total, throughput, Int32(fileIndex), Int32(fileCount), ctx)
-		}
-	}
+    private func nextGeneration() -> UInt64
+    {
+        generationLock.lock()
+        defer { generationLock.unlock() }
+        generation = (generation &+ 1) & 0xffff_ffff
+        if generation == 0 { generation = 1 }
+        currentOperationID = (instanceID << 32) | generation
+        return currentOperationID
+    }
 
-	func reportDone(_ ok: Bool, _ message: String)
-		{
-		message.withCString { c in onDone(ok, c, ctx) }
-	}
+    private func isCurrent(_ operationID: UInt64) -> Bool
+    {
+        generationLock.lock()
+        defer { generationLock.unlock() }
+        return currentOperationID == operationID
+    }
 
-	func cancel()
-		{
-		task?.cancel()
-	}
+    func reportProgress(_ operationID: UInt64,
+                        _ phase: courier_phase,
+                        _ message: String,
+                        _ percent: Int,
+                        _ received: UInt64,
+                        _ total: UInt64,
+                        _ throughput: UInt64,
+                        _ fileIndex: Int,
+                        _ fileCount: Int)
+    {
+        guard isCurrent(operationID) else { return }
+        message.withCString { c in
+            onProgress(operationID, phase, c, Int32(percent), received, total, throughput,
+                       Int32(fileIndex), Int32(fileCount), ctx)
+        }
+    }
 
-	func run(_ body: @escaping () async throws -> Void)
-		{
-		task?.cancel()
-		task = Task {
-			do {
-				try await body()
-			} catch is CancellationError {
-				reportDone(false, "Cancelled.")
-			} catch let e as Err {
-				log(4, e.message)
-				reportDone(false, e.message)
-			} catch {
-				log(4, "\(error)")
-				reportDone(false, "\(error)")
-			}
-		}
-	}
+    func reportDone(_ operationID: UInt64, _ ok: Bool, _ message: String)
+    {
+        guard isCurrent(operationID) else { return }
+        message.withCString { c in onDone(operationID, ok, c, ctx) }
+    }
+
+    func cancel()
+    {
+        generationLock.lock()
+        currentOperationID = 0
+        generationLock.unlock()
+        task?.cancel()
+        task = nil
+    }
+
+    @discardableResult
+    func run(_ body: @escaping (UInt64) async throws -> Void) -> UInt64
+    {
+        task?.cancel()
+        let operationID = nextGeneration()
+        task = Task { [self] in
+            do {
+                try await body(operationID)
+            } catch is CancellationError {
+                reportDone(operationID, false, "Cancelled.")
+            } catch let error as Err {
+                log(4, error.message)
+                reportDone(operationID, false, error.message)
+            } catch {
+                log(4, "\(error)")
+                reportDone(operationID, false, "\(error)")
+            }
+        }
+        return operationID
+    }
 }

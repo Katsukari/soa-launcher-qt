@@ -4,6 +4,7 @@
 #include "util/SimpleUtils.hpp"
 #include "util/Styles.hpp"
 #include "util/Config.hpp"
+#include <QIcon>
 #include <QLineEdit>
 #include <QPushButton>
 #include <QFileDialog>
@@ -14,6 +15,7 @@ AdvancedSettings::AdvancedSettings(QWidget* parent) : QWidget(parent)
 {
     setup_game_path_option();
     setup_game_args_option();
+    setup_repair_option();
 }
 void AdvancedSettings::setup_game_path_option()
 {
@@ -71,4 +73,45 @@ void AdvancedSettings::setup_game_args_option()
     {
         Config::instance().set_game_args(field->text());
     });
+}
+
+void AdvancedSettings::setup_repair_option()
+{
+    const QSize w = window()->size();
+    const int y = aset::row(2);
+    util::simple_utils::make_label_block(
+        this, w, y,
+        "VERIFY AND REPAIR GAME",
+        "Check the selected game's manifest and redownload missing or damaged files.");
+
+    const auto& asset = util::assets::buttons[util::assets::Button::Repair];
+    const QSize button_size = util::layout::scaled(asset.normal.size(), w);
+    const QPoint control_pos = ls::ctrl_pos(w, y);
+    const int x = control_pos.x() + (ls::ctrl_w(w) - button_size.width()) / 2;
+
+    repair_button = util::simple_utils::make_flat_button(this);
+    repair_button->setText(QString{});
+    repair_button->setIcon(QIcon(asset.normal));
+    repair_button->setIconSize(button_size);
+    repair_button->setGeometry(x, control_pos.y(), button_size.width(), button_size.height());
+    repair_button->setEnabled(Config::instance().game_installed());
+    repair_button->setAccessibleName(QStringLiteral("Verify and repair selected game"));
+    repair_button->installEventFilter(this);
+
+    connect(repair_button, &QPushButton::clicked, this, &AdvancedSettings::repair_requested);
+    connect(&Config::instance(), &Config::changed, repair_button, [this]()
+    {
+        repair_button->setEnabled(Config::instance().game_installed());
+    });
+}
+
+bool AdvancedSettings::eventFilter(QObject* object, QEvent* event)
+{
+    if (object == repair_button && repair_button->isEnabled())
+    {
+        const auto& asset = util::assets::buttons[util::assets::Button::Repair];
+        util::simple_utils::apply_button_state(
+            event, repair_button, asset.normal, asset.hover, asset.clicked);
+    }
+    return QWidget::eventFilter(object, event);
 }

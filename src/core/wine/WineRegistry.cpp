@@ -22,22 +22,41 @@ namespace core::wine
     RuntimeType WineRegistry::identify(const QString& path, bool* ok)
     {
         const QFileInfo info(path);
-        if (ok) *ok = info.exists();
+        if (ok) *ok = false;
 
-        if (info.isFile() && info.fileName().compare(QStringLiteral("proton"), Qt::CaseInsensitive) == 0)
-            return RuntimeType::Proton;
+        if (info.isFile())
+        {
+            const bool executable = info.isExecutable();
+            if (ok) *ok = executable;
+            return info.fileName().compare(QStringLiteral("proton"), Qt::CaseInsensitive) == 0
+                ? RuntimeType::Proton
+                : RuntimeType::Wine;
+        }
 
         if (info.isDir())
         {
             const QDir dir(path);
-            if (dir.exists("proton") || dir.exists("proton_dist.tar"))
+            const QFileInfo proton(dir.filePath(QStringLiteral("proton")));
+            if (proton.isFile())
+            {
+                if (ok) *ok = proton.isExecutable();
                 return RuntimeType::Proton;
-            if (dir.exists("files/bin/wine") || dir.exists("dist/bin/wine") ||
-                dir.exists("bin/wine") || dir.exists("Contents/Resources/wine/bin/wine") ||
-                dir.exists("Contents/SharedSupport/CrossOver/bin/wine"))
-                return RuntimeType::Wine;
-            if (ok) *ok = false;
-            return RuntimeType::Wine;
+            }
+
+            for (const QString& relative : {
+                     QStringLiteral("files/bin/wine"),
+                     QStringLiteral("dist/bin/wine"),
+                     QStringLiteral("bin/wine"),
+                     QStringLiteral("Contents/Resources/wine/bin/wine"),
+                     QStringLiteral("Contents/SharedSupport/CrossOver/bin/wine")})
+            {
+                const QFileInfo wine(dir.filePath(relative));
+                if (wine.isFile())
+                {
+                    if (ok) *ok = wine.isExecutable();
+                    return RuntimeType::Wine;
+                }
+            }
         }
 
         return RuntimeType::Wine;
@@ -50,9 +69,16 @@ namespace core::wine
         void add_install(QVector<WineInstall>& out, QSet<QString>& seen,
                          const QString& path, RuntimeType type, const QString& name)
         {
-            if (!QFileInfo::exists(path)) return;
+            const QFileInfo supplied(path);
+            QString executable = path;
+            if (type == RuntimeType::Proton && supplied.isDir())
+                executable = QDir(path).filePath(QStringLiteral("proton"));
 
-            const QString canonical = QFileInfo(path).canonicalFilePath();
+            const QFileInfo executableInfo(executable);
+            if (!executableInfo.isFile() || !executableInfo.isExecutable())
+                return;
+
+            const QString canonical = supplied.canonicalFilePath();
             const QString key = canonical.isEmpty() ? path : canonical;
             if (seen.contains(key)) return;
             seen.insert(key);
@@ -72,7 +98,8 @@ namespace core::wine
                                         QStringLiteral("/Contents/Resources/wine/bin/wine"),
                                         QStringLiteral("/Contents/SharedSupport/CrossOver/bin/wine") })
             {
-                if (QFileInfo::exists(folder + rel)) return folder + rel;
+                const QFileInfo candidate(folder + rel);
+                if (candidate.isFile() && candidate.isExecutable()) return candidate.absoluteFilePath();
             }
             return {};
         }
@@ -151,9 +178,11 @@ namespace core::wine
         QVector<WineInstall> out;
         QSet<QString> seen;
 
-        const QString system_wine = QStandardPaths::findExecutable("wine");
+        QString system_wine = QStandardPaths::findExecutable(QStringLiteral("wine"));
+        if (system_wine.isEmpty())
+            system_wine = QStandardPaths::findExecutable(QStringLiteral("wine64"));
         if (!system_wine.isEmpty())
-            add_install(out, seen, system_wine, RuntimeType::Wine, "System Wine");
+            add_install(out, seen, system_wine, RuntimeType::Wine, QStringLiteral("System Wine"));
 
         for (const QString& bin : direct_binaries())
             add_install(out, seen, bin, RuntimeType::Wine, QFileInfo(bin).dir().dirName());
@@ -208,7 +237,7 @@ namespace core::wine
         if (!configured.isEmpty())
         {
             if (QFileInfo(configured).isAbsolute())
-                return QFileInfo::exists(configured) ? configured : QString {};
+                return QFileInfo(configured).isExecutable() ? configured : QString {};
 
             const QString found = QStandardPaths::findExecutable(configured);
             if (!found.isEmpty()) return found;
@@ -223,17 +252,19 @@ namespace core::wine
         if (!found.isEmpty()) return found;
 
         const QString local = QDir::home().filePath(".local/bin/umu-run");
-        return QFileInfo::exists(local) ? local : QString {};
+        return QFileInfo(local).isExecutable() ? local : QString {};
     }
 
     bool winetricks_available()
     {
-        return !winetricks_path().isEmpty();
+        const QString path = winetricks_path();
+        return !path.isEmpty() && QFileInfo(path).isExecutable();
     }
 
     bool umu_available()
     {
-        return !umu_path().isEmpty();
+        const QString path = umu_path();
+        return !path.isEmpty() && QFileInfo(path).isExecutable();
     }
 
 }

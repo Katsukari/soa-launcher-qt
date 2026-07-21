@@ -34,7 +34,9 @@ void Settings::setup_pages()
 
     stack->addWidget(new LauncherSettings(stack));
     stack->addWidget(new WineSettings(shell, stack));
-    stack->addWidget(new AdvancedSettings(stack));
+    auto* advanced = new AdvancedSettings(stack);
+    stack->addWidget(advanced);
+    connect(advanced, &AdvancedSettings::repair_requested, this, &Settings::repair_requested);
     stack->setCurrentIndex(0);
 }
 
@@ -52,6 +54,7 @@ void Settings::setup_close_button()
     close_button->setIcon(QIcon(close_px));
     close_button->setIconSize(util::layout::settings::close_icon(w));
     close_button->setGeometry(util::layout::settings::close(w));
+    close_button->setAccessibleName(QStringLiteral("Close settings"));
     close_button->raise();
 
     connect(close_button, &QPushButton::clicked, this, [this]() { hide(); emit closed(); });
@@ -71,6 +74,9 @@ void Settings::setup_tabs()
     auto tab_general  = make_tab(0);
     auto tab_wine     = make_tab(1);
     auto tab_advanced = make_tab(2);
+    tab_general->setAccessibleName(QStringLiteral("Launcher settings tab"));
+    tab_wine->setAccessibleName(QStringLiteral("Wine settings tab"));
+    tab_advanced->setAccessibleName(QStringLiteral("Advanced settings tab"));
 
     connect(tab_general,  &QPushButton::clicked, this, [this]() { set_tab(0); });
     connect(tab_wine,     &QPushButton::clicked, this, [this]() { set_tab(1); });

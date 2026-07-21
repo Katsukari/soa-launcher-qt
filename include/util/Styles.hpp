@@ -23,8 +23,10 @@ namespace util::styles
         "    font-family: 'Eurostile';"
         "    font-weight: 900;"
         "    font-size: 11px;"
+        "    outline: none;"
         "}"
-        "QPushButton:hover { background: #E6DCD0; }";
+        "QPushButton:hover { background: #E6DCD0; }"
+        "QPushButton:focus { outline: none; }";
 
     inline constexpr const char* k_primary_button =
         "QPushButton"
@@ -36,8 +38,10 @@ namespace util::styles
         "    font-family: 'Eurostile';"
         "    font-weight: 900;"
         "    font-size: 11px;"
+        "    outline: none;"
         "}"
-        "QPushButton:hover { background: #4FC4EF; }";
+        "QPushButton:hover { background: #4FC4EF; }"
+        "QPushButton:focus { outline: none; }";
 
     inline constexpr const char* k_flat_transparent =
         "border:none; outline:none; background:transparent;";
@@ -61,10 +65,13 @@ namespace util::styles
         "QPushButton"
         "{"
         "    background: transparent;"
+        "    border: none;"
+        "    outline: none;"
         "    color: #2FB4E0;"
         "    font-family: 'Inter';"
         "    font-size: 15px;"
         "    text-decoration: underline;"
         "}"
-        "QPushButton:hover { color: #6FD4EF; outline: none; border: none; }";
+        "QPushButton:hover { color: #6FD4EF; outline: none; border: none; }"
+        "QPushButton:focus { outline: none; border: none; }";
 }

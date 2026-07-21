@@ -43,7 +43,7 @@ namespace core::log
 
         const auto logger = std::make_shared<spdlog::logger>("soa", sinks.begin(), sinks.end());
         logger->set_level(spdlog::level::trace);
-        logger->flush_on(spdlog::level::trace);
+        logger->flush_on(spdlog::level::warn);
         spdlog::set_default_logger(logger);
 
         (void) LogBridge::instance();

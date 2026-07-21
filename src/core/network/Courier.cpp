@@ -9,27 +9,26 @@
 #include <QString>
 
 using core::status::State;
-using core::status::Status;
 using core::network::DownloadStatus;
 
 extern "C" void soa_log(int level, const char* message)
 {
     switch (level)
     {
-        case 0:  SPDLOG_TRACE("[swift] {}", message); break;
-        case 1:  SPDLOG_DEBUG("[swift] {}", message); break;
-        case 2:  SPDLOG_INFO ("[swift] {}", message); break;
-        case 3:  SPDLOG_WARN ("[swift] {}", message); break;
-        case 4:  SPDLOG_ERROR("[swift] {}", message); break;
-        default: SPDLOG_INFO ("[swift] {}", message); break;
+        case 0:  SPDLOG_TRACE("[courier] {}", message ? message : ""); break;
+        case 1:  SPDLOG_DEBUG("[courier] {}", message ? message : ""); break;
+        case 2:  SPDLOG_INFO ("[courier] {}", message ? message : ""); break;
+        case 3:  SPDLOG_WARN ("[courier] {}", message ? message : ""); break;
+        case 4:  SPDLOG_ERROR("[courier] {}", message ? message : ""); break;
+        default: SPDLOG_INFO ("[courier] {}", message ? message : ""); break;
     }
 }
 
 namespace
 {
-    const char* phase_name(courier_phase p)
+    const char* phase_name(const courier_phase phase)
     {
-        switch (p)
+        switch (phase)
         {
             case courier_phase_preparing:   return "preparing";
             case courier_phase_checking:    return "checking";
@@ -39,26 +38,28 @@ namespace
         return "preparing";
     }
 
-    void on_progress_cb(courier_phase phase,
+    void on_progress_cb(const uint64_t operation_id,
+                        const courier_phase phase,
                         const char* message,
-                        int         percent,
-                        uint64_t    received,
-                        uint64_t    total,
-                        uint64_t    throughput,
-                        int         file_index,
-                        int         file_count,
-                        void*       )
+                        const int percent,
+                        const uint64_t received,
+                        const uint64_t total,
+                        const uint64_t throughput,
+                        const int file_index,
+                        const int file_count,
+                        void*)
     {
         const QString msg = QString::fromUtf8(message ? message : "");
         QMetaObject::invokeMethod(
             &core::network::CourierBridge::instance(),
-            [phase, msg, percent, received, total, throughput, file_index, file_count]()
+            [operation_id, phase, msg, percent, received, total, throughput, file_index, file_count]()
             {
                 DownloadStatus ds;
+                ds.operation_id = static_cast<qulonglong>(operation_id);
                 ds.base.state    = State::Working;
                 ds.base.phase    = phase_name(phase);
                 ds.base.message  = msg;
-                ds.base.progress = percent / 100.0;
+                ds.base.progress = qBound(0, percent, 100) / 100.0;
                 ds.phase      = phase;
                 ds.received   = static_cast<qulonglong>(received);
                 ds.total      = static_cast<qulonglong>(total);
@@ -70,14 +71,15 @@ namespace
             Qt::QueuedConnection);
     }
 
-    void on_done_cb(bool ok, const char* message, void* )
+    void on_done_cb(const uint64_t operation_id, const bool ok, const char* message, void*)
     {
         const QString msg = QString::fromUtf8(message ? message : "");
         QMetaObject::invokeMethod(
             &core::network::CourierBridge::instance(),
-            [ok, msg]()
+            [operation_id, ok, msg]()
             {
                 DownloadStatus ds;
+                ds.operation_id = static_cast<qulonglong>(operation_id);
                 ds.base.state    = ok ? State::Done : State::Failed;
                 ds.base.message  = msg;
                 ds.base.progress = ok ? 1.0 : -1.0;
@@ -97,10 +99,29 @@ namespace core::network
         return bridge;
     }
 
+    void CourierBridge::begin_operation(const qulonglong operation_id)
+    {
+        if (operation_id != 0) active_operations.insert(operation_id);
+    }
+
+    void CourierBridge::clear_operation(const qulonglong operation_id)
+    {
+        if (operation_id == 0) active_operations.clear();
+        else active_operations.remove(operation_id);
+    }
+
     void CourierBridge::report(const DownloadStatus& ds)
     {
+        if (ds.operation_id == 0 || !active_operations.contains(ds.operation_id))
+        {
+            SPDLOG_DEBUG("courier: ignoring stale callback for operation {}", ds.operation_id);
+            return;
+        }
+
         set_status(ds.base);
         emit download_status(ds);
+        if (ds.base.state == State::Done || ds.base.state == State::Failed)
+            active_operations.remove(ds.operation_id);
     }
 
     courier_progress_cb CourierBridge::progress_callback()
@@ -110,6 +131,6 @@ namespace core::network
 
     courier_done_cb CourierBridge::done_callback()
     {
-        return & on_done_cb;
+        return &on_done_cb;
     }
 }

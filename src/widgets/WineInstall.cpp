@@ -14,7 +14,6 @@
 #include "core/wine/WineRegistry.hpp"
 #include "util/Config.hpp"
 #include "core/Log.hpp"
-#include "widgets/LauncherLog.hpp"
 #include <spdlog/spdlog.h>
 
 using util::config::Config;
@@ -120,9 +119,6 @@ void WineInstall::start_install()
     warn_message.clear();
 
     installing = true;
-
-    LauncherLog::instance()->show();
-    LauncherLog::instance()->raise();
 
     if (!prefix_progress)
     {

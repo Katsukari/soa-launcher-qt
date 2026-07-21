@@ -24,6 +24,7 @@ class GameInstall : public util::modal_overlay::ModalOverlay
         void setup_close_button();
         void setup_buttons();
         void start_install();
+        void set_installing(bool value);
         bool path_inside_prefix() const;
         QString game_path {};
         bool    show_warning {};

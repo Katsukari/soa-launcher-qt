@@ -2,103 +2,198 @@ name: Build (macOS & Linux)
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
+
+permissions:
+  contents: read
 
 jobs:
   build:
+    name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
+
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          - name: Linux GCC
+            os: ubuntu-22.04
             cpp_compiler: g++
-          - os: ubuntu-latest
+
+          - name: Linux Clang
+            os: ubuntu-22.04
             cpp_compiler: clang++
-          - os: macos-latest
-            cpp_compiler: clang++   # AppleClang
+
+          - name: macOS AppleClang
+            os: macos-latest
+            cpp_compiler: clang++
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out repository
+        uses: actions/checkout@v4
 
-      # macOS ships Swift via Xcode, but make sure full Xcode (not just the
-      # Command Line Tools) is selected so CMake can find swiftc.
-      - name: Select Xcode (macOS)
+      - name: Select Xcode
         if: runner.os == 'macOS'
         run: sudo xcode-select -s /Applications/Xcode.app
 
-      # Ubuntu runners have no Swift toolchain by default - install one so
-      # enable_language(Swift) succeeds.
-      - name: Install Swift (Linux)
+      - name: Install Swift
         if: runner.os == 'Linux'
         uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "6.0"
 
-      - name: Verify Swift is available
+      - name: Verify Swift
         run: swift --version
 
-      - name: Install CMake + Ninja
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            build-essential \
+            clang \
+            desktop-file-utils \
+            file \
+            libfuse2 \
+            libgl1-mesa-dev \
+            libxcb-cursor0 \
+            libxkbcommon-x11-0 \
+            patchelf \
+            wget
+
+      - name: Install CMake and Ninja
         uses: lukka/get-cmake@latest
 
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
-          version: '6.8.3'        # LTS
-          target: 'desktop'
+          version: "6.8.3"
+          target: desktop
           cache: true
-          install-deps: true      # pulls libxcb/xkb deps on Linux
+          install-deps: true
 
       - name: Configure
-        # Swift requires the Ninja (or Xcode) generator - CI defaults to Unix
-        # Makefiles, which doesn't support Swift. Ninja is installed above.
         run: >
-          cmake -B ${{ github.workspace }}/build
+          cmake
+          -S "${{ github.workspace }}"
+          -B "${{ github.workspace }}/build"
           -G Ninja
-          -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
+          -DCMAKE_CXX_COMPILER="${{ matrix.cpp_compiler }}"
           -DCMAKE_BUILD_TYPE=Release
-          -S ${{ github.workspace }}
 
       - name: Build
-        run: cmake --build ${{ github.workspace }}/build --config Release
+        run: |
+          cmake --build "${{ github.workspace }}/build" \
+            --config Release \
+            --parallel
 
       - name: Test
         working-directory: ${{ github.workspace }}/build
-        # offscreen platform so QApplication-based tests don't need a display
         env:
           QT_QPA_PLATFORM: offscreen
         run: ctest --output-on-failure --build-config Release
 
       # ------------------------------------------------------------------
-      # Package a .dmg on macOS. Runs macdeployqt first so the .app bundles
-      # the Qt frameworks (otherwise the dmg only runs where Qt is installed).
+      # Linux AppImage
+      #
+      # Ubuntu 22.04 is intentionally used as the build baseline so the
+      # resulting AppImage does not inherit a very new glibc requirement.
       # ------------------------------------------------------------------
-      - name: Bundle Qt frameworks (macOS)
+
+      - name: Build AppImage
+        if: runner.os == 'Linux' && matrix.cpp_compiler == 'g++'
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+          QMAKE: ${{ env.QT_ROOT_DIR }}/bin/qmake
+        run: |
+          chmod +x packaging/build-appimage.sh
+          ./packaging/build-appimage.sh
+
+      - name: Verify AppImage exists
+        if: runner.os == 'Linux' && matrix.cpp_compiler == 'g++'
+        run: |
+          test -f packaging/Story_Of_Alicia-x86_64.AppImage
+          chmod +x packaging/Story_Of_Alicia-x86_64.AppImage
+          file packaging/Story_Of_Alicia-x86_64.AppImage
+
+      - name: Verify AppImage glibc baseline
+        if: runner.os == 'Linux' && matrix.cpp_compiler == 'g++'
+        working-directory: ${{ github.workspace }}/packaging
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        run: |
+          set -euo pipefail
+
+          rm -rf squashfs-root
+          ./Story_Of_Alicia-x86_64.AppImage --appimage-extract >/dev/null
+
+          MAX_GLIBC="$(
+            find squashfs-root -type f -print0 |
+            while IFS= read -r -d '' ITEM; do
+              if file "$ITEM" | grep -q "ELF"; then
+                strings "$ITEM" |
+                  grep -oE 'GLIBC_[0-9]+(\.[0-9]+)*' || true
+              fi
+            done |
+            sort -V |
+            tail -n 1
+          )"
+
+          if [ -z "$MAX_GLIBC" ]; then
+            echo "Could not determine the AppImage glibc requirement."
+            exit 1
+          fi
+
+          echo "Highest required glibc symbol: $MAX_GLIBC"
+
+          REQUIRED_VERSION="${MAX_GLIBC#GLIBC_}"
+          if dpkg --compare-versions "$REQUIRED_VERSION" gt "2.35"; then
+            echo "AppImage requires glibc $REQUIRED_VERSION, newer than Ubuntu 22.04's 2.35 baseline."
+            exit 1
+          fi
+
+          rm -rf squashfs-root
+
+      - name: Upload Linux AppImage
+        if: runner.os == 'Linux' && matrix.cpp_compiler == 'g++'
+        uses: actions/upload-artifact@v4
+        with:
+          name: soa-launcher-linux-appimage
+          path: ${{ github.workspace }}/packaging/Story_Of_Alicia-x86_64.AppImage
+          if-no-files-found: error
+          compression-level: 0
+
+      # ------------------------------------------------------------------
+      # macOS DMG
+      # ------------------------------------------------------------------
+
+      - name: Bundle Qt frameworks
         if: runner.os == 'macOS'
         working-directory: ${{ github.workspace }}/build
         run: |
-          APP=$(find . -maxdepth 1 -name "*.app" | head -n1)
-          echo "Bundling: $APP"
+          set -euo pipefail
+
+          APP="$(find . -maxdepth 1 -type d -name "*.app" -print -quit)"
+
+          if [ -z "$APP" ]; then
+            echo "No macOS application bundle was produced."
+            exit 1
+          fi
+
+          echo "Bundling Qt frameworks into: $APP"
           macdeployqt "$APP" -verbose=1
 
-      - name: Package .dmg (macOS)
+      - name: Package macOS DMG
         if: runner.os == 'macOS'
         working-directory: ${{ github.workspace }}/build
         run: cpack -G DragNDrop --verbose
 
-      - name: Upload .dmg artifact (macOS)
+      - name: Upload macOS DMG
         if: runner.os == 'macOS'
         uses: actions/upload-artifact@v4
         with:
           name: soa-launcher-macos-dmg
           path: ${{ github.workspace }}/build/*.dmg
-          if-no-files-found: warn
-
-      # Optional: upload the Linux build too (raw binary) for testing.
-      - name: Upload Linux binary
-        if: runner.os == 'Linux' && matrix.cpp_compiler == 'g++'
-        uses: actions/upload-artifact@v4
-        with:
-          name: soa-launcher-linux
-          path: ${{ github.workspace }}/build/soa_launcher
-          if-no-files-found: warn
+          if-no-files-found: error

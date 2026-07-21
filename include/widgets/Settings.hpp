@@ -1,7 +1,6 @@
 #pragma once
 #include <QWidget>
 
-#include "core/wine/Shell.hpp"
 #include "util/Assets.hpp"
 #include "util/ModalOverlay.hpp"
 
@@ -11,7 +10,7 @@ class LauncherSettings;
 class WineSettings;
 class AdvancedSettings;
 
-namespace core::wine::shell
+namespace core::wine
 {
     class Shell;
 }
@@ -21,6 +20,9 @@ class Settings : public util::modal_overlay::ModalOverlay
     Q_OBJECT
     public:
         explicit Settings(core::wine::Shell* shell, QWidget* parent = nullptr);
+
+    signals:
+        void repair_requested();
 
     protected:
         void paint_content(QPainter& painter) override;

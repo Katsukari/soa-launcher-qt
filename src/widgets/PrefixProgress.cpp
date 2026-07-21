@@ -1,9 +1,7 @@
 #include "widgets/PrefixProgress.hpp"
-#include "widgets/LauncherLog.hpp"
 #include "util/Assets.hpp"
 #include "util/Layout.hpp"
 #include "util/SimpleUtils.hpp"
-#include "util/Styles.hpp"
 #include "util/Colors.hpp"
 #include "util/ProgressBar.hpp"
 #include <QPainter>
@@ -95,17 +93,6 @@ void PrefixProgress::setup_buttons()
     });
     close_button->raise();
 
-    log_button = new QPushButton("SHOW LOG", this);
-    log_button->setCursor(Qt::PointingHandCursor);
-    log_button->setFocusPolicy(Qt::NoFocus);
-    log_button->setStyleSheet(util::styles::k_link_blue);
-    log_button->setGeometry(dl::log_button(w));
-    connect(log_button, &QPushButton::clicked, this, []()
-    {
-        LauncherLog::instance()->show();
-        LauncherLog::instance()->raise();
-    });
-    log_button->raise();
 }
 
 void PrefixProgress::showEvent(QShowEvent* event)

@@ -1,136 +1,322 @@
 #include "core/state/InstallState.hpp"
-#include "core/status/StatusBus.hpp"
-#include "core/status/StatusReporter.hpp"
-#include "util/Config.hpp"
-#include "core/wine/WineRegistry.hpp"
+
+#include <QTimer>
 
 #include "core/Log.hpp"
+#include "core/game/GameVersion.hpp"
+#include "core/network/CourierBridge.hpp"
+#include "core/network/DownloadStatus.hpp"
+#include "core/status/StatusBus.hpp"
+#include "core/status/StatusReporter.hpp"
+#include "core/wine/PrefixInspector.hpp"
+#include "core/wine/WineRegistry.hpp"
+#include "util/Config.hpp"
 #include <spdlog/spdlog.h>
-#include <QDir>
-#include <QFile>
-#include <QFileInfo>
 
 namespace core::state
 {
     namespace
     {
-        const QString k_reporter_wine    = "wine";
-        const QString k_reporter_courier = "courier";
-        const QString k_reporter_auth    = "auth";
-
-        bool prefix_setup_complete(const QString& prefix, const QString& runtime)
-        {
-            QFile marker(QDir(prefix).filePath(".soa-prefix-ready"));
-            if (!marker.open(QIODevice::ReadOnly | QIODevice::Text))
-                return false;
-
-            const QString version = QString::fromUtf8(marker.readLine()).trimmed();
-            const QString marker_runtime = QString::fromUtf8(marker.readLine()).trimmed();
-            return version == "1" && marker_runtime == runtime;
-        }
-
-        bool prefix_is_win64(const QString& prefix)
-        {
-            QFile registry(QDir(prefix).filePath("system.reg"));
-            if (!registry.open(QIODevice::ReadOnly | QIODevice::Text))
-                return false;
-
-            return QString::fromUtf8(registry.readLine()).contains("win64", Qt::CaseInsensitive);
-        }
-
-        bool component_dll_exists(const QString& prefix, const QString& name)
-        {
-            const QString windows = QDir(prefix).filePath("drive_c/windows");
-            const QString dll_dir = QDir(windows).filePath(
-                prefix_is_win64(prefix) ? "syswow64" : "system32");
-            return QFileInfo::exists(QDir(dll_dir).filePath(name));
-        }
-
-        bool required_components_present(const QString& prefix, bool proton)
-        {
-            if (!component_dll_exists(prefix, "d3dx9_43.dll")
-                || !component_dll_exists(prefix, "d3dcompiler_47.dll"))
-            {
-                return false;
-            }
-
-            return proton
-                || (component_dll_exists(prefix, "msvcp140.dll")
-                    && component_dll_exists(prefix, "vcruntime140.dll"));
-        }
+        const QString k_reporter_wine = QStringLiteral("wine");
+        const QString k_reporter_auth = QStringLiteral("auth");
     }
+
+    using core::network::CourierBridge;
+    using core::network::DownloadStatus;
     using core::status::State;
     using core::status::Status;
     using core::status::StatusBus;
     using core::status::StatusReporter;
+
     InstallState::InstallState(QObject* parent) : QObject(parent)
     {
         connect(&StatusBus::instance(), &StatusBus::reporter_status_changed, this,
-            [this](StatusReporter* r, const Status& s)
+            [this](StatusReporter* reporter, const Status& status)
             {
-                on_reporter_changed(r->reporter_name(), s);
+                on_reporter_changed(reporter->reporter_name(), status);
             });
+        connect(&CourierBridge::instance(), &CourierBridge::download_status,
+                this, &InstallState::on_courier_status);
+        connect(&util::config::Config::instance(), &util::config::Config::changed,
+                this, [this]() { probe(); });
     }
+
+    InstallState::~InstallState()
+    {
+        cancel_update_check();
+        if (update_checker)
+        {
+            courier_destroy(update_checker);
+            update_checker = nullptr;
+        }
+    }
+
+    QString InstallState::current_update_key() const
+    {
+        const auto& config = util::config::Config::instance();
+        const auto& game = core::game::profile(config.game_version());
+        return core::game::to_string(config.game_version())
+            + QLatin1Char('|') + config.game_install_path()
+            + QLatin1Char('|') + QString::fromLatin1(game.cdn_base_url);
+    }
+
+    void InstallState::cancel_update_check()
+    {
+        if (update_checker && update_operation_id != 0)
+            courier_cancel(update_checker);
+        CourierBridge::instance().clear_operation(update_operation_id);
+        update_operation_id = 0;
+        update_check_in_progress = false;
+    }
+
     void InstallState::probe()
     {
-        auto& cfg = util::config::Config::instance();
-        const QString prefix = cfg.prefix_root();
+        auto& config = util::config::Config::instance();
+        const QString prefix = config.prefix_root();
+        prerequisites_confirmed = config.prerequisites_confirmed();
+        rules_accepted = config.rules_accepted();
+        runtime_chosen = config.runtime_selected();
 
-        runtime_chosen = cfg.runtime_selected();
-
-        const bool proton = core::wine::WineRegistry::identify(cfg.wine_binary())
+        const bool proton = core::wine::WineRegistry::identify(config.wine_binary())
             == core::wine::RuntimeType::Proton;
+        const auto inspection = core::wine::PrefixInspector::inspect(
+            prefix, config.wine_binary(), proton);
 
-        prefix_exists = !prefix.isEmpty() && QDir(prefix).exists("drive_c");
-        prefix_ready = prefix_exists
-            && prefix_setup_complete(prefix, cfg.wine_binary())
-            && required_components_present(prefix, proton);
-        game_installed = cfg.game_installed();
-        authed         = cfg.has_auth();
-        update_needed  = false;
+        prefix_exists = inspection.exists;
+        prefix_ready = inspection.exists && inspection.marker_valid
+            && inspection.required_components_present(proton);
+        game_installed = config.game_installed();
+        authed = config.has_auth();
         probed = true;
+
+        const QString key = current_update_key();
+        if (key != checked_update_key)
+        {
+            cancel_update_check();
+            if (update_checker)
+            {
+                courier_destroy(update_checker);
+                update_checker = nullptr;
+            }
+            update_check_complete = false;
+            update_needed = false;
+            checked_update_key = key;
+        }
+
+        recompute();
+        QTimer::singleShot(0, this, [this]() { start_update_check_if_needed(); });
+    }
+
+    void InstallState::start_update_check_if_needed()
+    {
+        if (!probed || !prerequisites_confirmed || !runtime_chosen || !prefix_ready || !game_installed
+            || update_check_complete || update_check_in_progress
+            || courier_working || !last_error.isEmpty())
+        {
+            return;
+        }
+
+        auto& config = util::config::Config::instance();
+        const auto& game = core::game::profile(config.game_version());
+        if (!update_checker)
+        {
+            update_checker = courier_create(
+                game.cdn_base_url,
+                CourierBridge::progress_callback(),
+                CourierBridge::done_callback(),
+                &CourierBridge::instance());
+        }
+        if (!update_checker)
+        {
+            update_check_complete = true;
+            set_warning(QStringLiteral("Could not create the game update checker."));
+            recompute();
+            return;
+        }
+
+        update_check_in_progress = true;
+        update_operation_id = courier_update_check(
+            update_checker, config.game_install_path().toUtf8().constData());
+        if (update_operation_id == 0)
+        {
+            update_check_in_progress = false;
+            update_check_complete = true;
+            set_warning(QStringLiteral("Could not start the game update check."));
+            recompute();
+            return;
+        }
+        CourierBridge::instance().begin_operation(update_operation_id);
         recompute();
     }
-    void InstallState::set_prefix_exists(bool v)  { if (prefix_exists  != v) { prefix_exists  = v; recompute(); } }
-    void InstallState::set_prefix_ready(bool v)   { if (prefix_ready   != v) { prefix_ready   = v; recompute(); } }
-    void InstallState::set_game_installed(bool v) { if (game_installed != v) { game_installed = v; recompute(); } }
-    void InstallState::set_update_needed(bool v)  { if (update_needed  != v) { update_needed  = v; recompute(); } }
-    void InstallState::set_authed(bool v)         { if (authed         != v) { authed         = v; recompute(); } }
-    void InstallState::set_broken(bool v)         { if (broken         != v) { broken         = v; recompute(); } }
-    void InstallState::on_reporter_changed(const QString& name, const Status& s)
+
+    void InstallState::on_courier_status(const DownloadStatus& status)
     {
-        if (name == k_reporter_wine)         wine_state    = s.state;
-        else if (name == k_reporter_courier) courier_state = s.state;
-        else if (name == k_reporter_auth)    auth_state    = s.state;
-        else return;
-        if (s.state == State::Done || s.state == State::Failed)
-            probe();
-        else
+        if (status.operation_id == update_operation_id)
+        {
+            if (status.base.state != State::Done && status.base.state != State::Failed)
+                return;
+
+            update_check_in_progress = false;
+            update_check_complete = true;
+            CourierBridge::instance().clear_operation(update_operation_id);
+            update_operation_id = 0;
+
+            if (status.base.state == State::Done)
+            {
+                update_needed = status.base.message == QStringLiteral("update-available");
+                if (!update_needed)
+                    set_warning({});
+            }
+            else
+            {
+                update_needed = false;
+                set_warning(QStringLiteral(
+                    "The launcher could not check for game updates. You can still launch the installed version."));
+            }
             recompute();
+            return;
+        }
+
+        if (status.base.state == State::Working)
+        {
+            courier_working = true;
+            set_warning({});
+            recompute();
+            return;
+        }
+
+        if (status.base.state == State::Done || status.base.state == State::Failed)
+        {
+            courier_working = false;
+            if (status.base.state == State::Failed)
+            {
+                if (status.base.message.compare(QStringLiteral("Cancelled."), Qt::CaseInsensitive) == 0)
+                {
+                    set_warning({});
+                }
+                else
+                {
+                    const QString detail = status.base.message.isEmpty()
+                        ? QStringLiteral("The game download failed.")
+                        : status.base.message;
+                    set_warning(QStringLiteral(
+                        "The last game transfer failed. Retry will verify existing files and continue: %1")
+                        .arg(detail));
+                }
+            }
+            else
+            {
+                set_warning({});
+                update_check_complete = false;
+                update_needed = false;
+                QTimer::singleShot(0, this, [this]() { probe(); });
+            }
+            recompute();
+        }
     }
+
+    void InstallState::set_error(const QString& message)
+    {
+        if (last_error == message)
+            return;
+        last_error = message;
+        emit error_changed(last_error);
+    }
+
+    void InstallState::set_warning(const QString& message)
+    {
+        if (last_warning == message)
+            return;
+        last_warning = message;
+        emit warning_changed(last_warning);
+    }
+
+    void InstallState::dismiss_error()
+    {
+        set_error({});
+        probe();
+    }
+
+    void InstallState::clear_warning()
+    {
+        set_warning({});
+    }
+
+    void InstallState::set_prefix_exists(const bool value) { if (prefix_exists != value) { prefix_exists = value; recompute(); } }
+    void InstallState::set_prefix_ready(const bool value) { if (prefix_ready != value) { prefix_ready = value; recompute(); } }
+    void InstallState::set_game_installed(const bool value) { if (game_installed != value) { game_installed = value; recompute(); } }
+    void InstallState::set_update_needed(const bool value) { if (update_needed != value) { update_needed = value; recompute(); } }
+    void InstallState::set_authed(const bool value) { if (authed != value) { authed = value; recompute(); } }
+    void InstallState::set_broken(const bool value) { if (broken != value) { broken = value; recompute(); } }
+
+    void InstallState::on_reporter_changed(const QString& name, const Status& status)
+    {
+        if (name == k_reporter_wine)
+        {
+            wine_state = status.state;
+            wine_phase = status.phase;
+        }
+        else if (name == k_reporter_auth)
+        {
+            auth_state = status.state;
+            auth_phase = status.phase;
+        }
+        else
+        {
+            return;
+        }
+
+        if (status.state == State::Failed)
+        {
+            set_error(status.message.isEmpty()
+                ? QStringLiteral("The requested launcher operation failed.")
+                : status.message);
+            recompute();
+            return;
+        }
+        if (status.state == State::Done)
+        {
+            set_error({});
+            QTimer::singleShot(0, this, [this]() { probe(); });
+        }
+        else
+        {
+            recompute();
+        }
+    }
+
     Stage InstallState::compute() const
     {
         if (!probed) return Stage::Probing;
-        if (broken)  return Stage::Broken;
+        if (!last_error.isEmpty()) return Stage::Failed;
+        if (broken) return Stage::Broken;
+        if (!prerequisites_confirmed) return Stage::NeedsPrerequisites;
+        if (!runtime_chosen) return Stage::NeedsRuntime;
 
-        // each step depends on the previous one being healthy
-        if (!runtime_chosen)              return Stage::NeedsRuntime;
-        if (wine_state == State::Working) return Stage::SettingUpPrefix;
-        if (!prefix_exists)               return Stage::NeedsPrefix;
-        if (!prefix_ready)                return Stage::PrefixBroken;
+        if (wine_state == State::Working)
+        {
+            if (wine_phase == QStringLiteral("game-running")) return Stage::Running;
+            if (wine_phase == QStringLiteral("game-first-launch")) return Stage::Launching;
+            return Stage::SettingUpPrefix;
+        }
 
-        if (courier_state == State::Working)
-            return game_installed ? Stage::Updating : Stage::Downloading;
-        if (!game_installed)              return Stage::NeedsDownload;
-        if (update_needed)                return Stage::NeedsUpdate;
+        if (!prefix_exists) return Stage::NeedsPrefix;
+        if (!prefix_ready) return Stage::PrefixBroken;
+        if (courier_working) return game_installed ? Stage::Updating : Stage::Downloading;
+        if (!game_installed) return Stage::NeedsDownload;
+        if (update_check_in_progress) return Stage::CheckingUpdate;
+        if (update_needed) return Stage::NeedsUpdate;
+        if (!rules_accepted) return Stage::NeedsRules;
         if (auth_state == State::Working) return Stage::Authenticating;
-        if (!authed)                      return Stage::NeedsAuth;
+        if (!authed) return Stage::NeedsAuth;
         return Stage::Ready;
     }
+
     void InstallState::recompute()
     {
         const Stage next = compute();
-        if (next == current) return;
+        if (next == current)
+            return;
         SPDLOG_INFO("install state: {} -> {}", to_string(current), to_string(next));
         current = next;
         emit stage_changed(current);

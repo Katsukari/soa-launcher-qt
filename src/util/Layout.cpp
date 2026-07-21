@@ -77,13 +77,13 @@ namespace util::layout
 
         QSize  discord_icon(const QSize win)    { return scaled(k_discord_icon, win); }
         QRect  discord_button(const QSize win)  { return scaled(k_discord_button, win); }
+        QRect  keep_signed_in(const QSize win)  { return scaled(k_keep_signed_in, win); }
         QRect  disclaimer(const QSize win)      { return scaled(k_disclaimer, win); }
 
         QRect  waiting_title(const QSize win)   { return scaled(k_waiting_title, win); }
         QRect  steps(const QSize win)           { return scaled(k_steps, win); }
+        QRect  try_again(const QSize win)       { return scaled(k_try_again, win); }
 
-        QRect  check_bugs(const QSize win)        { return scaled(k_check_bugs, win); }
-        QRect  check_rules(const QSize win)       { return scaled(k_check_rules, win); }
         QRect  signed_in_banner(const QSize win)  { return scaled(k_signed_in_banner, win); }
         QRect  enter_button(const QSize win)      { return scaled(k_enter_button, win); }
     }
@@ -193,7 +193,11 @@ namespace util::layout
 
     namespace advanced_settings
     {
-        int row(const int i) { return settings::row_y(i, 5, false); }
+        int row(const int i)
+        {
+            static constexpr int ys[3] = {104, 218, 332};
+            return (i >= 0 && i < 3) ? ys[i] : ys[0];
+        }
     }
 
     namespace dropdown
@@ -274,7 +278,7 @@ namespace util::layout
         QRect bar_rect(const QSize win)  { return scaled(k_bar.translated(k_rect.topLeft()), win); }
         QRect under_row(const QSize win) { return scaled(k_under.translated(k_rect.topLeft()), win); }
 
-        QRect log_button(const QSize win)
+        QRect retry_button(const QSize win)
         {
             const QRect under = under_row(win);
             return { under.left() + under.width() / 2 - scaled(50, win),

@@ -1,27 +1,40 @@
 import Foundation
 import Soa_Courier
+
 extension Courier
-	{
+{
+    func startIntegrityCheck(installPath: String) -> UInt64
+    {
+        run { [self] operationID in
+            let installRoot = try canonicalInstallRoot(installPath)
+            try recoverInterruptedUpdate(installRoot: installRoot)
 
-	func startIntegrityCheck(installPath: String)
-		{
-		run { [self] in
-			reportProgress(courier_phase_preparing, "Requesting game version...", 0, 0, 0, 0, 0, 0)
-			let version = try await fetchRemoteVersion()
-			reportProgress(courier_phase_preparing, "Requesting manifest...", 0, 0, 0, 0, 0, 0)
-			let manifest = try await fetchManifest(version: version)
-			guard !manifest.files.isEmpty else { throw Err("Manifest has no files") }
+            reportProgress(operationID, courier_phase_preparing,
+                           "Requesting game version...", 0, 0, 0, 0, 0, 0)
+            let version = try await fetchRemoteVersion()
+            reportProgress(operationID, courier_phase_preparing,
+                           "Requesting manifest...", 0, 0, 0, 0, 0, 0)
+            let manifest = try await fetchManifest(version: version)
 
-			var bad = 0
-			for (i, entry) in manifest.files.enumerated() {
-				try Task.checkCancellation()
-				let local = localComparePath(installDir: installPath, entry: entry)
-				let pct = Int(Double(i + 1) / Double(manifest.files.count) * 100)
-				reportProgress(courier_phase_verifying, "Verifying (\(i + 1)/\(manifest.files.count))", pct, 0, 0, 0, i + 1, manifest.files.count)
-				let hash = md5OfFile(at: local)
-				if hash == nil || hash != entry.hash { bad += 1 }
-			}
-			reportDone(true, "\(bad)")
-		}
-	}
+            var bad = 0
+            for (index, entry) in manifest.enumerated() {
+                try Task.checkCancellation()
+                let relative = try actualManagedRelativePath(installRoot: installRoot, entry: entry)
+                let local = try safeDestination(root: installRoot, relativePath: relative)
+                let percent = Int(Double(index + 1) / Double(manifest.count) * 100)
+                reportProgress(operationID, courier_phase_verifying,
+                               "Verifying (\(index + 1)/\(manifest.count))", percent,
+                               0, 0, 0, index + 1, manifest.count)
+                let hash = try md5OfFile(at: local.path) { _ in
+                    self.reportProgress(operationID, courier_phase_verifying,
+                                        "Verifying (\(index + 1)/\(manifest.count))", percent,
+                                        0, 0, 0, index + 1, manifest.count)
+                }
+                if hash == nil || hash?.caseInsensitiveCompare(entry.manifest.hash) != .orderedSame {
+                    bad += 1
+                }
+            }
+            reportDone(operationID, true, "\(bad)")
+        }
+    }
 }

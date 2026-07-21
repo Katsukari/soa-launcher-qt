@@ -1,6 +1,5 @@
 #pragma once
 
-#include <QCheckBox>
 #include <QEvent>
 #include <QLabel>
 #include <QPainter>
@@ -11,6 +10,7 @@
 #include "util/Assets.hpp"
 
 class AuthHandler;
+class QCheckBox;
 namespace core::wine
 {
     class Shell;
@@ -57,6 +57,7 @@ private:
     void set_state(State state);
     void apply_state_visibility();
     void refresh_enter_enabled();
+    void refresh_keep_signed_in();
     void refresh_game_text();
 
     AuthHandler* auth {};
@@ -64,16 +65,17 @@ private:
     core::state::InstallState* install_state {};
     core::game::GameVersion game_version {core::game::GameVersion::Playtest};
     State state {State::Download};
+    core::state::Stage current_stage {core::state::Stage::Probing};
     QLabel* title_label {};
     QPushButton* settings_button {};
     QPushButton* download_button {};
     QLabel* message_label {};
     QPushButton* discord_button {};
+    QCheckBox* keep_signed_button {};
     QLabel* disclaimer_label {};
     QLabel* waiting_title {};
     QLabel* steps_label {};
-    QCheckBox* check_bugs {};
-    QCheckBox* check_rules {};
+    QPushButton* try_again_button {};
     QLabel* signed_in_label {};
     QPushButton* enter_button {};
     QPushButton* reset_path_button {};

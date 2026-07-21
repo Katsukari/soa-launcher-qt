@@ -10,17 +10,25 @@
 #include "util/ModalOverlay.hpp"
 #include "util/SimpleUtils.hpp"
 #include "widgets/AliciaChooser.hpp"
+#include "widgets/PrerequisitesIntro.hpp"
+#include "widgets/RulesAgreement.hpp"
+#include "widgets/RepairFiles.hpp"
 #include "widgets/GameInstall.hpp"
+#include "widgets/DownloadProgress.hpp"
 #include "widgets/Settings.hpp"
 #include "widgets/WineInstall.hpp"
 #include "widgets/WineSelectMenu.hpp"
 
+#include <QApplication>
+#include <QCloseEvent>
+#include <QGuiApplication>
 #include <QLabel>
 #include <QMouseEvent>
 #include <QMessageBox>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPushButton>
+#include <QScreen>
 #include <QWindow>
 
 using core::game::GameVersion;
@@ -28,8 +36,37 @@ using core::state::Stage;
 using core::state::View;
 using util::config::Config;
 
+#ifndef SOA_LAUNCHER_VERSION
+#define SOA_LAUNCHER_VERSION "0.1.0"
+#endif
+
 namespace
 {
+    QSize configured_window_size()
+    {
+        const QString configured = Config::instance().launcher_size();
+        const QStringList parts = configured.split(QLatin1Char('x'));
+        QSize requested = util::layout::win::k_default;
+        if (parts.size() == 2)
+        {
+            bool width_ok = false;
+            bool height_ok = false;
+            const int width = parts[0].toInt(&width_ok);
+            const int height = parts[1].toInt(&height_ok);
+            if (width_ok && height_ok && width >= 800 && height >= 480)
+                requested = QSize(width, height);
+        }
+
+        QScreen* screen = QGuiApplication::primaryScreen();
+        if (!screen)
+            return requested;
+        const QSize available = screen->availableGeometry().size() - QSize(24, 24);
+        const double scale = qMin(1.0, qMin(
+            static_cast<double>(available.width()) / requested.width(),
+            static_cast<double>(available.height()) / requested.height()));
+        return QSize(qMax(800, qRound(requested.width() * scale)),
+                     qMax(480, qRound(requested.height() * scale)));
+    }
     QPixmap make_version_button(const QSize window_size, const QRect button_rect,
                                 const QPixmap& frame, const QPixmap& icon,
                                 const QPoint icon_offset)
@@ -53,7 +90,7 @@ MainWindow::MainWindow(QWidget* parent)
       game_version(Config::instance().game_version())
 {
     setWindowFlags(Qt::FramelessWindowHint);
-    setFixedSize(util::layout::win::k_default);
+    setFixedSize(configured_window_size());
     setAttribute(Qt::WA_TranslucentBackground);
 
     shell = new core::wine::Shell(this);
@@ -64,6 +101,9 @@ MainWindow::MainWindow(QWidget* parent)
     setup_version_label();
     setup_settings();
     setup_alicia_chooser();
+    setup_prerequisites();
+    setup_rules();
+    setup_repair_files();
     setup_game_selector();
     setup_wine_install();
     setup_game_install();
@@ -71,6 +111,42 @@ MainWindow::MainWindow(QWidget* parent)
 
     connect(install_state, &core::state::InstallState::stage_changed,
             this, &MainWindow::on_stage_changed);
+    connect(install_state, &core::state::InstallState::error_changed, this,
+            [this](const QString& message)
+    {
+        if (message.isEmpty())
+            return;
+        if ((game_install && game_install->isVisible())
+            || (repair_progress && repair_progress->isVisible()))
+            return;
+        QMessageBox box(QMessageBox::Critical, QStringLiteral("Launcher Error"), message,
+                        QMessageBox::Retry | QMessageBox::Ignore, this);
+        box.setInformativeText(QStringLiteral("The launcher log has been opened with diagnostic details."));
+        box.exec();
+        install_state->dismiss_error();
+    });
+    connect(shell, &core::wine::Shell::user_notice, this, [this](const QString& message)
+    {
+        QMessageBox::information(this, QStringLiteral("Story Of Alicia Launcher"), message);
+    });
+    connect(shell, &core::wine::Shell::game_started, this, [this](core::game::GameVersion)
+    {
+        if (Config::instance().after_game_start() == QStringLiteral("minimize"))
+        {
+            minimized_for_game = true;
+            showMinimized();
+        }
+    });
+    connect(shell, &core::wine::Shell::game_exited, this,
+            [this](core::game::GameVersion, int, bool)
+    {
+        if (!minimized_for_game)
+            return;
+        minimized_for_game = false;
+        showNormal();
+        raise();
+        activateWindow();
+    });
 
     install_state->probe();
 }
@@ -83,6 +159,7 @@ void MainWindow::setup_window_buttons()
     close_button->setIcon(QIcon(util::assets::images[util::assets::Image::CloseIcon]));
     close_button->setIconSize(util::layout::chrome::close_icon(window_size));
     close_button->setGeometry(util::layout::chrome::close(window_size));
+    close_button->setAccessibleName(QStringLiteral("Close launcher"));
     connect(close_button, &QPushButton::clicked, this, [this]()
     {
         close();
@@ -92,6 +169,7 @@ void MainWindow::setup_window_buttons()
     minimize_button->setIcon(QIcon(util::assets::images[util::assets::Image::Minimize]));
     minimize_button->setIconSize(util::layout::chrome::minimize_icon(window_size));
     minimize_button->setGeometry(util::layout::chrome::minimize(window_size));
+    minimize_button->setAccessibleName(QStringLiteral("Minimize launcher"));
     connect(minimize_button, &QPushButton::clicked, this, [this]()
     {
         showMinimized();
@@ -101,7 +179,7 @@ void MainWindow::setup_window_buttons()
 void MainWindow::setup_version_label()
 {
     const QSize window_size = size();
-    auto* version_label = new QLabel("VERSION 0.1.0", this);
+    auto* version_label = new QLabel(QStringLiteral("VERSION ") + QString::fromLatin1(SOA_LAUNCHER_VERSION), this);
 
     QFont font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
     font.setPixelSize(util::layout::scaled(util::layout::text::k_version, window_size));
@@ -123,6 +201,93 @@ void MainWindow::setup_settings()
     {
         on_overlay_closed(settings);
     });
+    connect(settings, &Settings::repair_requested, this, [this]()
+    {
+        close_overlay(settings);
+        repair_files->refresh();
+        open_overlay(repair_files);
+    });
+}
+
+
+void MainWindow::setup_prerequisites()
+{
+    prerequisites_intro = new PrerequisitesIntro(this);
+    prerequisites_intro->hide();
+
+    connect(prerequisites_intro, &PrerequisitesIntro::accepted, this, [this]()
+    {
+        close_overlay(prerequisites_intro);
+        Config::instance().set_prerequisites_confirmed(true);
+    });
+    connect(prerequisites_intro, &PrerequisitesIntro::choose_own_requested, this, [this]()
+    {
+        close_overlay(prerequisites_intro);
+
+        auto& config = Config::instance();
+        config.set_prerequisites_confirmed(true);
+        config.set_runtime_selected(false);
+
+        install_state->probe();
+        open_for_current_stage();
+    });
+}
+
+void MainWindow::setup_rules()
+{
+    rules_agreement = new RulesAgreement(this);
+    rules_agreement->hide();
+
+    connect(rules_agreement, &RulesAgreement::accepted, this, [this]()
+    {
+        close_overlay(rules_agreement);
+        Config::instance().set_rules_accepted(true);
+    });
+}
+
+void MainWindow::setup_repair_files()
+{
+    repair_files = new RepairFiles(this);
+    repair_files->hide();
+
+    connect(repair_files, &RepairFiles::closed, this, [this]()
+    {
+        on_overlay_closed(repair_files);
+    });
+    connect(repair_files, &RepairFiles::repair_requested, this, [this]()
+    {
+        close_overlay(repair_files);
+
+        repair_active = true;
+        set_game_switching_enabled(install_state->stage());
+
+        if (!repair_progress)
+        {
+            repair_progress = new DownloadProgress(DownloadProgress::Mode::Repair, this);
+            connect(repair_progress, &DownloadProgress::download_finished, this, [this](const bool ok)
+            {
+                if (!ok)
+                    return;
+
+                repair_active = false;
+                close_overlay(repair_progress);
+                install_state->probe();
+                last_view = View::Loading;
+                on_stage_changed(install_state->stage());
+                QMessageBox::information(this, QStringLiteral("Repair Complete"),
+                                         QStringLiteral("The selected game was verified and repaired."));
+            });
+            connect(repair_progress, &DownloadProgress::closed, this, [this]()
+            {
+                repair_active = false;
+                on_overlay_closed(repair_progress);
+                last_view = View::Loading;
+                on_stage_changed(install_state->stage());
+            });
+        }
+
+        open_overlay(repair_progress);
+    });
 }
 
 void MainWindow::setup_alicia_chooser()
@@ -136,8 +301,7 @@ void MainWindow::setup_alicia_chooser()
 
     connect(alicia_chooser, &AliciaChooser::settings_requested, this, [this]()
     {
-        on_overlay_opened(settings);
-        settings->show_over(this);
+        open_overlay(settings);
     });
 
     connect(alicia_chooser, &AliciaChooser::download_triggered, this, [this]()
@@ -150,7 +314,7 @@ void MainWindow::setup_alicia_chooser()
         const auto answer = QMessageBox::question(
             this,
             "Reset Launcher Config",
-            "This resets launcher settings and signs you out.\n\n"
+            "This resets launcher settings, the setup/rules confirmations, and signs you out.\n\n"
             "The Wine prefix and both game installations will not be deleted.",
             QMessageBox::Yes | QMessageBox::Cancel,
             QMessageBox::Cancel);
@@ -173,7 +337,6 @@ void MainWindow::setup_game_selector()
 
     playtest_button = util::simple_utils::make_flat_button(this);
     playtest_button->setCursor(Qt::PointingHandCursor);
-    playtest_button->setFocusPolicy(Qt::NoFocus);
     playtest_button->setAccessibleName("Story of Alicia Playtest");
     playtest_button->setGeometry(util::layout::chrome::playtest_button(window_size));
     connect(playtest_button, &QPushButton::clicked, this, [this]()
@@ -183,7 +346,6 @@ void MainWindow::setup_game_selector()
 
     alicia_2_button = util::simple_utils::make_flat_button(this);
     alicia_2_button->setCursor(Qt::PointingHandCursor);
-    alicia_2_button->setFocusPolicy(Qt::NoFocus);
     alicia_2_button->setAccessibleName("Story of Alicia 2.0");
     alicia_2_button->setGeometry(util::layout::chrome::alicia_2_button(window_size));
     connect(alicia_2_button, &QPushButton::clicked, this, [this]()
@@ -288,10 +450,14 @@ void MainWindow::refresh_game_selector()
 void MainWindow::set_game_switching_enabled(const Stage stage)
 {
     const bool enabled =
+        !repair_active &&
         stage != Stage::SettingUpPrefix &&
         stage != Stage::Downloading &&
         stage != Stage::Updating &&
-        stage != Stage::Authenticating;
+        stage != Stage::Authenticating &&
+        stage != Stage::CheckingUpdate &&
+        stage != Stage::Launching &&
+        stage != Stage::Running;
 
     playtest_button->setEnabled(enabled);
     alicia_2_button->setEnabled(enabled);
@@ -301,18 +467,23 @@ void MainWindow::open_for_current_stage()
 {
     const View view = core::state::view_for(install_state->stage());
 
-    if (view == View::WineSelect) open_overlay(wine_select);
+    if (view == View::Prerequisites) open_overlay(prerequisites_intro);
+    else if (view == View::WineSelect) open_overlay(wine_select);
     else if (view == View::WineInstall) open_overlay(wine_install);
     else if (view == View::GameInstall)
     {
         game_install->refresh_game_path();
         open_overlay(game_install);
     }
+    else if (view == View::Rules) open_overlay(rules_agreement);
 }
 
 void MainWindow::on_stage_changed(const Stage stage)
 {
     set_game_switching_enabled(stage);
+
+    if (repair_active && repair_progress && repair_progress->isVisible())
+        return;
 
     const View view = core::state::view_for(stage);
     if (view == last_view) return;
@@ -320,25 +491,49 @@ void MainWindow::on_stage_changed(const Stage stage)
 
     switch (view)
     {
-        case View::WineSelect:
+        case View::Prerequisites:
+            close_overlay(wine_select);
             close_overlay(wine_install);
             close_overlay(game_install);
+            close_overlay(rules_agreement);
+            open_overlay(prerequisites_intro);
+            break;
+
+        case View::WineSelect:
+            close_overlay(prerequisites_intro);
+            close_overlay(wine_install);
+            close_overlay(game_install);
+            close_overlay(rules_agreement);
             break;
 
         case View::WineInstall:
+            close_overlay(prerequisites_intro);
             close_overlay(wine_select);
             close_overlay(game_install);
+            close_overlay(rules_agreement);
             if (stage == Stage::NeedsPrefix) break;
             open_overlay(wine_install);
             break;
 
         case View::GameInstall:
+            close_overlay(prerequisites_intro);
             close_overlay(wine_select);
             close_overlay(wine_install);
+            close_overlay(rules_agreement);
             open_overlay(game_install);
             break;
 
+        case View::Rules:
+            close_overlay(prerequisites_intro);
+            close_overlay(wine_select);
+            close_overlay(wine_install);
+            close_overlay(game_install);
+            open_overlay(rules_agreement);
+            break;
+
         case View::AliciaChooser:
+            close_overlay(prerequisites_intro);
+            close_overlay(rules_agreement);
             close_overlay(wine_select);
             close_overlay(wine_install);
             close_overlay(game_install);
@@ -350,29 +545,39 @@ void MainWindow::on_stage_changed(const Stage stage)
     }
 }
 
-void MainWindow::on_overlay_opened(util::modal_overlay::ModalOverlay* overlay)
+void MainWindow::update_chrome_visibility()
 {
-    if (overlay->keeps_chrome())
+    bool should_hide = false;
+    const auto overlays = findChildren<util::modal_overlay::ModalOverlay*>(
+        QString(), Qt::FindDirectChildrenOnly);
+    for (const auto* overlay : overlays)
     {
-        chrome_hidden = false;
+        if (overlay->isVisible() && !overlay->keeps_chrome())
+        {
+            should_hide = true;
+            break;
+        }
+    }
+
+    chrome_hidden = should_hide;
+    close_button->setVisible(!chrome_hidden);
+    minimize_button->setVisible(!chrome_hidden);
+    if (!chrome_hidden)
+    {
         close_button->raise();
         minimize_button->raise();
-    }
-    else
-    {
-        chrome_hidden = true;
-        close_button->hide();
-        minimize_button->hide();
     }
     update();
 }
 
+void MainWindow::on_overlay_opened(util::modal_overlay::ModalOverlay*)
+{
+    update_chrome_visibility();
+}
+
 void MainWindow::on_overlay_closed(util::modal_overlay::ModalOverlay*)
 {
-    chrome_hidden = false;
-    close_button->show();
-    minimize_button->show();
-    update();
+    update_chrome_visibility();
 }
 
 void MainWindow::open_overlay(util::modal_overlay::ModalOverlay* overlay)
@@ -426,9 +631,47 @@ void MainWindow::paintEvent(QPaintEvent*)
 
 void MainWindow::mousePressEvent(QMouseEvent* event)
 {
-    if (event->button() == Qt::LeftButton)
+    const int drag_height = util::layout::scaled(58, size());
+    if (event->button() == Qt::LeftButton && event->position().y() <= drag_height
+        && windowHandle())
     {
         windowHandle()->startSystemMove();
         event->accept();
+        return;
+    }
+    QWidget::mousePressEvent(event);
+}
+
+void MainWindow::closeEvent(QCloseEvent* event)
+{
+    if (!shell || !shell->is_game_running())
+    {
+        event->accept();
+        return;
+    }
+
+    QMessageBox box(QMessageBox::Warning,
+                    QStringLiteral("Alicia Is Running"),
+                    QStringLiteral("Closing the launcher may also terminate the running Wine process."),
+                    QMessageBox::NoButton,
+                    this);
+    auto* minimize = box.addButton(QStringLiteral("Minimize Launcher"), QMessageBox::AcceptRole);
+    auto* close = box.addButton(QStringLiteral("Close Anyway"), QMessageBox::DestructiveRole);
+    box.addButton(QMessageBox::Cancel);
+    box.setDefaultButton(minimize);
+    box.exec();
+
+    if (box.clickedButton() == minimize)
+    {
+        showMinimized();
+        event->ignore();
+    }
+    else if (box.clickedButton() == close)
+    {
+        event->accept();
+    }
+    else
+    {
+        event->ignore();
     }
 }

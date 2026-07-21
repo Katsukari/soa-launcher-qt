@@ -1,6 +1,5 @@
 #include "widgets/LauncherSettings.hpp"
 #include "widgets/ImageDropdown.hpp"
-#include "widgets/LauncherLog.hpp"
 #include "util/Assets.hpp"
 #include "util/Layout.hpp"
 #include "util/SimpleUtils.hpp"
@@ -23,37 +22,37 @@ LauncherSettings::LauncherSettings(QWidget* parent) : QWidget(parent)
     setup_run_connectivity_test_option();
     setup_launcher_size_option();
     setup_github_button();
-    setup_log_button();
 }
 
 void LauncherSettings::setup_launch_on_startup_option()
 {
     const QSize w = window()->size();
     const int y = lset::row(0);
-    util::simple_utils::make_label_block(this, w, y,
-                            "LAUNCH ON STARTUP",
-                            "Automatically open the launcher when you log in to your computer.");
+    util::simple_utils::make_label_block(
+        this, w, y,
+        "LAUNCH ON STARTUP",
+        "Automatically open the launcher when you log in to your computer.");
 
     auto* slider = util::simple_utils::make_flat_button(this);
+    const QRect slider_rect = ls::slider_rect(w, y);
+    slider->setIconSize(slider_rect.size());
+    slider->setGeometry(slider_rect);
+    slider->setAccessibleName(QStringLiteral("Launch on startup"));
 
-    const QRect sr = ls::slider_rect(w, y);
-    const QSize ssz = sr.size();
-    slider->setIconSize(ssz);
-    slider->setGeometry(sr);
-
-    auto paint = [slider, ssz](bool on)
+    auto paint = [slider, size = slider_rect.size()](const bool enabled)
     {
-        const auto& a = on ? util::assets::buttons[util::assets::Button::SliderOn]
-                           : util::assets::buttons[util::assets::Button::SliderOff];
-        slider->setIcon(QIcon(a.normal.scaled(ssz, Qt::KeepAspectRatio, Qt::SmoothTransformation)));
+        const auto button = enabled ? util::assets::Button::SliderOn
+                                    : util::assets::Button::SliderOff;
+        slider->setIcon(QIcon(util::assets::buttons[button].normal.scaled(
+            size, Qt::KeepAspectRatio, Qt::SmoothTransformation)));
     };
     paint(Config::instance().launch_on_startup());
 
     connect(slider, &QPushButton::clicked, this, [paint]()
     {
-        const bool on = !Config::instance().launch_on_startup();
-        Config::instance().set_launch_on_startup(on);
-        paint(on);
+        const bool enabled = !Config::instance().launch_on_startup();
+        Config::instance().set_launch_on_startup(enabled);
+        paint(enabled);
     });
 }
 
@@ -65,7 +64,7 @@ void LauncherSettings::setup_after_game_start_option()
                             "AFTER GAME START",
                             "Choose what the launcher does after the game starts up.");
 
-    auto* dd = new ImageDropdown({ "Keep launcher open", "Minimize to tray" }, this);
+    auto* dd = new ImageDropdown({ "Keep launcher open", "Minimize launcher" }, this);
 
     dd->set_index(Config::instance().after_game_start() == "minimize" ? 1 : 0);
     dd->move(ls::ctrl_pos(w, y));
@@ -80,17 +79,18 @@ void LauncherSettings::setup_run_connectivity_test_option()
 {
     const QSize w = window()->size();
     const int y = lset::row(2);
-    util::simple_utils::make_label_block(this, w, y,
-                            "CONNECTIVITY CHECK",
-                            "Diagnose issues connecting to the game and related servers.");
+    util::simple_utils::make_label_block(
+        this, w, y,
+        "CONNECTIVITY CHECK",
+        "Diagnose issues connecting to the game and related servers.");
 
     auto* button = util::simple_utils::make_flat_button(this);
-
-    const QRect br = ls::run_check(w, y);
-    button->setIcon(QIcon(util::assets::buttons[util::assets::Button::RunCheck].normal
-        .scaled(br.size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
-    button->setIconSize(br.size());
-    button->setGeometry(br);
+    const QRect button_rect = ls::run_check(w, y);
+    button->setIcon(QIcon(util::assets::buttons[util::assets::Button::RunCheck].normal.scaled(
+        button_rect.size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
+    button->setIconSize(button_rect.size());
+    button->setGeometry(button_rect);
+    button->setAccessibleName(QStringLiteral("Run connectivity check"));
 }
 
 void LauncherSettings::setup_launcher_size_option()
@@ -103,7 +103,7 @@ void LauncherSettings::setup_launcher_size_option()
 
     const QStringList sizes = { "1120x677", "1400x846", "1600x967", "1920x1160" };
     auto* dd = new ImageDropdown(
-        { "Small (1120x677)", "Default (1400x846)", "Large (1600x967)", "4K (1920x1160)" }, this);
+        { "Small (1120x677)", "Default (1400x846)", "Large (1600x967)", "Extra Large (1920x1160)" }, this);
 
     int idx = sizes.indexOf(Config::instance().launcher_size());
     if (idx < 0) idx = 1;
@@ -127,19 +127,5 @@ void LauncherSettings::setup_github_button()
     connect(gh, &QPushButton::clicked, this, []()
     {
         QDesktopServices::openUrl(QUrl("https://github.com/Story-Of-Alicia/soa-launcher-qt"));
-    });
-}
-
-void LauncherSettings::setup_log_button()
-{
-    const QSize w = window()->size();
-    auto* show_log = new QPushButton("SHOW LOG", this);
-    show_log->setCursor(Qt::PointingHandCursor);
-    show_log->setStyleSheet(util::styles::k_neutral_button);
-    show_log->setGeometry(lset::footer_right(w));
-    connect(show_log, &QPushButton::clicked, this, []()
-    {
-        LauncherLog::instance()->show();
-        LauncherLog::instance()->raise();
     });
 }

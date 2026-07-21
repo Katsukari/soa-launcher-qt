@@ -6,24 +6,40 @@ namespace core::state
     {
         switch (stage)
         {
-            case Stage::Probing:         return View::Loading;
+            case Stage::Probing:
+            case Stage::CheckingUpdate:
+                return View::Loading;
 
-            case Stage::NeedsRuntime:    return View::WineSelect;
+            case Stage::NeedsPrerequisites:
+                return View::Prerequisites;
 
-            case Stage::NeedsPrefix:     return View::WineInstall;
-            case Stage::PrefixBroken:    return View::WineInstall;
-            case Stage::SettingUpPrefix: return View::WineInstall;
+            case Stage::NeedsRuntime:
+                return View::WineSelect;
 
-            case Stage::NeedsDownload:   return View::GameInstall;
-            case Stage::NeedsUpdate:     return View::GameInstall;
-            case Stage::Downloading:     return View::GameInstall;
-            case Stage::Updating:        return View::GameInstall;
+            case Stage::NeedsPrefix:
+            case Stage::PrefixBroken:
+            case Stage::SettingUpPrefix:
+                return View::WineInstall;
 
-            case Stage::NeedsAuth:       return View::AliciaChooser;
-            case Stage::Authenticating:  return View::AliciaChooser;
-            case Stage::Ready:           return View::AliciaChooser;
+            case Stage::NeedsDownload:
+            case Stage::NeedsUpdate:
+            case Stage::Downloading:
+            case Stage::Updating:
+                return View::GameInstall;
 
-            case Stage::Broken:          return View::Error;
+            case Stage::NeedsRules:
+                return View::Rules;
+
+            case Stage::NeedsAuth:
+            case Stage::Authenticating:
+            case Stage::Launching:
+            case Stage::Running:
+            case Stage::Ready:
+                return View::AliciaChooser;
+
+            case Stage::Failed:
+            case Stage::Broken:
+                return View::Error;
         }
         return View::Loading;
     }

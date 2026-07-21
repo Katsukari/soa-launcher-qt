@@ -2,7 +2,6 @@
 #include <QWidget>
 
 class QPlainTextEdit;
-class LauncherLog;
 
 namespace core::wine
 {
@@ -22,6 +21,5 @@ class WineSettings : public QWidget
         void setup_tricks_option();
         void setup_wine_args_option();
 
-        LauncherLog * log_window {};
         core::wine::Shell * shell{};
 };

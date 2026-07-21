@@ -8,6 +8,9 @@
 #include <QClipboard>
 #include <QApplication>
 #include <QScrollBar>
+#include <QTextDocument>
+
+#include "util/Config.hpp"
 
 LauncherLog* LauncherLog::instance()
 {
@@ -27,6 +30,7 @@ LauncherLog::LauncherLog(QWidget* parent) : QDialog(parent)
 
     output = new QPlainTextEdit(this);
     output->setReadOnly(true);
+    output->document()->setMaximumBlockCount(5000);
     output->setStyleSheet(
         "QPlainTextEdit { background:#1E1B17; color:#D8C9B8;"
         " font-family:'monospace'; font-size:12px; border:none; }");
@@ -78,12 +82,29 @@ LauncherLog::LauncherLog(QWidget* parent) : QDialog(parent)
 
 void LauncherLog::append_line(int level, const QString& text)
 {
-    entries.push_back({ level, text });
+    QString safeText = text;
+    const QString token = util::config::Config::instance().token();
+    if (!token.isEmpty())
+        safeText.replace(token, QStringLiteral("[REDACTED]"));
+
+    entries.push_back({ level, safeText });
+    constexpr qsizetype k_max_entries = 5000;
+    if (entries.size() > k_max_entries)
+        entries.remove(0, entries.size() - k_max_entries);
+
     if (passes(level))
     {
-        output->appendPlainText(text);
+        output->appendPlainText(safeText);
         if (autoscroll)
             output->verticalScrollBar()->setValue(output->verticalScrollBar()->maximum());
+    }
+
+    constexpr int k_error_level = 4; // spdlog::level::err
+    if (level >= k_error_level)
+    {
+        showNormal();
+        raise();
+        activateWindow();
     }
 }
 

@@ -2,12 +2,6 @@
 
 #include <QWidget>
 
-class LauncherLog;
-namespace core::wine
-{
-    class Shell;
-}
-
 class LauncherSettings : public QWidget
 {
     Q_OBJECT
@@ -20,8 +14,5 @@ class LauncherSettings : public QWidget
         void setup_run_connectivity_test_option();
         void setup_launcher_size_option();
         void setup_github_button();
-        void setup_log_button();
 
-        LauncherLog * log_window {};
-        core::wine::Shell * shell{};
 };

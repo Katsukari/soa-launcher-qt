@@ -6,37 +6,47 @@
 #include "core/network/Courier.h"
 #include "core/network/DownloadStatus.hpp"
 
-class QTimer;
 class QPushButton;
 
 class DownloadProgress : public util::modal_overlay::ModalOverlay
 {
     Q_OBJECT
-    public:
-        explicit DownloadProgress(QWidget* parent = nullptr);
-        ~DownloadProgress() override;
 
-        signals:
-            void closed();
-        void download_finished(bool ok);
+public:
+    enum class Mode
+    {
+        Download,
+        Repair
+    };
 
-    protected:
-        void paint_content(QPainter& painter) override;
-        void showEvent(QShowEvent* event) override;
-        void hideEvent(QHideEvent* event) override;
+    explicit DownloadProgress(QWidget* parent = nullptr);
+    explicit DownloadProgress(Mode mode, QWidget* parent = nullptr);
+    ~DownloadProgress() override;
 
-    private:
-        void setup_buttons();
-        void start_download();
+signals:
+    void closed();
+    void download_started();
+    void download_finished(bool ok);
 
-        static QString human_size(qulonglong bytes);
-        static QString human_speed(qulonglong bytes_per_sec);
-        static QString human_eta(qulonglong remaining, qulonglong throughput);
+protected:
+    void paint_content(QPainter& painter) override;
+    void showEvent(QShowEvent* event) override;
 
-        courier* downloader {};
+private:
+    void setup_buttons();
+    void start_download();
+    void cancel_download();
+    void set_terminal_error(const QString& message);
 
-        core::network::DownloadStatus current;
+    static QString human_size(qulonglong bytes);
+    static QString human_speed(qulonglong bytes_per_sec);
+    static QString human_eta(qulonglong remaining, qulonglong throughput);
 
-        QPushButton* close_button {};
-        QPushButton* log_button {};
+    Mode mode {Mode::Download};
+    courier* downloader {};
+    qulonglong active_operation_id {};
+    core::network::DownloadStatus current;
+
+    QPushButton* close_button {};
+    QPushButton* retry_button {};
 };

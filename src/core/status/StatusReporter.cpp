@@ -4,6 +4,8 @@
 #include "core/Log.hpp"
 #include <spdlog/spdlog.h>
 
+#include <utility>
+
 namespace core::status
 {
     StatusReporter::StatusReporter(QString name_, QObject* parent)
@@ -23,11 +25,25 @@ namespace core::status
         next.last_changed = QDateTime::currentDateTime();
         current = std::move(next);
 
-        SPDLOG_DEBUG("status[{}]: {} {} {}",
-                     name.toStdString(),
-                     to_string(current.state),
-                     current.phase.toStdString(),
-                     current.message.toStdString());
+        // Courier reports byte-level progress roughly ten times per second. Those
+        // updates must still reach the UI and watchdog, but writing an identical
+        // log line for every chunk makes the useful diagnostics unreadable. The
+        // Swift downloader emits one explicit milestone after each file has been
+        // fully downloaded and verified instead.
+        const bool noisy_courier_progress =
+            name == QStringLiteral("courier")
+            && current.state == State::Working
+            && (current.phase == QStringLiteral("downloading")
+                || current.phase == QStringLiteral("verifying"));
+
+        if (!noisy_courier_progress)
+        {
+            SPDLOG_DEBUG("status[{}]: {} {} {}",
+                         name.toStdString(),
+                         to_string(current.state),
+                         current.phase.toStdString(),
+                         current.message.toStdString());
+        }
 
         emit status_changed(current);
     }

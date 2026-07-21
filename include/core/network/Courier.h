@@ -8,7 +8,6 @@ extern "C" {
 #endif
 
 void soa_log(int level, const char* message);
-
 void soa_ping(void);
 
 typedef struct courier courier;
@@ -21,29 +20,31 @@ typedef enum
     courier_phase_verifying   = 3
 } courier_phase;
 
-typedef void (*courier_progress_cb)(courier_phase phase,
+typedef void (*courier_progress_cb)(uint64_t    operation_id,
+                                    courier_phase phase,
+                                    const char*   message,
+                                    int           percent,
+                                    uint64_t      received,
+                                    uint64_t      total,
+                                    uint64_t      throughput,
+                                    int           file_index,
+                                    int           file_count,
+                                    void*         ctx);
+
+typedef void (*courier_done_cb)(uint64_t  operation_id,
+                                bool      ok,
                                 const char* message,
-                                int         percent,
-                                uint64_t    received,
-                                uint64_t    total,
-                                uint64_t    throughput,
-                                int         file_index,
-                                int         file_count,
-                                void*       ctx);
+                                void*     ctx);
 
-typedef void (*courier_done_cb)(bool        ok,
-                            const char* message,
-                            void*       ctx);
-
-courier* courier_create(const char*     cdn_base_url,
-                                      courier_progress_cb on_progress,
-                                      courier_done_cb     on_done,
-                                      void*           ctx);
+courier* courier_create(const char* cdn_base_url,
+                        courier_progress_cb on_progress,
+                        courier_done_cb on_done,
+                        void* ctx);
 void courier_destroy(courier* d);
 
-void courier_integrity_check(courier* d, const char* install_path);
-void courier_update_check  (courier* d, const char* install_path);
-void courier_update        (courier* d, const char* install_path);
+uint64_t courier_integrity_check(courier* d, const char* install_path);
+uint64_t courier_update_check(courier* d, const char* install_path);
+uint64_t courier_update(courier* d, const char* install_path);
 
 void courier_cancel(courier* d);
 

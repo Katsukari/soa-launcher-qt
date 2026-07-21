@@ -5,116 +5,139 @@ import FoundationNetworking
 
 extension Courier
 {
+    private func fetchData(url: URL, maximumBytes: Int, description: String) async throws -> Data
+    {
+        var attempt = 0
+        while true {
+            try Task.checkCancellation()
+            attempt += 1
+            do {
+                let session = URLSession(configuration: sessionConfiguration)
+                defer { session.invalidateAndCancel() }
+                let (data, response) = try await session.data(from: url)
+                guard let http = response as? HTTPURLResponse else {
+                    throw Err("Remote returned a non-HTTP response for \(description)")
+                }
+                guard http.statusCode == 200 else {
+                    throw Err(
+                        "Remote returned HTTP \(http.statusCode) while retrieving \(description)",
+                        retryable: http.statusCode == 408 || http.statusCode == 429 || http.statusCode >= 500)
+                }
+                guard data.count <= maximumBytes else {
+                    throw Err("Remote \(description) exceeds the allowed size")
+                }
+                return data
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch let error as Err {
+                if !error.retryable || attempt >= 3 { throw error }
+                log(3, "Retrying \(description) request after transient failure: \(error.message)")
+            } catch {
+                if attempt >= 3 {
+                    throw Err("Failed to retrieve \(description): \(error)")
+                }
+                log(3, "Retrying \(description) request after transient failure: \(error)")
+            }
+            try await Task.sleep(for: .seconds(pow(2.0, Double(attempt - 1))))
+        }
+    }
 
-	func fetchRemoteVersion() async throws -> String
-	{
-		let url = URL(string: "\(cdnBaseURL)/version")!
-		let (data, response) = try await URLSession.shared.data(from: url)
+    func fetchRemoteVersion() async throws -> String
+    {
+        guard let url = URL(string: "\(cdnBaseURL)/version") else {
+            throw Err("Invalid remote version URL")
+        }
+        let data = try await fetchData(url: url, maximumBytes: 4096, description: "game version")
+        let version = String(decoding: data, as: UTF8.self)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
 
-		guard let http = response as? HTTPURLResponse, http.statusCode == 200
-		else
-		{
-			throw Err("Remote returned bad status retrieving version")
-		}
+        guard !version.isEmpty,
+              version.count <= 128,
+              version.range(of: #"^[A-Za-z0-9._-]+$"#, options: .regularExpression) != nil else {
+            throw Err("Remote returned an invalid game version")
+        }
+        return version
+    }
 
-		return String(decoding: data, as: UTF8.self)
-		.trimmingCharacters(in: .whitespacesAndNewlines)
-	}
+    func fetchManifest(version: String) async throws -> [ValidatedManifestEntry]
+    {
+        guard let url = URL(string: "\(cdnBaseURL)/\(version)/manifest.json") else {
+            throw Err("Invalid remote manifest URL")
+        }
+        let data = try await fetchData(url: url, maximumBytes: 32 * 1024 * 1024, description: "game manifest")
+        do {
+            return try validateManifest(JSONDecoder().decode(Manifest.self, from: data))
+        } catch let error as Err {
+            throw error
+        } catch {
+            throw Err("Invalid manifest JSON: \(error)")
+        }
+    }
 
-	func fetchManifest(version: String) async throws -> Manifest
-	{
-		let url = URL(string: "\(cdnBaseURL)/\(version)/manifest.json")!
-		let (data, response) = try await URLSession.shared.data(from: url)
+    func md5OfFile(at path: String, progress: ((UInt64) -> Void)? = nil) throws -> String?
+    {
+        guard let handle = FileHandle(forReadingAtPath: path) else { return nil }
+        defer { try? handle.close() }
 
-		guard let http = response as? HTTPURLResponse, http.statusCode == 200
-		else
-		{
-			throw Err("Remote returned bad status retrieving manifest")
-		}
+        var hasher = MD5()
+        var processed: UInt64 = 0
+        var nextReport: UInt64 = 8 * 1024 * 1024
+        while true {
+            try Task.checkCancellation()
+            let chunk = handle.readData(ofLength: 1 << 16)
+            if chunk.isEmpty { break }
+            hasher.update(chunk)
+            processed += UInt64(chunk.count)
+            if processed >= nextReport {
+                progress?(processed)
+                nextReport = processed + 8 * 1024 * 1024
+            }
+        }
+        progress?(processed)
+        return hasher.finalizeHex()
+    }
 
-		do
-		{
-			return try JSONDecoder().decode(Manifest.self, from: data)
-		}
-		catch
-		{
-			throw Err("Invalid manifest JSON: \(error)")
-		}
-	}
+    func tempPath(for destination: URL) -> URL
+    {
+        destination.appendingPathExtension("download")
+    }
 
-	func md5OfFile(at path: String) -> String?
-	{
-		guard let handle = FileHandle(forReadingAtPath: path) else { return nil }
-		defer { try? handle.close() }
+    func atomicWriteJSON<T: Encodable>(_ value: T, to url: URL) throws
+    {
+        let data = try JSONEncoder.pretty.encode(value)
+        try data.write(to: url, options: .atomic)
+    }
 
-		var hasher = MD5()
+    func writeVersionJSON(installRoot: URL, version: String) throws
+    {
+        struct VersionFile: Codable { let version: String }
+        try atomicWriteJSON(VersionFile(version: version), to: installRoot.appendingPathComponent("version.json"))
+    }
 
-		while true
-		{
-			let chunk = handle.readData(ofLength: 1 << 16)
-			if chunk.isEmpty { break }
-			hasher.update(chunk)
-		}
-		return hasher.finalizeHex()
-	}
+    func readLocalVersion(installPath: String) -> String?
+    {
+        let path = (installPath as NSString).appendingPathComponent("version.json")
+        guard let data = FileManager.default.contents(atPath: path),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return nil
+        }
+        return (object["version"] as? String) ?? (object["latest"] as? String)
+    }
 
-	func localComparePath(installDir: String, entry: ManifestEntry) -> String
-	{
-		let direct = (installDir as NSString).appendingPathComponent(entry.path)
+    func readManagedManifest(installRoot: URL) -> ManagedManifest?
+    {
+        let url = installRoot.appendingPathComponent(".soa-managed-manifest.json")
+        guard let data = try? Data(contentsOf: url), data.count <= 16 * 1024 * 1024 else { return nil }
+        return try? JSONDecoder().decode(ManagedManifest.self, from: data)
+    }
+}
 
-		if dxvkBackedUpDlls.contains(where: { entry.path.caseInsensitiveCompare($0) == .orderedSame })
-		{
-			let bak = direct + ".bak"
-			if FileManager.default.fileExists(atPath: bak) { return bak }
-		}
-		return direct
-	}
-
-	func downloadFile(from url: URL,
-	toTemp tempPath: String,
-	onBytes: (Int) throws -> Void) async throws -> String
-	{
-		try Task.checkCancellation()
-
-		let (data, response) = try await URLSession.shared.data(from: url)
-
-		guard let http = response as? HTTPURLResponse, http.statusCode == 200
-		else
-		{
-			throw Err("Remote returned bad status for \(url.lastPathComponent)")
-		}
-
-		try Task.checkCancellation()
-
-		try data.write(to: URL(fileURLWithPath: tempPath))
-
-		var hasher = MD5()
-		hasher.update(data)
-
-		try onBytes(data.count)
-
-		return hasher.finalizeHex()
-	}
-
-	func tempPath(for dest: String) -> String
-	{
-		dest + ".download"
-	}
-
-	func writeVersionJson(installPath: String, version: String) throws
-	{
-		let path = (installPath as NSString).appendingPathComponent("version.json")
-		let obj = ["version": version]
-		let data = try JSONSerialization.data(withJSONObject: obj, options: [.prettyPrinted])
-		try data.write(to: URL(fileURLWithPath: path))
-	}
-
-	func readLocalVersion(installPath: String) -> String?
-	{
-		let path = (installPath as NSString).appendingPathComponent("version.json")
-		guard let data = FileManager.default.contents(atPath: path),
-		let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-		else { return nil }
-		return (obj["version"] as? String) ?? (obj["latest"] as? String)
-	}
+private extension JSONEncoder
+{
+    static var pretty: JSONEncoder
+    {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        return encoder
+    }
 }

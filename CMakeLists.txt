@@ -1,11 +1,11 @@
-cmake_minimum_required(VERSION 4.3)
+cmake_minimum_required(VERSION 3.25)
 project(soa_launcher
         LANGUAGES CXX
         DESCRIPTION "Story of Alicia Launcher"
         VERSION 0.1.0
 )
 
-set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -47,6 +47,8 @@ add_library(soa_network STATIC
         src/core/network/CourierUpdate.swift
         src/core/network/CourierDownload.swift
         src/core/network/CourierIntegrity.swift
+        src/core/network/CourierPaths.swift
+        src/core/network/CourierTransfer.swift
         src/core/network/CourierTypes.swift
         src/core/network/CourierABI.swift
         src/core/network/CourierPing.swift
@@ -64,6 +66,9 @@ set(LAUNCHER_SOURCES
         src/MainWindow.cpp
         src/util/Assets.cpp
         src/widgets/AliciaChooser.cpp
+        src/widgets/PrerequisitesIntro.cpp
+        src/widgets/RulesAgreement.cpp
+        src/widgets/RepairFiles.cpp
         src/widgets/Settings.cpp
         src/util/Layout.cpp
         src/widgets/LauncherSettings.cpp
@@ -76,9 +81,12 @@ set(LAUNCHER_SOURCES
         src/widgets/AdvancedSettings.cpp
         src/core/Log.cpp
         src/core/wine/Shell.cpp
+        src/core/system/SystemProfile.cpp
+        src/core/wine/PrefixInspector.cpp
         src/core/network/Courier.cpp
         src/core/auth/AuthHandler.cpp
         src/util/Config.cpp
+        src/util/CredentialStore.cpp
         src/widgets/GameInstall.cpp
         src/widgets/DownloadProgress.cpp
         src/widgets/PrefixProgress.cpp
@@ -95,6 +103,9 @@ set(LAUNCHER_HEADERS
         include/MainWindow.hpp
         include/util/Assets.hpp
         include/widgets/AliciaChooser.hpp
+        include/widgets/PrerequisitesIntro.hpp
+        include/widgets/RulesAgreement.hpp
+        include/widgets/RepairFiles.hpp
         include/widgets/Settings.hpp
         include/util/Layout.hpp
         include/widgets/LauncherSettings.hpp
@@ -106,6 +117,8 @@ set(LAUNCHER_HEADERS
         include/widgets/LauncherLog.hpp
         include/widgets/AdvancedSettings.hpp
         include/core/wine/Shell.hpp
+        include/core/system/SystemProfile.hpp
+        include/core/wine/PrefixInspector.hpp
         include/core/QtLogSink.hpp
         include/core/Log.hpp
         include/util/Styles.hpp
@@ -113,6 +126,7 @@ set(LAUNCHER_HEADERS
         include/core/network/CourierBridge.hpp
         include/core/auth/AuthHandler.hpp
         include/util/Config.hpp
+        include/util/CredentialStore.hpp
         include/widgets/GameInstall.hpp
         include/widgets/DownloadProgress.hpp
         include/widgets/PrefixProgress.hpp
@@ -151,9 +165,15 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
         soa_network
 )
 
-target_compile_definitions(${PROJECT_NAME} PRIVATE SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE)
+target_compile_definitions(${PROJECT_NAME} PRIVATE
+        SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE
+        SOA_LAUNCHER_VERSION="${PROJECT_VERSION}"
+)
 
 if(APPLE)
+    find_library(SECURITY_FRAMEWORK Security REQUIRED)
+    target_link_libraries(${PROJECT_NAME} PRIVATE ${SECURITY_FRAMEWORK})
+
     set_target_properties(${PROJECT_NAME} PROPERTIES
             MACOSX_BUNDLE TRUE
             MACOSX_BUNDLE_BUNDLE_NAME "Story Of Alicia Launcher"

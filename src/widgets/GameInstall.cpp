@@ -13,7 +13,6 @@
 #include "core/wine/Shell.hpp"
 #include "util/Config.hpp"
 #include "core/Log.hpp"
-#include "widgets/LauncherLog.hpp"
 #include <spdlog/spdlog.h>
 
 using util::config::Config;
@@ -109,6 +108,22 @@ void GameInstall::setup_buttons()
     change_path_button->raise();
 }
 
+
+void GameInstall::set_installing(const bool value)
+{
+    installing = value;
+
+    const auto& assets = util::assets::buttons[util::assets::Button::Install];
+    const QPixmap& pixmap = value && !assets.loading.isNull() ? assets.loading : assets.normal;
+    QIcon icon;
+    icon.addPixmap(pixmap, QIcon::Normal);
+    icon.addPixmap(pixmap, QIcon::Disabled);
+    install_button->setIcon(icon);
+    install_button->setEnabled(!value);
+    change_path_button->setEnabled(!value);
+    update();
+}
+
 bool GameInstall::path_inside_prefix() const
 {
     return Config::instance().path_inside_prefix(game_path);
@@ -132,7 +147,7 @@ void GameInstall::start_install()
         return;
     }
 
-    installing = true;
+    set_installing(true);
     show_warning = false;
     update();
 
@@ -141,11 +156,19 @@ void GameInstall::start_install()
     if (!download)
     {
         download = new DownloadProgress(this);
-        connect(download, &DownloadProgress::download_finished, this, [this](bool)
+        connect(download, &DownloadProgress::download_started, this, [this]()
         {
-            installing = false;
-            if (download) download->hide();
-            update();
+            set_installing(true);
+        });
+        connect(download, &DownloadProgress::download_finished, this, [this](const bool ok)
+        {
+            set_installing(false);
+            if (ok && download)
+                download->hide();
+        });
+        connect(download, &DownloadProgress::closed, this, [this]()
+        {
+            set_installing(false);
         });
     }
 

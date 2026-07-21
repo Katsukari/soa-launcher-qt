@@ -41,5 +41,4 @@ class PrefixProgress : public util::modal_overlay::ModalOverlay
         double  target_pct  {0.0};
 
         QPushButton* close_button {};
-        QPushButton* log_button {};
 };

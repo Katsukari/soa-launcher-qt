@@ -1,5 +1,4 @@
 #include "widgets/WineSettings.hpp"
-#include "widgets/LauncherLog.hpp"
 #include "util/Assets.hpp"
 #include "util/Layout.hpp"
 #include "util/SimpleUtils.hpp"
@@ -198,11 +197,11 @@ void WineSettings::setup_wine_args_option()
     const QSize w = window()->size();
     const int y = wset::row(4);
     util::simple_utils::make_label_block(this, w, y,
-                            "WINE LAUNCH ARGUMENTS",
-                            "Extra flags passed to Wine. Leave blank if unsure.");
+                            "WINE ENVIRONMENT VARIABLES",
+                            "Space-separated KEY=VALUE entries, for example WINEDEBUG=-all.");
 
     auto* field = new QLineEdit(this);
-    field->setPlaceholderText("e.g. WINEDEBUG=-all");
+    field->setPlaceholderText("WINEDEBUG=-all WINEESYNC=1");
     field->setStyleSheet(util::styles::k_field);
     field->setGeometry(ls::ctrl_pos(w, y).x(), ls::ctrl_pos(w, y).y(),
                        ls::ctrl_w(w), util::layout::scaled(34, w));

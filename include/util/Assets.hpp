@@ -1,13 +1,8 @@
 #pragma once
 
-#include <QPixmap>
-#include <optional>
-#include <QString>
-#include <QFontDatabase>
-#include <QPixmap>
 #include <QFont>
+#include <QPixmap>
 #include <unordered_map>
-#include "spdlog/spdlog.h"
 
 namespace util::assets
 {
@@ -51,6 +46,7 @@ namespace util::assets
         VersionIconPlaytest,
         VersionIconAlicia2,
         SettingsButton,
+        Count
     };
 
     enum class Button
@@ -67,7 +63,8 @@ namespace util::assets
         Repair,
         Settings,
         SliderOn,
-        SliderOff
+        SliderOff,
+        Count
     };
 
     enum class Font
@@ -79,7 +76,8 @@ namespace util::assets
         Inter,
         NanumRegular,
         NanumBold,
-        NanumExtraBold
+        NanumExtraBold,
+        Count
     };
 
     struct ButtonAsset

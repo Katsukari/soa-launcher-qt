@@ -1,8 +1,19 @@
 #include <QApplication>
+#include <QCryptographicHash>
+#include <QDataStream>
+#include <QDir>
 #include <QFileOpenEvent>
-#include <utility>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QLocalServer>
 #include <QLocalSocket>
+#include <QLockFile>
+#include <QStandardPaths>
+#include <QThread>
+#include <QTimer>
+#include <QUrl>
+
+#include <utility>
 
 #include "MainWindow.hpp"
 #include "core/Log.hpp"
@@ -13,98 +24,187 @@
 
 #include <spdlog/spdlog.h>
 
+#ifndef SOA_LAUNCHER_VERSION
+#define SOA_LAUNCHER_VERSION "0.1.0"
+#endif
+
 namespace
 {
-    const char* k_instance_key = "soa_launcher";
+    constexpr quint32 k_max_ipc_payload = 64 * 1024;
+
+    bool is_auth_url(const QString& value)
+    {
+        const QUrl url(value, QUrl::StrictMode);
+        return url.isValid()
+            && url.scheme().compare(QStringLiteral("soa"), Qt::CaseInsensitive) == 0
+            && url.host().compare(QStringLiteral("launcher"), Qt::CaseInsensitive) == 0;
+    }
 
     QString soa_url_from_args(const QStringList& args)
     {
         for (const QString& arg : args)
         {
-            if (arg.startsWith("soa://"))
+            if (is_auth_url(arg))
                 return arg;
         }
-
         return {};
+    }
+
+    QString instance_suffix()
+    {
+        const QByteArray identity = (QDir::homePath() + QLatin1Char('|')
+            + QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)).toUtf8();
+        return QString::fromLatin1(
+            QCryptographicHash::hash(identity, QCryptographicHash::Sha256).toHex().left(16));
+    }
+
+    QString instance_key()
+    {
+        return QStringLiteral("soa_launcher_") + instance_suffix();
+    }
+
+    QString lock_path()
+    {
+        QString directory = QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation);
+        if (directory.isEmpty())
+            directory = QDir::tempPath();
+        directory = QDir(directory).filePath(QStringLiteral("story-of-alicia-launcher"));
+        QDir().mkpath(directory);
+        return QDir(directory).filePath(QStringLiteral("instance-") + instance_suffix() + QStringLiteral(".lock"));
+    }
+
+    QByteArray make_frame(const QString& url)
+    {
+        QJsonObject command {
+            {QStringLiteral("version"), 1},
+            {QStringLiteral("command"), QStringLiteral("activate")},
+            {QStringLiteral("url"), is_auth_url(url) ? url : QString()}
+        };
+        const QByteArray payload = QJsonDocument(command).toJson(QJsonDocument::Compact);
+        QByteArray frame;
+        QDataStream stream(&frame, QIODevice::WriteOnly);
+        stream.setByteOrder(QDataStream::BigEndian);
+        stream << static_cast<quint32>(payload.size());
+        frame.append(payload);
+        return frame;
+    }
+
+    bool forward_to_existing(const QString& key, const QString& url, const int timeout_ms)
+    {
+        QLocalSocket socket;
+        socket.connectToServer(key, QIODevice::WriteOnly);
+        if (!socket.waitForConnected(timeout_ms))
+            return false;
+
+        const QByteArray frame = make_frame(url);
+        if (socket.write(frame) != frame.size())
+            return false;
+        socket.flush();
+        const bool written = socket.waitForBytesWritten(timeout_ms);
+        socket.disconnectFromServer();
+        return written;
     }
 
     class LauncherApplication final : public QApplication
     {
         Q_OBJECT
 
-        public:
-            LauncherApplication(int& argc, char** argv)
-                : QApplication(argc, argv)
-            {
-            }
+    public:
+        LauncherApplication(int& argc, char** argv) : QApplication(argc, argv) {}
 
-            QString take_pending_url()
-            {
-                return std::exchange(pending_url, {});
-            }
+        QString take_pending_url()
+        {
+            return std::exchange(pending_url, {});
+        }
 
-        signals:
-            void soa_url_opened(const QString& url);
+    signals:
+        void soa_url_opened(const QString& url);
 
-        protected:
-            bool event(QEvent* event) override
-            {
-                if (event->type() != QEvent::FileOpen)
-                    return QApplication::event(event);
+    protected:
+        bool event(QEvent* event) override
+        {
+            if (event->type() != QEvent::FileOpen)
+                return QApplication::event(event);
 
-                const auto* open_event = static_cast<QFileOpenEvent*>(event);
-                const QString url = open_event->url().toString();
-                if (!url.startsWith("soa://"))
-                    return QApplication::event(event);
+            const auto* open_event = static_cast<QFileOpenEvent*>(event);
+            const QString url = open_event->url().toString();
+            if (!is_auth_url(url))
+                return QApplication::event(event);
 
-                pending_url = url;
-                emit soa_url_opened(url);
-                return true;
-            }
+            pending_url = url;
+            emit soa_url_opened(url);
+            return true;
+        }
 
-        private:
-            QString pending_url;
+    private:
+        QString pending_url;
     };
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     LauncherApplication app(argc, argv);
+    app.setApplicationName(QStringLiteral("Story Of Alicia Launcher"));
+    app.setApplicationVersion(QString::fromLatin1(SOA_LAUNCHER_VERSION));
+    app.setOrganizationName(QStringLiteral("Story Of Alicia"));
+    app.setOrganizationDomain(QStringLiteral("storyofalicia.com"));
+    app.setStyleSheet(QStringLiteral(
+        "QPushButton:focus { outline: none; }"
+        "QToolButton:focus { outline: none; }"
+        "QCheckBox:focus { outline: none; }"
+        "QRadioButton:focus { outline: none; }"));
 
     QString url = soa_url_from_args(app.arguments());
     if (url.isEmpty())
         url = app.take_pending_url();
 
-    QLocalSocket probe;
-    probe.connectToServer(k_instance_key);
-    if (probe.waitForConnected(200))
-    {
-        probe.write(url.toUtf8());
-        probe.flush();
-        probe.waitForBytesWritten(200);
-        probe.disconnectFromServer();
+    const QString server_key = instance_key();
+    if (forward_to_existing(server_key, url, 350))
         return 0;
+
+    QLockFile instance_lock(lock_path());
+    instance_lock.setStaleLockTime(0);
+    if (!instance_lock.tryLock(0))
+    {
+        // The primary may still be between taking the lock and opening its socket.
+        for (int attempt = 0; attempt < 20; ++attempt)
+        {
+            QThread::msleep(100);
+            if (forward_to_existing(server_key, url, 250))
+                return 0;
+        }
+        return 1;
     }
 
     core::log::init();
     LauncherLog::instance();
     SPDLOG_INFO("Running Story Of Alicia for Linux and macOS");
-    SPDLOG_INFO("Version: 0.1.0");
+    SPDLOG_INFO("Version: {}", SOA_LAUNCHER_VERSION);
     util::assets::load_all();
-    SPDLOG_DEBUG("loaded all assets successfully!");
+    SPDLOG_DEBUG("loaded all assets successfully");
     soa_ping();
 
-    QLocalServer::removeServer(k_instance_key);
+    QLocalServer::removeServer(server_key);
     QLocalServer server;
-    if (!server.listen(k_instance_key))
-        SPDLOG_WARN("single-instance server failed to listen: {}", server.errorString().toStdString());
+    if (!server.listen(server_key))
+    {
+        SPDLOG_ERROR("single-instance server failed to listen: {}", server.errorString().toStdString());
+        return 1;
+    }
 
     MainWindow window;
     window.show();
 
-    const auto handle_url = [&window](const QString& incoming)
+    const auto handle_command = [&window](const QJsonObject& command)
     {
-        if (incoming.startsWith("soa://"))
+        if (command.value(QStringLiteral("version")).toInt() != 1
+            || command.value(QStringLiteral("command")).toString() != QStringLiteral("activate"))
+        {
+            return;
+        }
+
+        const QString incoming = command.value(QStringLiteral("url")).toString();
+        if (is_auth_url(incoming))
             window.auth_handler()->handle_url(incoming);
 
         window.setWindowState((window.windowState() & ~Qt::WindowMinimized) | Qt::WindowActive);
@@ -113,23 +213,78 @@ int main(int argc, char *argv[])
         window.activateWindow();
     };
 
-    QObject::connect(&app, &LauncherApplication::soa_url_opened, &window, handle_url);
-
-    QObject::connect(&server, &QLocalServer::newConnection, &window, [&server, handle_url]()
+    QObject::connect(&app, &LauncherApplication::soa_url_opened, &window,
+                     [&handle_command](const QString& incoming)
     {
-        QLocalSocket* client = server.nextPendingConnection();
-        if (!client)
-            return;
-
-        QObject::connect(client, &QLocalSocket::readyRead, client, [client, handle_url]()
-        {
-            handle_url(QString::fromUtf8(client->readAll()));
-            client->deleteLater();
+        handle_command(QJsonObject{
+            {QStringLiteral("version"), 1},
+            {QStringLiteral("command"), QStringLiteral("activate")},
+            {QStringLiteral("url"), incoming}
         });
     });
 
+    QObject::connect(&server, &QLocalServer::newConnection, &window,
+                     [&server, &handle_command]()
+    {
+        while (QLocalSocket* client = server.nextPendingConnection())
+        {
+            client->setProperty("soa_buffer", QByteArray{});
+            const auto consume = [client, &handle_command]()
+            {
+                QByteArray buffer = client->property("soa_buffer").toByteArray();
+                buffer.append(client->readAll());
+
+                while (buffer.size() >= static_cast<int>(sizeof(quint32)))
+                {
+                    QByteArray header = buffer.left(static_cast<int>(sizeof(quint32)));
+                    QDataStream stream(&header, QIODevice::ReadOnly);
+                    stream.setByteOrder(QDataStream::BigEndian);
+                    quint32 length = 0;
+                    stream >> length;
+                    if (length == 0 || length > k_max_ipc_payload)
+                    {
+                        client->disconnectFromServer();
+                        buffer.clear();
+                        break;
+                    }
+                    const int frame_size = static_cast<int>(sizeof(quint32) + length);
+                    if (buffer.size() < frame_size)
+                        break;
+
+                    const QByteArray payload = buffer.mid(static_cast<int>(sizeof(quint32)),
+                                                          static_cast<int>(length));
+                    buffer.remove(0, frame_size);
+                    QJsonParseError error;
+                    const QJsonDocument document = QJsonDocument::fromJson(payload, &error);
+                    if (error.error == QJsonParseError::NoError && document.isObject())
+                        handle_command(document.object());
+                }
+                client->setProperty("soa_buffer", buffer);
+            };
+
+            QObject::connect(client, &QLocalSocket::readyRead, client, consume);
+            QObject::connect(client, &QLocalSocket::disconnected, client, &QObject::deleteLater);
+            QTimer::singleShot(5000, client, [client]()
+            {
+                if (client->state() != QLocalSocket::UnconnectedState)
+                    client->disconnectFromServer();
+            });
+            if (client->bytesAvailable() > 0)
+                consume();
+        }
+    });
+
     if (!url.isEmpty())
-        handle_url(url);
+    {
+        QTimer::singleShot(0, &window, [&handle_command, url]()
+        {
+            handle_command(QJsonObject{
+                {QStringLiteral("version"), 1},
+                {QStringLiteral("command"), QStringLiteral("activate")},
+                {QStringLiteral("url"), url}
+            });
+        });
+    }
 
     return QApplication::exec();
 }

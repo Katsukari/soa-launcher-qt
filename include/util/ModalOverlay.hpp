@@ -11,23 +11,21 @@ namespace util::modal_overlay
         public:
         explicit ModalOverlay(QWidget * parent = nullptr);
 
-        void show_over(QWidget* background);   // grab -> blur -> show -> raise
+        void show_over(QWidget* background);
         [[nodiscard]] bool keeps_chrome() const { return keep_chrome; }
 
         signals:
             void closed();
 
     protected:
-        // Subclass draws its box + contents here. Called AFTER the blurred backdrop
-        // (and frames, if kept) are already painted.
         virtual void paint_content(QPainter& painter) = 0;
         void set_keeps_chrome(const bool v) { keep_chrome = v; }
-        void paintEvent(QPaintEvent* event) override;   // paints backdrop, then calls paint_content
+        void paintEvent(QPaintEvent* event) override;
 
     private:
-        void paint_frames(QPainter& painter) const;   // left/right frame + PT/lock, sharp
+        void paint_frames(QPainter& painter) const;
 
         QPixmap blurred_bg;
-        bool    keep_chrome {true};   // default = modal over live launcher (keeps frames/icons/chrome)
+        bool    keep_chrome {true};
     };
 }

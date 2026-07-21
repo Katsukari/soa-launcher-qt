@@ -22,9 +22,26 @@ BUILD_DIR="build-appimage"
 APPDIR="AppDir"
 
 # --- 1. Build (Release, Ninja - Swift needs Ninja). Source is the repo root. ---
+# Force the Qt deployment plugin to inspect the same Qt major version used by
+# the application. Arch/CachyOS commonly exposes Qt 5 as qmake-qt5 and Qt 6 as
+# qmake6, and linuxdeploy-plugin-qt otherwise may select the wrong one.
+if [ -z "${QMAKE:-}" ]; then
+  QMAKE="$(command -v qmake6 || true)"
+fi
+if [ -z "$QMAKE" ] || [ ! -x "$QMAKE" ]; then
+  echo "Could not find a Qt 6 qmake executable. Set QMAKE=/path/to/qmake6." >&2
+  exit 1
+fi
+export QMAKE
+
 cmake -S "$PROJECT_ROOT" -B "$BUILD_DIR" -G Ninja \
       -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF
-cmake --build "$BUILD_DIR"
+
+# Patch archives can preserve source mtimes that are older than objects already
+# present in build-appimage/. A normal incremental Ninja build can then retain a
+# stale executable. AppImage builds are release artifacts, so rebuild from clean
+# objects every time.
+cmake --build "$BUILD_DIR" --clean-first
 
 # --- 2. Install into a clean AppDir ---
 rm -rf "$APPDIR"

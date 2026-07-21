@@ -139,15 +139,15 @@ namespace util::layout
 
         inline constexpr QSize k_discord_icon   {24, 24};
         inline constexpr QRect k_discord_button  {104, 100, 432, 56};
-        inline constexpr QRect k_disclaimer      {105, 174, 430, 102};
+        inline constexpr QRect k_keep_signed_in  {104, 173, 230, 22};
+        inline constexpr QRect k_disclaimer      {105, 202, 430, 94};
 
         inline constexpr QRect k_waiting_title {0, 100, k_box.width(), 28};
         inline constexpr QRect k_steps         {85, 148, 470, 121};
+        inline constexpr QRect k_try_again     {0, 270, k_box.width(), 22};
 
-        inline constexpr QRect k_check_bugs       {100, 88,  440, 24};
-        inline constexpr QRect k_check_rules      {100, 116, 440, 24};
-        inline constexpr QRect k_signed_in_banner {105, 148, 430, 48};
-        inline constexpr QRect k_enter_button     {104, 209, 432, 67};
+        inline constexpr QRect k_signed_in_banner {105, 104, 430, 48};
+        inline constexpr QRect k_enter_button     {104, 174, 432, 67};
 
         QRect  rect(QSize win);
         QPoint pos(QSize win);
@@ -163,13 +163,13 @@ namespace util::layout
 
         QSize  discord_icon(QSize win);
         QRect  discord_button(QSize win);
+        QRect  keep_signed_in(QSize win);
         QRect  disclaimer(QSize win);
 
         QRect  waiting_title(QSize win);
         QRect  steps(QSize win);
+        QRect  try_again(QSize win);
 
-        QRect  check_bugs(QSize win);
-        QRect  check_rules(QSize win);
         QRect  signed_in_banner(QSize win);
         QRect  enter_button(QSize win);
     }
@@ -356,8 +356,8 @@ namespace util::layout
         inline constexpr int   k_info_y      = 74;
         inline constexpr int   k_info_h      = 18;
         inline constexpr int   k_bar_y       = 100;
-        inline constexpr int   k_bar_h       = 14;
-        inline constexpr int   k_under_y     = 124;
+        inline constexpr int   k_bar_h       = 19;
+        inline constexpr int   k_under_y     = 129;
         inline constexpr int   k_under_h     = 20;
 
         inline constexpr QRect k_rect = center_in_region(k_box, 0, k_margin_top);
@@ -383,6 +383,6 @@ namespace util::layout
         QRect info_row(QSize win);
         QRect bar_rect(QSize win);
         QRect under_row(QSize win);
-        QRect log_button(QSize win);
+        QRect retry_button(QSize win);
     }
 }

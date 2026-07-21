@@ -7,7 +7,8 @@ namespace core::network
 {
     struct DownloadStatus
     {
-        status::Status base;
+        qulonglong           operation_id {0};
+        status::Status       base;
         courier_phase        phase      {courier_phase_preparing};
         qulonglong           received   {0};
         qulonglong           total      {0};

@@ -1,4 +1,6 @@
 #include "util/Assets.hpp"
+#include <spdlog/spdlog.h>
+#include <QFontDatabase>
 
 namespace util::assets
 {
@@ -80,7 +82,7 @@ namespace util::assets
             {Button::Install,        "btn-install-normal.png",         "btn-install-hover.png",         "btn-install-clicked.png",         "btn-install-loading.png"},
             {Button::RunCheck,       "btn-run-check-normal.png",       "btn-run-check-hover.png",       "btn-run-check-clicked.png",       "btn-run-check-loading.png"},
             {Button::UpdateAvailable,"btn-update-available.png",       "btn-update-available-hover.png", "btn-update-available-clicked.png", ""},
-            {Button::Update,         "update-hover.png",               "update-hover.png",              "update-clicked.png",              ""},
+            {Button::Update,         "btn-update.png",                  "update-hover.png",              "update-clicked.png",              ""},
             {Button::Repair,         "btn-repair.png",                 "btn-repair-hover.png",          "btn-repair-clicked.png",          ""},
             {Button::Settings,       "Settings Button.png",            "",                              "",                                ""},
             {Button::SliderOn,       "slider-toggle-on.png",           "",                              "",                                ""},
@@ -141,5 +143,33 @@ namespace util::assets
         load_images();
         load_buttons();
         load_fonts();
+
+        for (int value = 0; value < static_cast<int>(Image::Count); ++value)
+        {
+            const auto key = static_cast<Image>(value);
+            if (!images.contains(key))
+            {
+                spdlog::error("Required image asset {} was not loaded", value);
+                images.emplace(key, QPixmap{});
+            }
+        }
+        for (int value = 0; value < static_cast<int>(Button::Count); ++value)
+        {
+            const auto key = static_cast<Button>(value);
+            if (!buttons.contains(key))
+            {
+                spdlog::error("Required button asset {} was not loaded", value);
+                buttons.emplace(key, ButtonAsset{});
+            }
+        }
+        for (int value = 0; value < static_cast<int>(Font::Count); ++value)
+        {
+            const auto key = static_cast<Font>(value);
+            if (!fonts.contains(key))
+            {
+                spdlog::error("Required font asset {} was not loaded; using the system font", value);
+                fonts.emplace(key, QFont{});
+            }
+        }
     }
 }

@@ -1,6 +1,10 @@
 #pragma once
 
 #include <QObject>
+#include <QString>
+
+#include "core/network/Courier.h"
+#include "core/network/DownloadStatus.hpp"
 #include "core/state/Stage.hpp"
 #include "core/status/Status.hpp"
 
@@ -10,41 +14,66 @@ namespace core::state
     {
         Q_OBJECT
 
-        public:
-            explicit InstallState(QObject* parent = nullptr);
+    public:
+        explicit InstallState(QObject* parent = nullptr);
+        ~InstallState() override;
 
-            Stage stage() const { return current; }
+        [[nodiscard]] Stage stage() const { return current; }
+        [[nodiscard]] QString error_message() const { return last_error; }
+        [[nodiscard]] QString warning_message() const { return last_warning; }
 
-            void probe();
+        void probe();
+        void dismiss_error();
+        void clear_warning();
 
-            void set_prefix_exists(bool v);
-            void set_prefix_ready(bool v);
-            void set_game_installed(bool v);
-            void set_update_needed(bool v);
-            void set_authed(bool v);
-            void set_broken(bool v);
+        void set_prefix_exists(bool value);
+        void set_prefix_ready(bool value);
+        void set_game_installed(bool value);
+        void set_update_needed(bool value);
+        void set_authed(bool value);
+        void set_broken(bool value);
 
-            signals:
-                void stage_changed(core::state::Stage now);
+    signals:
+        void stage_changed(core::state::Stage now);
+        void error_changed(const QString& message);
+        void warning_changed(const QString& message);
 
-        private:
-            void on_reporter_changed(const QString& name, const status::Status& s);
-            void recompute();
-            Stage compute() const;
+    private:
+        void on_reporter_changed(const QString& name, const status::Status& status);
+        void on_courier_status(const core::network::DownloadStatus& status);
+        void set_error(const QString& message);
+        void set_warning(const QString& message);
+        void recompute();
+        Stage compute() const;
+        void start_update_check_if_needed();
+        QString current_update_key() const;
+        void cancel_update_check();
 
-            bool probed         {false};
-            bool broken         {false};
-            bool runtime_chosen {false};
-            bool prefix_exists  {false};
-            bool prefix_ready   {false};
-            bool game_installed {false};
-            bool update_needed  {false};
-            bool authed         {false};
+        bool probed {};
+        bool prerequisites_confirmed {};
+        bool rules_accepted {};
+        bool broken {};
+        bool runtime_chosen {};
+        bool prefix_exists {};
+        bool prefix_ready {};
+        bool game_installed {};
+        bool update_needed {};
+        bool authed {};
+        bool courier_working {};
+        bool update_check_in_progress {};
+        bool update_check_complete {};
 
-            core::status::State wine_state    {status::State::Idle};
-            core::status::State courier_state {status::State::Idle};
-            core::status::State auth_state    {status::State::Idle};
+        core::status::State wine_state {status::State::Idle};
+        core::status::State auth_state {status::State::Idle};
+        QString wine_phase;
+        QString auth_phase;
+        QString last_error;
+        QString last_warning;
+        QString checked_update_key;
 
-            Stage current {Stage::Probing};
+        courier* update_checker {};
+        qulonglong update_operation_id {};
+
+        Stage current {Stage::Probing};
     };
 }
