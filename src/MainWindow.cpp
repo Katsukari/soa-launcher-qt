@@ -1,6 +1,7 @@
 #include "MainWindow.hpp"
 
 #include "core/auth/AuthHandler.hpp"
+#include "core/integrity/GameIntegrityWatcher.hpp"
 #include "core/state/InstallState.hpp"
 #include "core/state/ViewRouter.hpp"
 #include "core/wine/Shell.hpp"
@@ -104,6 +105,7 @@ MainWindow::MainWindow(QWidget* parent)
     setup_prerequisites();
     setup_rules();
     setup_repair_files();
+    setup_integrity_watcher();
     setup_game_selector();
     setup_wine_install();
     setup_game_install();
@@ -267,6 +269,9 @@ void MainWindow::setup_repair_files()
         close_overlay(repair_files);
 
         repair_active = true;
+        repair_files->set_detected_changes({});
+        if (integrity_watcher)
+            integrity_watcher->set_suspended(true);
         set_game_switching_enabled(install_state->stage());
 
         if (!repair_progress)
@@ -279,6 +284,8 @@ void MainWindow::setup_repair_files()
 
                 repair_active = false;
                 close_overlay(repair_progress);
+                if (integrity_watcher)
+                    integrity_watcher->set_suspended(false);
                 install_state->probe();
                 last_view = View::Loading;
                 on_stage_changed(install_state->stage());
@@ -288,6 +295,8 @@ void MainWindow::setup_repair_files()
             connect(repair_progress, &DownloadProgress::closed, this, [this]()
             {
                 repair_active = false;
+                if (integrity_watcher)
+                    integrity_watcher->set_suspended(false);
                 on_overlay_closed(repair_progress);
                 last_view = View::Loading;
                 on_stage_changed(install_state->stage());
@@ -296,6 +305,36 @@ void MainWindow::setup_repair_files()
 
         open_overlay(repair_progress);
     });
+}
+
+
+void MainWindow::setup_integrity_watcher()
+{
+    integrity_watcher = new core::integrity::GameIntegrityWatcher(this);
+    connect(integrity_watcher, &core::integrity::GameIntegrityWatcher::protected_files_changed,
+            this, [this](const core::game::GameVersion version, const QStringList& paths)
+    {
+        if (repair_active || (repair_files && repair_files->isVisible())
+            || (repair_progress && repair_progress->isVisible()))
+        {
+            return;
+        }
+
+        close_overlay(settings);
+        close_overlay(prerequisites_intro);
+        close_overlay(rules_agreement);
+        close_overlay(wine_select);
+        close_overlay(wine_install);
+        close_overlay(game_install);
+        set_game_version(version);
+        repair_files->set_game_version(version);
+        repair_files->set_detected_changes(paths);
+        open_overlay(repair_files);
+        showNormal();
+        raise();
+        activateWindow();
+    });
+    integrity_watcher->refresh();
 }
 
 void MainWindow::setup_alicia_chooser()
@@ -489,6 +528,14 @@ void MainWindow::open_for_current_stage()
 void MainWindow::on_stage_changed(const Stage stage)
 {
     set_game_switching_enabled(stage);
+
+    if (integrity_watcher)
+    {
+        const bool files_changing = repair_active
+            || stage == Stage::Downloading
+            || stage == Stage::Updating;
+        integrity_watcher->set_suspended(files_changing);
+    }
 
     if (repair_active && repair_progress && repair_progress->isVisible())
         return;

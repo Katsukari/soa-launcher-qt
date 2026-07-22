@@ -1,7 +1,5 @@
 cmake_minimum_required(VERSION 3.21.1)
 
-
-
 if(CMAKE_HOST_APPLE AND NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
     set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum supported macOS version")
 endif()
@@ -15,8 +13,6 @@ project(soa_launcher
 if(NOT APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
     message(FATAL_ERROR "soa_launcher currently supports Linux and macOS only")
 endif()
-
-
 
 if(NOT CMAKE_GENERATOR MATCHES "^Ninja" AND NOT CMAKE_GENERATOR STREQUAL "Xcode")
     message(FATAL_ERROR "The Swift Courier library requires the Ninja or Xcode generator")
@@ -32,6 +28,17 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
 option(BUILD_TESTS "Build tests" ON)
+
+set(SOA_PORTABLE_CXX_OPTIONS)
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux"
+        AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$"
+        AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    list(APPEND SOA_PORTABLE_CXX_OPTIONS
+            -march=x86-64
+            -mtune=generic
+    )
+endif()
 
 set(SOA_QT_COMPONENTS
         Core
@@ -50,13 +57,21 @@ find_package(Qt6 REQUIRED COMPONENTS ${SOA_QT_COMPONENTS})
 list(TRANSFORM SOA_QT_COMPONENTS PREPEND Qt6:: OUTPUT_VARIABLE SOA_QT_LIBS)
 
 include(FetchContent)
+
 FetchContent_Declare(
         spdlog
         GIT_REPOSITORY https://github.com/gabime/spdlog.git
-        GIT_TAG        v1.16.0
-        GIT_SHALLOW    TRUE
+        GIT_TAG v1.16.0
+        GIT_SHALLOW TRUE
 )
+
 FetchContent_MakeAvailable(spdlog)
+
+if(SOA_PORTABLE_CXX_OPTIONS AND TARGET spdlog)
+    target_compile_options(spdlog PRIVATE
+            ${SOA_PORTABLE_CXX_OPTIONS}
+    )
+endif()
 
 add_library(soa_network SHARED
         src/core/network/Courier.swift
@@ -74,9 +89,10 @@ add_library(soa_network SHARED
 target_compile_options(soa_network PRIVATE
         "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xcc -fmodule-map-file=${CMAKE_CURRENT_SOURCE_DIR}/src/core/network/module.modulemap>"
 )
-target_include_directories(soa_network PRIVATE include)
 
-
+target_include_directories(soa_network PRIVATE
+        include
+)
 
 set_target_properties(soa_network PROPERTIES
         AUTOMOC OFF
@@ -106,6 +122,7 @@ set(LAUNCHER_SOURCES
         src/core/Log.cpp
         src/core/wine/Shell.cpp
         src/core/system/SystemProfile.cpp
+        src/core/integrity/GameIntegrityWatcher.cpp
         src/core/wine/PrefixInspector.cpp
         src/core/network/Courier.cpp
         src/core/auth/AuthHandler.cpp
@@ -142,6 +159,7 @@ set(LAUNCHER_HEADERS
         include/widgets/AdvancedSettings.hpp
         include/core/wine/Shell.hpp
         include/core/system/SystemProfile.hpp
+        include/core/integrity/GameIntegrityWatcher.hpp
         include/core/wine/PrefixInspector.hpp
         include/core/QtLogSink.hpp
         include/core/Log.hpp
@@ -170,12 +188,17 @@ set(LAUNCHER_HEADERS
 )
 
 set(SOA_PLATFORM_RESOURCES)
+
 if(APPLE)
     set(SOA_MACOS_ICON "${CMAKE_CURRENT_SOURCE_DIR}/packaging/macos/soa-launcher.icns")
+
     set_source_files_properties(${SOA_MACOS_ICON} PROPERTIES
             MACOSX_PACKAGE_LOCATION "Resources"
     )
-    list(APPEND SOA_PLATFORM_RESOURCES ${SOA_MACOS_ICON})
+
+    list(APPEND SOA_PLATFORM_RESOURCES
+            ${SOA_MACOS_ICON}
+    )
 endif()
 
 qt_add_executable(${PROJECT_NAME}
@@ -185,13 +208,25 @@ qt_add_executable(${PROJECT_NAME}
         ${SOA_PLATFORM_RESOURCES}
 )
 
-target_include_directories(${PROJECT_NAME} PRIVATE ${SOA_INCLUDE_DIRS})
+target_include_directories(${PROJECT_NAME} PRIVATE
+        ${SOA_INCLUDE_DIRS}
+)
+
+if(SOA_PORTABLE_CXX_OPTIONS)
+    target_compile_options(${PROJECT_NAME} PRIVATE
+            ${SOA_PORTABLE_CXX_OPTIONS}
+    )
+endif()
+
 target_link_libraries(${PROJECT_NAME} PRIVATE
         ${SOA_QT_LIBS}
         spdlog::spdlog
         soa_network
 )
-set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE CXX)
+
+set_target_properties(${PROJECT_NAME} PROPERTIES
+        LINKER_LANGUAGE CXX
+)
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE
         SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE
@@ -202,10 +237,10 @@ include(GNUInstallDirs)
 
 if(APPLE)
     find_library(SECURITY_FRAMEWORK Security REQUIRED)
-    target_link_libraries(${PROJECT_NAME} PRIVATE ${SECURITY_FRAMEWORK})
 
-
-
+    target_link_libraries(${PROJECT_NAME} PRIVATE
+            ${SECURITY_FRAMEWORK}
+    )
 
     set_target_properties(soa_network PROPERTIES
             MACOSX_RPATH TRUE
@@ -225,14 +260,12 @@ if(APPLE)
             INSTALL_RPATH "@executable_path/../Frameworks"
     )
 
-
-
     add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E make_directory
-                    "$<TARGET_BUNDLE_DIR:${PROJECT_NAME}>/Contents/Frameworks"
+            "$<TARGET_BUNDLE_DIR:${PROJECT_NAME}>/Contents/Frameworks"
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    "$<TARGET_FILE:soa_network>"
-                    "$<TARGET_BUNDLE_DIR:${PROJECT_NAME}>/Contents/Frameworks/$<TARGET_FILE_NAME:soa_network>"
+            "$<TARGET_FILE:soa_network>"
+            "$<TARGET_BUNDLE_DIR:${PROJECT_NAME}>/Contents/Frameworks/$<TARGET_FILE_NAME:soa_network>"
             VERBATIM
     )
 else()
@@ -242,7 +275,7 @@ else()
 endif()
 
 install(TARGETS ${PROJECT_NAME}
-        BUNDLE  DESTINATION .
+        BUNDLE DESTINATION .
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
@@ -250,10 +283,14 @@ if(NOT APPLE)
     install(TARGETS soa_network
             LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
+
     install(FILES packaging/soa-launcher.desktop
-            DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
+    )
+
     install(FILES packaging/soa-launcher.png
-            DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps)
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps
+    )
 endif()
 
 set(CPACK_PACKAGE_NAME "Story Of Alicia Launcher")
@@ -270,10 +307,23 @@ endif()
 
 if(BUILD_TESTS)
     enable_testing()
+
     find_package(Qt6 REQUIRED COMPONENTS Test)
 
-    qt_add_executable(launcher_tests tests/main.cpp)
-    target_include_directories(launcher_tests PRIVATE ${SOA_INCLUDE_DIRS})
+    qt_add_executable(launcher_tests
+            tests/main.cpp
+    )
+
+    target_include_directories(launcher_tests PRIVATE
+            ${SOA_INCLUDE_DIRS}
+    )
+
+    if(SOA_PORTABLE_CXX_OPTIONS)
+        target_compile_options(launcher_tests PRIVATE
+                ${SOA_PORTABLE_CXX_OPTIONS}
+        )
+    endif()
+
     target_link_libraries(launcher_tests PRIVATE
             Qt6::Core
             Qt6::Gui
@@ -281,7 +331,17 @@ if(BUILD_TESTS)
             Qt6::Test
             spdlog::spdlog
     )
-    set_target_properties(launcher_tests PROPERTIES LINKER_LANGUAGE CXX)
-    target_compile_definitions(launcher_tests PRIVATE SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE)
-    add_test(NAME launcher_tests COMMAND launcher_tests)
+
+    set_target_properties(launcher_tests PROPERTIES
+            LINKER_LANGUAGE CXX
+    )
+
+    target_compile_definitions(launcher_tests PRIVATE
+            SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE
+    )
+
+    add_test(
+            NAME launcher_tests
+            COMMAND launcher_tests
+    )
 endif()

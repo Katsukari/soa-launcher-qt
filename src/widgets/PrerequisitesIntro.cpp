@@ -16,7 +16,7 @@
 
 namespace
 {
-    constexpr QSize k_box_size {620, 300};
+    constexpr QSize k_box_size {660, 350};
 
     QRect box_rect(const QSize window_size)
     {
@@ -29,14 +29,14 @@ namespace
     }
 
     const char* k_recommendation_style =
-        "QLabel { background:rgba(255,255,255,0.68); border:1px solid rgba(201,187,170,190);"
-        " border-radius:8px; color:#392518; font-family:'Inter'; font-size:13px;"
-        " padding:12px 18px; }";
+        "QLabel { background:rgba(255,255,255,0.76); border:1px solid rgba(201,187,170,205);"
+        " border-radius:10px; color:#392518; font-family:'Inter'; font-size:14px;"
+        " padding:22px 24px 14px 24px; }";
 
     const char* k_error_style =
-        "QLabel { background:rgba(255,245,242,0.88); border:1px solid rgba(192,111,91,190);"
-        " border-radius:8px; color:#7F2929; font-family:'Inter'; font-size:13px;"
-        " padding:12px 18px; }";
+        "QLabel { background:rgba(255,245,242,0.94); border:1px solid rgba(192,111,91,205);"
+        " border-radius:10px; color:#7F2929; font-family:'Inter'; font-size:14px;"
+        " padding:22px 24px 14px 24px; }";
 
     const char* k_primary_style =
         "QPushButton { background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #54D8FF,stop:1 #08A9D8);"
@@ -48,10 +48,10 @@ namespace
         "QPushButton:focus { outline:none; }";
 
     const char* k_secondary_style =
-        "QPushButton { background:rgba(255,255,255,0.64); border:1px solid #C9BBAA;"
+        "QPushButton { background:rgba(255,255,255,0.72); border:1px solid #C9BBAA;"
         " border-radius:6px; color:#4F1717; font-family:'Eurostile'; font-weight:900;"
         " font-size:13px; outline:none; }"
-        "QPushButton:hover { border-color:#2FB4E0; background:rgba(255,255,255,0.86); }"
+        "QPushButton:hover { border-color:#2FB4E0; background:rgba(255,255,255,0.94); }"
         "QPushButton:pressed { background:#EAF7FC; }"
         "QPushButton:focus { outline:none; }";
 
@@ -61,6 +61,7 @@ namespace
         if (runtime.type == core::wine::RuntimeType::Wine)
         {
             if (name == QStringLiteral("system wine")) return 10000;
+            if (name.contains(QStringLiteral("cachyos"))) return 9000;
             return 8000;
         }
 
@@ -88,8 +89,8 @@ namespace
             score = 8000;
         }
 
-        const QRegularExpression version_pattern(QStringLiteral(R"((\d+)(?:\.(\d+))?)"));
-        const QRegularExpressionMatch match = version_pattern.match(name);
+        const QRegularExpression pattern(QStringLiteral(R"((\d+)(?:\.(\d+))?)"));
+        const QRegularExpressionMatch match = pattern.match(name);
         if (match.hasMatch())
             score += match.captured(1).toInt() * 100 + match.captured(2).toInt();
         return score;
@@ -97,13 +98,10 @@ namespace
 
     QString joined_requirements(const QStringList& requirements)
     {
-        if (requirements.isEmpty())
-            return {};
-        if (requirements.size() == 1)
-            return requirements.front();
+        if (requirements.isEmpty()) return {};
+        if (requirements.size() == 1) return requirements.front();
         if (requirements.size() == 2)
             return requirements.front() + QStringLiteral(" and ") + requirements.back();
-
         QStringList leading = requirements;
         const QString last = leading.takeLast();
         return leading.join(QStringLiteral(", ")) + QStringLiteral(", and ") + last;
@@ -124,30 +122,32 @@ void PrerequisitesIntro::setup_controls()
 {
     const QSize w = window()->size();
 
-    recommendation_title = new QLabel(this);
-    recommendation_title->setTextFormat(Qt::PlainText);
-    recommendation_title->setAlignment(Qt::AlignCenter);
-    recommendation_title->setStyleSheet(
-        "color:#4F1717; background:transparent; font-family:'Eurostile';"
-        " font-weight:900; font-size:18px;");
-    recommendation_title->setGeometry(local_rect(w, {42, 92, 536, 30}));
-
     recommendation_body = new QLabel(this);
     recommendation_body->setTextFormat(Qt::PlainText);
     recommendation_body->setWordWrap(true);
     recommendation_body->setAlignment(Qt::AlignHCenter | Qt::AlignVCenter);
     recommendation_body->setStyleSheet(k_recommendation_style);
-    recommendation_body->setGeometry(local_rect(w, {52, 124, 516, 96}));
+    recommendation_body->setGeometry(local_rect(w, {50, 112, 560, 122}));
     auto* shadow = new QGraphicsDropShadowEffect(recommendation_body);
-    shadow->setBlurRadius(util::layout::scaled(15, w));
-    shadow->setOffset(0, util::layout::scaled(4, w));
-    shadow->setColor(QColor(79, 23, 23, 42));
+    shadow->setBlurRadius(util::layout::scaled(18, w));
+    shadow->setOffset(0, util::layout::scaled(5, w));
+    shadow->setColor(QColor(79, 23, 23, 48));
     recommendation_body->setGraphicsEffect(shadow);
+
+    recommendation_title = new QLabel(this);
+    recommendation_title->setTextFormat(Qt::PlainText);
+    recommendation_title->setAlignment(Qt::AlignCenter);
+    recommendation_title->setStyleSheet(
+        "color:#4F1717; background:rgba(247,239,230,0.96); border:1px solid #D8C8B6;"
+        " border-radius:12px; padding:2px 14px; font-family:'Eurostile';"
+        " font-weight:900; font-size:15px;");
+    recommendation_title->setGeometry(local_rect(w, {205, 99, 250, 28}));
+    recommendation_title->raise();
 
     continue_button = new QPushButton(QStringLiteral("CHECKING..."), this);
     continue_button->setCursor(Qt::PointingHandCursor);
     continue_button->setStyleSheet(k_primary_style);
-    continue_button->setGeometry(local_rect(w, {84, 236, 330, 46}));
+    continue_button->setGeometry(local_rect(w, {72, 276, 360, 50}));
     continue_button->setEnabled(false);
     connect(continue_button, &QPushButton::clicked,
             this, &PrerequisitesIntro::apply_recommendation);
@@ -155,24 +155,21 @@ void PrerequisitesIntro::setup_controls()
     choose_own_button = new QPushButton(QStringLiteral("CHOOSE MY OWN"), this);
     choose_own_button->setCursor(Qt::PointingHandCursor);
     choose_own_button->setStyleSheet(k_secondary_style);
-    choose_own_button->setGeometry(local_rect(w, {426, 236, 140, 46}));
+    choose_own_button->setGeometry(local_rect(w, {444, 276, 144, 50}));
     connect(choose_own_button, &QPushButton::clicked,
             this, &PrerequisitesIntro::choose_own_requested);
 }
 
 void PrerequisitesIntro::start_detection()
 {
-    if (detector->isRunning())
-        return;
-
+    if (detector->isRunning()) return;
     detection_complete = false;
-    recommendation_title->setText(QStringLiteral("CHECKING THIS COMPUTER"));
+    recommendation_title->setText(QStringLiteral("CHECKING"));
     recommendation_body->setStyleSheet(k_recommendation_style);
     recommendation_body->setText(QStringLiteral(
         "Looking for a usable Wine or Proton setup. Nothing will be installed automatically."));
     continue_button->setText(QStringLiteral("CHECKING..."));
     continue_button->setEnabled(false);
-
     detector->setFuture(QtConcurrent::run(core::system::detect_system_profile));
 }
 
@@ -195,13 +192,9 @@ core::wine::RuntimeType PrerequisitesIntro::recommended_runtime() const
     const bool wine_found = best_runtime(core::wine::RuntimeType::Wine) != nullptr;
     const bool proton_ready = proton_found && umu_ready && winetricks_ready;
     const bool wine_ready = wine_found && winetricks_ready;
-
-    if (proton_ready)
-        return core::wine::RuntimeType::Proton;
-    if (wine_ready)
-        return core::wine::RuntimeType::Wine;
-    if (proton_found)
-        return core::wine::RuntimeType::Proton;
+    if (proton_ready) return core::wine::RuntimeType::Proton;
+    if (wine_ready) return core::wine::RuntimeType::Wine;
+    if (proton_found) return core::wine::RuntimeType::Proton;
     return core::wine::RuntimeType::Wine;
 #endif
 }
@@ -213,8 +206,7 @@ const core::wine::WineInstall* PrerequisitesIntro::best_runtime(
     int best_score = -1;
     for (const auto& runtime : runtimes)
     {
-        if (runtime.type != type)
-            continue;
+        if (runtime.type != type) continue;
         const int score = runtime_score(runtime);
         if (!best || score > best_score)
         {
@@ -231,6 +223,7 @@ bool PrerequisitesIntro::recommended_dxvk() const
     return false;
 #else
     return system_profile.vulkan_likely
+        && system_profile.gpu_vendor != core::system::GpuVendor::Apple
         && system_profile.gpu_vendor != core::system::GpuVendor::Unknown;
 #endif
 }
@@ -239,19 +232,12 @@ QStringList PrerequisitesIntro::missing_requirements(const core::wine::RuntimeTy
 {
     QStringList missing;
     if (!best_runtime(type))
-    {
         missing << (type == core::wine::RuntimeType::Proton
-                        ? QStringLiteral("Proton")
-                        : QStringLiteral("Wine"));
-    }
-
+                        ? QStringLiteral("Proton") : QStringLiteral("Wine"));
     if (type == core::wine::RuntimeType::Proton && !umu_ready)
         missing << QStringLiteral("UMU");
-
-
     if (!winetricks_ready)
         missing << QStringLiteral("Winetricks");
-
     return missing;
 }
 
@@ -259,45 +245,36 @@ bool PrerequisitesIntro::profile_ready(QString* blocker) const
 {
     if (!detection_complete)
     {
-        if (blocker)
-            *blocker = QStringLiteral("The system check is still running.");
+        if (blocker) *blocker = QStringLiteral("The system check is still running.");
         return false;
     }
 
     const auto runtime_type = recommended_runtime();
     const QStringList missing = missing_requirements(runtime_type);
-    if (!missing.isEmpty())
+    if (missing.isEmpty()) return true;
+    if (!blocker) return false;
+
+    const QString missing_text = joined_requirements(missing);
+    const QString install_wording = missing.size() == 1
+        ? QStringLiteral("Install it") : QStringLiteral("Install them");
+    if (runtime_type == core::wine::RuntimeType::Proton)
     {
-        if (blocker)
-        {
-            const QString missing_text = joined_requirements(missing);
-            const QString install_wording = missing.size() == 1
-                ? QStringLiteral("Install it")
-                : QStringLiteral("Install them");
-            if (runtime_type == core::wine::RuntimeType::Proton)
-            {
-                *blocker = QStringLiteral(
-                    "Proton needs Proton and UMU. Winetricks is also required for Alicia's "
-                    "Windows components.\nMissing: %1. %2, then restart the launcher.")
-                    .arg(missing_text, install_wording);
-            }
-            else
-            {
-                *blocker = QStringLiteral(
-                    "Pure Wine needs both Wine and Winetricks.\nMissing: %1. "
-                    "%2, then restart the launcher.")
-                    .arg(missing_text, install_wording);
-            }
-        }
-        return false;
+        *blocker = QStringLiteral(
+            "Proton needs Proton and UMU. Winetricks is also required for Alicia's Windows components.\n\nMissing: %1. %2, then restart the launcher.")
+            .arg(missing_text, install_wording);
     }
-    return true;
+    else
+    {
+        *blocker = QStringLiteral(
+            "Pure Wine needs both Wine and Winetricks.\n\nMissing: %1. %2, then restart the launcher.")
+            .arg(missing_text, install_wording);
+    }
+    return false;
 }
 
 void PrerequisitesIntro::update_recommendation()
 {
-    if (!detection_complete)
-        return;
+    if (!detection_complete) return;
 
     const auto runtime_type = recommended_runtime();
     const QString runtime_label = runtime_type == core::wine::RuntimeType::Proton
@@ -306,7 +283,7 @@ void PrerequisitesIntro::update_recommendation()
     QString blocker;
     if (!profile_ready(&blocker))
     {
-        recommendation_title->setText(QStringLiteral("%1 REQUIREMENTS").arg(runtime_label));
+        recommendation_title->setText(QStringLiteral("%1 NEEDED").arg(runtime_label));
         recommendation_body->setStyleSheet(k_error_style);
         recommendation_body->setText(blocker);
         continue_button->setText(QStringLiteral("USE THIS SETUP"));
@@ -315,10 +292,10 @@ void PrerequisitesIntro::update_recommendation()
     }
 
     const auto* runtime = best_runtime(runtime_type);
-    recommendation_title->setText(QStringLiteral("%1 IS READY").arg(runtime_label));
+    recommendation_title->setText(QStringLiteral("%1 READY").arg(runtime_label));
     recommendation_body->setStyleSheet(k_recommendation_style);
     recommendation_body->setText(QStringLiteral(
-        "%1 will be used for Alicia with %2. Nothing will be installed automatically.")
+        "%1 is the recommended setup for this computer. Alicia will use %2.\n\nNothing will be installed automatically.")
         .arg(runtime ? runtime->name : runtime_label)
         .arg(recommended_dxvk()
                  ? QStringLiteral("faster graphics")
@@ -339,24 +316,23 @@ void PrerequisitesIntro::apply_recommendation()
 
     const auto runtime_type = recommended_runtime();
     const auto* runtime = best_runtime(runtime_type);
-    if (!runtime)
-        return;
+    if (!runtime) return;
 
     auto& config = util::config::Config::instance();
+    config.set_setup_runtime_preference(
+        runtime_type == core::wine::RuntimeType::Proton
+            ? QStringLiteral("proton") : QStringLiteral("wine"));
+    config.set_setup_pc_age(QStringLiteral("unknown"));
     config.set_use_dxvk(recommended_dxvk());
     config.set_wine_binary(runtime->path);
     config.set_runtime_selected(true);
-
     emit accepted();
 }
 
 void PrerequisitesIntro::showEvent(QShowEvent* event)
 {
-    if (!detection_complete)
-        start_detection();
-    else
-        update_recommendation();
-
+    if (!detection_complete) start_detection();
+    else update_recommendation();
     ModalOverlay::showEvent(event);
 }
 
@@ -367,11 +343,11 @@ void PrerequisitesIntro::paint_content(QPainter& painter)
     painter.drawPixmap(box, util::assets::images[util::assets::Image::BoxSettings]);
 
     QFont title_font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
-    title_font.setPixelSize(util::layout::scaled(27, w));
+    title_font.setPixelSize(util::layout::scaled(29, w));
     title_font.setWeight(QFont::Black);
     painter.setFont(title_font);
     painter.setPen(util::colors::k_text_maroon);
-    painter.drawText(local_rect(w, {20, 28, 580, 38}), Qt::AlignCenter,
+    painter.drawText(local_rect(w, {20, 28, 620, 40}), Qt::AlignCenter,
                      QStringLiteral("EASY SETUP"));
 
     QFont body_font = util::assets::fonts[util::assets::Font::Inter];
@@ -379,7 +355,15 @@ void PrerequisitesIntro::paint_content(QPainter& painter)
     body_font.setWeight(QFont::Medium);
     painter.setFont(body_font);
     painter.setPen(util::colors::k_text_body);
-    painter.drawText(local_rect(w, {55, 66, 510, 24}),
-                     Qt::AlignHCenter | Qt::AlignTop | Qt::TextWordWrap,
-                     QStringLiteral("A safe setup has been selected for this computer."));
+    painter.drawText(local_rect(w, {55, 70, 550, 24}),
+                     Qt::AlignHCenter | Qt::AlignTop,
+                     QStringLiteral("Recommended setup for this computer"));
+
+    QFont note_font = util::assets::fonts[util::assets::Font::Inter];
+    note_font.setPixelSize(util::layout::scaled(12, w));
+    note_font.setWeight(QFont::Medium);
+    painter.setFont(note_font);
+    painter.setPen(util::colors::k_text_caption);
+    painter.drawText(local_rect(w, {80, 244, 500, 20}), Qt::AlignCenter,
+                     QStringLiteral("You can still choose a different runtime manually."));
 }

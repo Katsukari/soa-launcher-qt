@@ -9,6 +9,7 @@
 
 #include <QIcon>
 #include <QPainter>
+#include <QFileInfo>
 #include <QPushButton>
 
 using util::config::Config;
@@ -37,9 +38,37 @@ RepairFiles::RepairFiles(QWidget* parent)
 
 void RepairFiles::refresh()
 {
+    detected_message.clear();
     game_version = Config::instance().game_version();
-    install_path = Config::instance().game_install_path();
-    repair_button->setEnabled(Config::instance().game_installed());
+    install_path = Config::instance().game_install_path(game_version);
+    repair_button->setEnabled(QFileInfo::exists(install_path));
+    update();
+}
+
+void RepairFiles::set_game_version(const core::game::GameVersion version)
+{
+    game_version = version;
+    install_path = Config::instance().game_install_path(version);
+    repair_button->setEnabled(QFileInfo::exists(install_path));
+    update();
+}
+
+void RepairFiles::set_detected_changes(const QStringList& paths)
+{
+    if (paths.isEmpty())
+    {
+        detected_message.clear();
+    }
+    else if (paths.size() == 1)
+    {
+        detected_message = QStringLiteral("The launcher detected a protected file change: %1")
+            .arg(paths.front());
+    }
+    else
+    {
+        detected_message = QStringLiteral("The launcher detected %1 protected file changes.")
+            .arg(paths.size());
+    }
     update();
 }
 
@@ -137,7 +166,9 @@ void RepairFiles::paint_content(QPainter& painter)
     painter.drawText(note_box.adjusted(util::layout::scaled(18, w), util::layout::scaled(12, w),
                                        -util::layout::scaled(18, w), -util::layout::scaled(10, w)),
                      Qt::AlignLeft | Qt::AlignVCenter | Qt::TextWordWrap,
-                     QStringLiteral("Missing or damaged files will be downloaded again. Valid files and resumable partial downloads are kept, so the repair does not restart the whole game."));
+                     detected_message.isEmpty()
+                         ? QStringLiteral("Missing or damaged files will be downloaded again. Valid files and resumable partial downloads are kept, so the repair does not restart the whole game.")
+                         : detected_message + QStringLiteral(" Verify and repair before launching again."));
 }
 
 bool RepairFiles::eventFilter(QObject* object, QEvent* event)

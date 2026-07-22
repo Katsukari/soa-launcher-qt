@@ -20,6 +20,10 @@ namespace core::state
 {
     class InstallState;
 }
+namespace core::integrity
+{
+    class GameIntegrityWatcher;
+}
 
 class QPushButton;
 class AliciaChooser;
@@ -62,6 +66,7 @@ private:
     void setup_prerequisites();
     void setup_rules();
     void setup_repair_files();
+    void setup_integrity_watcher();
     void setup_alicia_chooser();
     void setup_game_selector();
     void setup_wine_install();
@@ -97,6 +102,7 @@ private:
     core::wine::Shell* shell {};
     AuthHandler* auth {};
     core::state::InstallState* install_state {};
+    core::integrity::GameIntegrityWatcher* integrity_watcher {};
     core::game::GameVersion game_version {core::game::GameVersion::Playtest};
     core::state::View last_view {core::state::View::Loading};
 };

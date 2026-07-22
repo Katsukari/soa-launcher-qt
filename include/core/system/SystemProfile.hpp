@@ -7,6 +7,7 @@ namespace core::system
         Amd,
         Nvidia,
         Intel,
+        Apple,
         Unknown
     };
 
