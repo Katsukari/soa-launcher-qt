@@ -7,6 +7,7 @@
 #include <QPainter>
 #include <QPushButton>
 #include <QTimer>
+#include "util/LanguageManager.hpp"
 
 #include "core/wine/Shell.hpp"
 #include "core/Log.hpp"
@@ -18,8 +19,9 @@ namespace
 {
     constexpr int    k_anim_interval_ms = 16;
     constexpr double k_fill_per_tick    = 0.6;
-    constexpr double k_pct_wineboot     = 33.0;
-    constexpr double k_pct_winetricks   = 66.0;
+    constexpr double k_pct_runtime      = 10.0;
+    constexpr double k_pct_wineboot     = 45.0;
+    constexpr double k_pct_winetricks   = 80.0;
     constexpr double k_pct_done         = 100.0;
 }
 
@@ -56,14 +58,20 @@ PrefixProgress::PrefixProgress(core::wine::Shell* shell_, QWidget* parent)
     {
         status = message;
 
-        if (message.contains("prefix", Qt::CaseInsensitive))
+        if (message.contains("runtime", Qt::CaseInsensitive))
         {
             step = 1;
-            target_pct = k_pct_wineboot;
+            target_pct = k_pct_runtime;
         }
-        else if (message.contains("components", Qt::CaseInsensitive))
+        else if (message.contains("prefix", Qt::CaseInsensitive))
         {
             step = 2;
+            target_pct = k_pct_wineboot;
+        }
+        else if (message.contains("components", Qt::CaseInsensitive)
+                 || message.contains("DXVK", Qt::CaseInsensitive))
+        {
+            step = 3;
             target_pct = k_pct_winetricks;
         }
         update();
@@ -73,7 +81,19 @@ PrefixProgress::PrefixProgress(core::wine::Shell* shell_, QWidget* parent)
     {
         done   = ok;
         failed = !ok;
-        if (ok) target_pct = k_pct_done;
+        if (ok)
+        {
+            target_pct = k_pct_done;
+        }
+        else if (status == QStringLiteral("Starting...")
+                 || status.contains(QStringLiteral("Validating"), Qt::CaseInsensitive))
+        {
+#if defined(Q_OS_MACOS)
+            status = QStringLiteral("Runtime prefix setup failed.");
+#else
+            status = QStringLiteral("Wine prefix setup failed.");
+#endif
+        }
         update();
     });
 }
@@ -88,6 +108,8 @@ void PrefixProgress::setup_buttons()
     close_button->setGeometry(dl::close(w));
     connect(close_button, &QPushButton::clicked, this, [this]()
     {
+        if (shell && shell->is_busy())
+            shell->cancel_current();
         hide();
         emit closed();
     });
@@ -125,7 +147,13 @@ void PrefixProgress::paint_content(QPainter& painter)
     title_font.setWeight(QFont::Black);
     painter.setFont(title_font);
     painter.setPen(util::colors::k_text_maroon);
-    painter.drawText(dl::title(w), Qt::AlignCenter, "INSTALLING WINE PREFIX");
+#if defined(Q_OS_MACOS)
+    painter.drawText(dl::title(w), Qt::AlignCenter,
+                     util::i18n::translate("INSTALLING RUNTIME PREFIX"));
+#else
+    painter.drawText(dl::title(w), Qt::AlignCenter,
+                     util::i18n::translate("INSTALLING WINE PREFIX"));
+#endif
 
     QFont label_font = util::assets::fonts[util::assets::Font::Inter];
     label_font.setPixelSize(util::layout::scaled(util::layout::text::k_body, w));
@@ -134,9 +162,9 @@ void PrefixProgress::paint_content(QPainter& painter)
     painter.setPen(util::colors::k_text_label);
 
     const QRect info = dl::info_row(w);
-    painter.drawText(info, Qt::AlignLeft | Qt::AlignVCenter, status);
+    painter.drawText(info, Qt::AlignLeft | Qt::AlignVCenter, util::i18n::translate(status));
     if (step > 0)
-        painter.drawText(info, Qt::AlignRight | Qt::AlignVCenter, QString("Step %1 of 2").arg(step));
+        painter.drawText(info, Qt::AlignRight | Qt::AlignVCenter, util::i18n::translate("Step %1 of 3").arg(step));
 
     util::progress_bar::draw(painter, dl::bar_rect(w), current_pct / 100.0);
 
@@ -145,5 +173,7 @@ void PrefixProgress::paint_content(QPainter& painter)
     pct_font.setWeight(QFont::DemiBold);
     painter.setFont(pct_font);
     painter.setPen(failed ? util::colors::k_warning : util::colors::k_text_maroon);
-    painter.drawText(dl::under_row(w), Qt::AlignCenter, QString("%1%").arg(int(current_pct)));
+    painter.drawText(dl::under_row(w), Qt::AlignCenter,
+                     failed ? util::i18n::translate("FAILED")
+                            : QString("%1%").arg(int(current_pct)));
 }

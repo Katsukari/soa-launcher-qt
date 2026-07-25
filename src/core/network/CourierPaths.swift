@@ -7,6 +7,18 @@ private let internalTopLevelNames: Set<String> = [
     ".soa-managed-manifest.json",
     "version.json",
 ]
+private let maximumManifestFiles = 50_000
+private let maximumManifestTotalBytes: UInt64 = 100 * 1024 * 1024 * 1024
+private let maximumManifestFileBytes: UInt64 = 32 * 1024 * 1024 * 1024
+private let maximumManifestPathBytes = 240
+private let maximumManifestComponentBytes = 120
+private let windowsReservedNames: Set<String> = [
+    "con", "prn", "aux", "nul",
+    "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9",
+    "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9",
+]
+private let windowsInvalidCharacters = CharacterSet(charactersIn: "<>:\"|?*")
+
 
 func normalizedManifestPath(_ raw: String) throws -> String
 {
@@ -35,33 +47,63 @@ func normalizedManifestPath(_ raw: String) throws -> String
         if part.isEmpty || part == "." || part == ".." {
             throw Err("Manifest contains an unsafe path component: \(raw)")
         }
-        if part.contains("\0") {
-            throw Err("Manifest contains an invalid path component: \(raw)")
+        if part.contains("\0") || part.utf8.count > maximumManifestComponentBytes
+            || part.unicodeScalars.contains(where: { $0.value < 32 }) {
+            throw Err("Manifest contains an invalid or oversized path component: \(raw)")
+        }
+        if part.hasSuffix(" ") || part.hasSuffix(".")
+            || part.unicodeScalars.contains(where: { windowsInvalidCharacters.contains($0) }) {
+            throw Err("Manifest contains a Windows-incompatible path component: \(raw)")
+        }
+        let reservedStem = part.split(separator: ".", omittingEmptySubsequences: false)
+            .first.map(String.init)?.lowercased() ?? ""
+        if windowsReservedNames.contains(reservedStem) {
+            throw Err("Manifest contains a reserved Windows path component: \(raw)")
         }
         normalized.append(part)
     }
 
     if let first = normalized.first,
-       internalTopLevelNames.contains(first.lowercased()) || first.lowercased().hasPrefix(".soa-update-") {
+       internalTopLevelNames.contains(first.lowercased())
+        || first.lowercased().hasPrefix(".soa-") {
         throw Err("Manifest path conflicts with launcher update metadata: \(raw)")
     }
 
-    return normalized.joined(separator: "/")
+    let joined = normalized.joined(separator: "/")
+    if joined.utf8.count > maximumManifestPathBytes {
+        throw Err("Manifest path is too long: \(raw)")
+    }
+    return joined
 }
 
 func validateManifest(_ manifest: Manifest) throws -> [ValidatedManifestEntry]
 {
     guard !manifest.files.isEmpty else { throw Err("Manifest has no files") }
+    guard manifest.files.count <= maximumManifestFiles else {
+        throw Err("Manifest contains too many files")
+    }
 
     var seen: Set<String> = []
+    var totalBytes: UInt64 = 0
     var result: [ValidatedManifestEntry] = []
     result.reserveCapacity(manifest.files.count)
 
     for entry in manifest.files {
         guard entry.size >= 0 else { throw Err("Manifest contains a negative file size: \(entry.path)") }
+        let fileBytes = UInt64(entry.size)
+        guard fileBytes <= maximumManifestFileBytes else {
+            throw Err("Manifest file is too large: \(entry.path)")
+        }
+        let (newTotal, overflow) = totalBytes.addingReportingOverflow(fileBytes)
+        guard !overflow && newTotal <= maximumManifestTotalBytes else {
+            throw Err("Manifest total size is too large")
+        }
+        totalBytes = newTotal
         let hash = entry.hash.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard hash.count == 32 && hash.allSatisfy({ $0.isHexDigit }) else {
-            throw Err("Manifest contains an invalid MD5 value for \(entry.path)")
+        guard (hash.count == 32 || hash.count == 64)
+                && hash.allSatisfy({ $0.isHexDigit }) else {
+            throw Err(
+                "Manifest contains an invalid MD5 or SHA-256 value for \(entry.path)")
         }
 
         let relative = try normalizedManifestPath(entry.path)
@@ -77,6 +119,21 @@ func validateManifest(_ manifest: Manifest) throws -> [ValidatedManifestEntry]
             manifest: ManifestEntry(path: entry.path, hash: hash.lowercased(), size: entry.size),
             relativePath: relative,
             collisionKey: key))
+    }
+
+    for entry in result {
+        let components = entry.collisionKey.split(separator: "/").map(String.init)
+        if components.count < 2 { continue }
+        var prefix = components[0]
+        for component in components.dropFirst().dropLast() {
+            if seen.contains(prefix) {
+                throw Err("Manifest contains a file-versus-directory path collision: \(entry.relativePath)")
+            }
+            prefix += "/" + component
+        }
+        if seen.contains(prefix) {
+            throw Err("Manifest contains a file-versus-directory path collision: \(entry.relativePath)")
+        }
     }
 
     return result

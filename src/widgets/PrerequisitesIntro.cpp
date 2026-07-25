@@ -1,9 +1,11 @@
 #include "widgets/PrerequisitesIntro.hpp"
+#include "util/LanguageManager.hpp"
 
 #include "util/Assets.hpp"
 #include "util/Colors.hpp"
 #include "util/Config.hpp"
 #include "util/Layout.hpp"
+#include "core/runtime/RuntimeProvider.hpp"
 
 #include <QGraphicsDropShadowEffect>
 #include <QLabel>
@@ -11,6 +13,8 @@
 #include <QPushButton>
 #include <QRegularExpression>
 #include <QShowEvent>
+
+#include <algorithm>
 #include <QStringList>
 #include <QtConcurrent/QtConcurrentRun>
 
@@ -41,58 +45,56 @@ namespace
     const char* k_primary_style =
         "QPushButton { background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #54D8FF,stop:1 #08A9D8);"
         " border:1px solid #159FC8; border-radius:6px; color:white; font-family:'Eurostile';"
-        " font-weight:900; font-size:17px; outline:none; }"
+        " font-weight:900; font-size:17px; }"
         "QPushButton:hover { background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #77E2FF,stop:1 #18B9E8); }"
         "QPushButton:pressed { background:#0798C5; }"
         "QPushButton:disabled { background:#D8CDC0; border-color:#C9BBAA; color:#9E8E7E; }"
-        "QPushButton:focus { outline:none; }";
+        "QPushButton:focus { border:2px solid #4F1717; }";
 
     const char* k_secondary_style =
         "QPushButton { background:rgba(255,255,255,0.72); border:1px solid #C9BBAA;"
         " border-radius:6px; color:#4F1717; font-family:'Eurostile'; font-weight:900;"
-        " font-size:13px; outline:none; }"
+        " font-size:13px; }"
         "QPushButton:hover { border-color:#2FB4E0; background:rgba(255,255,255,0.94); }"
         "QPushButton:pressed { background:#EAF7FC; }"
-        "QPushButton:focus { outline:none; }";
+        "QPushButton:focus { border:2px solid #2FB4E0; }";
 
     int runtime_score(const core::wine::WineInstall& runtime)
     {
+        if (!runtime.usable)
+            return -1;
+
         const QString name = runtime.name.toLower();
-        if (runtime.type == core::wine::RuntimeType::Wine)
+        int score = runtime.type == core::wine::RuntimeType::Proton ? 9000 : 8000;
+        if (runtime.type == core::wine::RuntimeType::Proton)
         {
-            if (name == QStringLiteral("system wine")) return 10000;
-            if (name.contains(QStringLiteral("cachyos"))) return 9000;
-            return 8000;
+            if (name.contains(QStringLiteral("ge-proton")))
+                score += 500;
+            else if (name.contains(QStringLiteral("experimental")))
+                score -= 500;
+            else if (name.contains(QStringLiteral("hotfix")))
+                score -= 750;
+        }
+        else if (name == QStringLiteral("system wine"))
+        {
+            score += 100;
         }
 
-        int score = 0;
-        if (name.startsWith(QStringLiteral("proton "))
-            && !name.contains(QStringLiteral("experimental"))
-            && !name.contains(QStringLiteral("hotfix")))
-        {
-            score = 10000;
-        }
-        else if (name.contains(QStringLiteral("ge-proton")))
-        {
-            score = 9000;
-        }
-        else if (name.contains(QStringLiteral("experimental")))
-        {
-            score = 7500;
-        }
-        else if (name.contains(QStringLiteral("hotfix")))
-        {
-            score = 7000;
-        }
-        else
-        {
-            score = 8000;
-        }
-
+        const QString versionText = runtime.version + QLatin1Char(' ') + runtime.name;
         const QRegularExpression pattern(QStringLiteral(R"((\d+)(?:\.(\d+))?)"));
-        const QRegularExpressionMatch match = pattern.match(name);
+        const QRegularExpressionMatch match = pattern.match(versionText);
+#if defined(Q_OS_MACOS)
         if (match.hasMatch())
-            score += match.captured(1).toInt() * 100 + match.captured(2).toInt();
+            score += qMin(match.captured(1).toInt(), 99) * 100
+                + qMin(match.captured(2).toInt(), 99);
+        if (name.contains(QStringLiteral("crossover"))) score += 300;
+        if (name.contains(QStringLiteral("whisky"))) score += 100;
+        if (runtime.requires_rosetta && runtime.rosetta_available) score += 50;
+#else
+        if (match.hasMatch())
+            score += qMin(match.captured(1).toInt(), 99) * 10
+                + qMin(match.captured(2).toInt(), 9);
+#endif
         return score;
     }
 
@@ -101,21 +103,40 @@ namespace
         if (requirements.isEmpty()) return {};
         if (requirements.size() == 1) return requirements.front();
         if (requirements.size() == 2)
-            return requirements.front() + QStringLiteral(" and ") + requirements.back();
+            return requirements.front() + util::i18n::translate(" and ") + requirements.back();
         QStringList leading = requirements;
         const QString last = leading.takeLast();
-        return leading.join(QStringLiteral(", ")) + QStringLiteral(", and ") + last;
+        return leading.join(QStringLiteral(", ")) + util::i18n::translate(", and ") + last;
     }
 }
 
 PrerequisitesIntro::PrerequisitesIntro(QWidget* parent)
     : ModalOverlay(parent),
-      detector(new QFutureWatcher<core::system::SystemProfile>(this))
+      detector(new QFutureWatcher<DetectionResult>(this))
 {
     set_keeps_chrome(false);
     setup_controls();
-    connect(detector, &QFutureWatcher<core::system::SystemProfile>::finished,
+    connect(detector, &QFutureWatcher<DetectionResult>::finished,
             this, &PrerequisitesIntro::finish_detection);
+    connect(&util::i18n::LanguageManager::instance(),
+            &util::i18n::LanguageManager::language_changed, this, [this]()
+    {
+        if (detection_complete)
+            update_recommendation();
+        else
+        {
+            recommendation_title->setText(util::i18n::translate("CHECKING"));
+#if defined(Q_OS_MACOS)
+            recommendation_body->setText(util::i18n::translate(
+                "Checking the Story of Alicia runtime and macOS compatibility."));
+#else
+            recommendation_body->setText(util::i18n::translate(
+                "Looking for a usable Wine or Proton setup. Nothing will be installed automatically."));
+#endif
+            continue_button->setText(util::i18n::translate("CHECKING..."));
+        }
+        update();
+    });
 }
 
 void PrerequisitesIntro::setup_controls()
@@ -152,7 +173,12 @@ void PrerequisitesIntro::setup_controls()
     connect(continue_button, &QPushButton::clicked,
             this, &PrerequisitesIntro::apply_recommendation);
 
+#if defined(Q_OS_MACOS)
+    choose_own_button = new QPushButton(QStringLiteral("LOCATE RUNTIME"), this);
+    choose_own_button->hide();
+#else
     choose_own_button = new QPushButton(QStringLiteral("CHOOSE MY OWN"), this);
+#endif
     choose_own_button->setCursor(Qt::PointingHandCursor);
     choose_own_button->setStyleSheet(k_secondary_style);
     choose_own_button->setGeometry(local_rect(w, {444, 276, 144, 50}));
@@ -164,21 +190,63 @@ void PrerequisitesIntro::start_detection()
 {
     if (detector->isRunning()) return;
     detection_complete = false;
-    recommendation_title->setText(QStringLiteral("CHECKING"));
+    recommendation_title->setText(util::i18n::translate("CHECKING"));
     recommendation_body->setStyleSheet(k_recommendation_style);
-    recommendation_body->setText(QStringLiteral(
+#if defined(Q_OS_MACOS)
+    recommendation_body->setText(util::i18n::translate(
+        "Checking the Story of Alicia runtime and macOS compatibility."));
+#else
+    recommendation_body->setText(util::i18n::translate(
         "Looking for a usable Wine or Proton setup. Nothing will be installed automatically."));
-    continue_button->setText(QStringLiteral("CHECKING..."));
+#endif
+    continue_button->setText(util::i18n::translate("CHECKING..."));
     continue_button->setEnabled(false);
-    detector->setFuture(QtConcurrent::run(core::system::detect_system_profile));
+#if defined(Q_OS_MACOS)
+    const QString savedRuntime = util::config::Config::instance().wine_binary();
+    const auto detection = [savedRuntime]()
+    {
+        DetectionResult result;
+        result.profile = core::system::detect_system_profile();
+        const auto resolution = core::runtime::RuntimeProvider::resolve(
+            savedRuntime, false);
+        if (resolution.usable)
+        {
+            core::wine::WineInstall runtime;
+            runtime.name = resolution.display_name;
+            runtime.path = resolution.selector;
+            runtime.type = core::wine::RuntimeType::Wine;
+            runtime.version = QStringLiteral("managed by launcher");
+            runtime.requires_rosetta = resolution.requires_rosetta;
+            runtime.rosetta_available = resolution.rosetta_available;
+            runtime.usable = true;
+            result.runtimes.append(runtime);
+        }
+        result.umu_ready = false;
+        return result;
+    };
+#else
+    const auto detection = []()
+    {
+        DetectionResult result;
+        result.profile = core::system::detect_system_profile();
+        result.runtimes = core::wine::WineRegistry::scan();
+        result.winetricks_ready = core::wine::winetricks_available();
+        result.umu_ready = core::wine::umu_available();
+        return result;
+    };
+#endif
+    detector->setFuture(QtConcurrent::run(detection));
 }
 
 void PrerequisitesIntro::finish_detection()
 {
-    system_profile = detector->result();
-    runtimes = core::wine::WineRegistry::scan();
-    winetricks_ready = core::wine::winetricks_available();
-    umu_ready = core::wine::umu_available();
+    const DetectionResult result = detector->result();
+    system_profile = result.profile;
+    runtimes = result.runtimes;
+#if !defined(Q_OS_MACOS)
+    winetricks_ready = result.winetricks_ready;
+#endif
+    umu_ready = result.umu_ready;
     detection_complete = true;
     update_recommendation();
 }
@@ -208,6 +276,8 @@ const core::wine::WineInstall* PrerequisitesIntro::best_runtime(
     {
         if (runtime.type != type) continue;
         const int score = runtime_score(runtime);
+        if (score < 0)
+            continue;
         if (!best || score > best_score)
         {
             best = &runtime;
@@ -217,27 +287,25 @@ const core::wine::WineInstall* PrerequisitesIntro::best_runtime(
     return best;
 }
 
-bool PrerequisitesIntro::recommended_dxvk() const
-{
-#if defined(Q_OS_MACOS)
-    return false;
-#else
-    return system_profile.vulkan_likely
-        && system_profile.gpu_vendor != core::system::GpuVendor::Apple
-        && system_profile.gpu_vendor != core::system::GpuVendor::Unknown;
-#endif
-}
-
 QStringList PrerequisitesIntro::missing_requirements(const core::wine::RuntimeType type) const
 {
     QStringList missing;
     if (!best_runtime(type))
+    {
+#if defined(Q_OS_MACOS)
+        missing << util::i18n::translate("Runtime");
+#else
         missing << (type == core::wine::RuntimeType::Proton
-                        ? QStringLiteral("Proton") : QStringLiteral("Wine"));
+                        ? util::i18n::translate("Proton")
+                        : util::i18n::translate("Wine"));
+#endif
+    }
+#if !defined(Q_OS_MACOS)
     if (type == core::wine::RuntimeType::Proton && !umu_ready)
-        missing << QStringLiteral("UMU");
+        missing << util::i18n::translate("UMU");
     if (!winetricks_ready)
-        missing << QStringLiteral("Winetricks");
+        missing << util::i18n::translate("Winetricks");
+#endif
     return missing;
 }
 
@@ -249,6 +317,36 @@ bool PrerequisitesIntro::profile_ready(QString* blocker) const
         return false;
     }
 
+#if defined(Q_OS_LINUX)
+    if (system_profile.cpu_architecture != core::system::CpuArchitecture::X86_64)
+    {
+        if (blocker)
+            *blocker = QStringLiteral("The Linux launcher and game currently require an x86_64 computer.");
+        return false;
+    }
+#endif
+
+#if defined(Q_OS_MACOS)
+    if (system_profile.cpu_architecture == core::system::CpuArchitecture::Arm64
+        && !system_profile.rosetta_available)
+    {
+        const bool intelRuntimeFound = std::any_of(runtimes.cbegin(), runtimes.cend(),
+            [](const core::wine::WineInstall& runtime)
+            {
+                return runtime.type == core::wine::RuntimeType::Wine
+                    && runtime.requires_rosetta;
+            });
+        if (intelRuntimeFound)
+        {
+            if (blocker)
+                *blocker = QStringLiteral(
+                    "An Intel macOS runtime was found, but Rosetta is unavailable. "
+                    "Request Rosetta, complete the macOS prompt, then rescan.");
+            return false;
+        }
+    }
+#endif
+
     const auto runtime_type = recommended_runtime();
     const QStringList missing = missing_requirements(runtime_type);
     if (missing.isEmpty()) return true;
@@ -256,7 +354,8 @@ bool PrerequisitesIntro::profile_ready(QString* blocker) const
 
     const QString missing_text = joined_requirements(missing);
     const QString install_wording = missing.size() == 1
-        ? QStringLiteral("Install it") : QStringLiteral("Install them");
+        ? util::i18n::translate("Install it")
+        : util::i18n::translate("Install them");
     if (runtime_type == core::wine::RuntimeType::Proton)
     {
         *blocker = QStringLiteral(
@@ -265,9 +364,16 @@ bool PrerequisitesIntro::profile_ready(QString* blocker) const
     }
     else
     {
+#if defined(Q_OS_MACOS)
+        Q_UNUSED(install_wording);
+        *blocker = QStringLiteral(
+            "The Story of Alicia runtime was not found. Use Locate Runtime to select the custom runtime app or folder.\n\nMissing: %1.")
+            .arg(missing_text);
+#else
         *blocker = QStringLiteral(
             "Pure Wine needs both Wine and Winetricks.\n\nMissing: %1. %2, then restart the launcher.")
             .arg(missing_text, install_wording);
+#endif
     }
     return false;
 }
@@ -277,30 +383,48 @@ void PrerequisitesIntro::update_recommendation()
     if (!detection_complete) return;
 
     const auto runtime_type = recommended_runtime();
+#if defined(Q_OS_MACOS)
+    const QString runtime_label = util::i18n::translate("RUNTIME");
+#else
     const QString runtime_label = runtime_type == core::wine::RuntimeType::Proton
-        ? QStringLiteral("PROTON") : QStringLiteral("WINE");
+        ? util::i18n::translate("PROTON")
+        : util::i18n::translate("WINE");
+#endif
 
     QString blocker;
     if (!profile_ready(&blocker))
     {
-        recommendation_title->setText(QStringLiteral("%1 NEEDED").arg(runtime_label));
+        recommendation_title->setText(util::i18n::translate("%1 NEEDED").arg(runtime_label));
         recommendation_body->setStyleSheet(k_error_style);
-        recommendation_body->setText(blocker);
-        continue_button->setText(QStringLiteral("USE THIS SETUP"));
+        recommendation_body->setText(util::i18n::translate(blocker));
+        continue_button->setText(util::i18n::translate("USE THIS SETUP"));
         continue_button->setEnabled(false);
+#if defined(Q_OS_MACOS)
+        choose_own_button->show();
+#endif
         return;
     }
 
     const auto* runtime = best_runtime(runtime_type);
-    recommendation_title->setText(QStringLiteral("%1 READY").arg(runtime_label));
+#if defined(Q_OS_MACOS)
+    choose_own_button->hide();
+#endif
+    recommendation_title->setText(util::i18n::translate("%1 READY").arg(runtime_label));
     recommendation_body->setStyleSheet(k_recommendation_style);
-    recommendation_body->setText(QStringLiteral(
-        "%1 is the recommended setup for this computer. Alicia will use %2.\n\nNothing will be installed automatically.")
-        .arg(runtime ? runtime->name : runtime_label)
-        .arg(recommended_dxvk()
-                 ? QStringLiteral("faster graphics")
-                 : QStringLiteral("compatibility graphics")));
-    continue_button->setText(QStringLiteral("USE THIS SETUP"));
+#if defined(Q_OS_MACOS)
+    recommendation_body->setText(util::i18n::translate(
+        "%1 passed its macOS compatibility probe. Alicia will use the shared "
+        "64-bit runtime prefix and the supported built-in graphics path. "
+        "Game-local components are verified before launch.")
+        .arg(runtime ? runtime->name : runtime_label));
+#else
+    recommendation_body->setText(util::i18n::translate(
+        "%1 is the recommended setup for this computer. Alicia will use "
+        "compatibility graphics by default.\n\nDXVK stays optional and can be "
+        "enabled later in Settings. Nothing will be installed automatically.")
+        .arg(runtime ? runtime->name : runtime_label));
+#endif
+    continue_button->setText(util::i18n::translate("USE THIS SETUP"));
     continue_button->setEnabled(true);
 }
 
@@ -310,7 +434,7 @@ void PrerequisitesIntro::apply_recommendation()
     if (!profile_ready(&blocker))
     {
         recommendation_body->setStyleSheet(k_error_style);
-        recommendation_body->setText(blocker);
+        recommendation_body->setText(util::i18n::translate(blocker));
         return;
     }
 
@@ -319,13 +443,17 @@ void PrerequisitesIntro::apply_recommendation()
     if (!runtime) return;
 
     auto& config = util::config::Config::instance();
+    config.begin_update();
     config.set_setup_runtime_preference(
         runtime_type == core::wine::RuntimeType::Proton
             ? QStringLiteral("proton") : QStringLiteral("wine"));
-    config.set_setup_pc_age(QStringLiteral("unknown"));
-    config.set_use_dxvk(recommended_dxvk());
+#if defined(Q_OS_MACOS)
+    config.set_wine_arch(QStringLiteral("win64"));
+    config.set_macos_compatibility_profile(QStringLiteral("default"));
+#endif
     config.set_wine_binary(runtime->path);
     config.set_runtime_selected(true);
+    config.end_update();
     emit accepted();
 }
 
@@ -348,7 +476,7 @@ void PrerequisitesIntro::paint_content(QPainter& painter)
     painter.setFont(title_font);
     painter.setPen(util::colors::k_text_maroon);
     painter.drawText(local_rect(w, {20, 28, 620, 40}), Qt::AlignCenter,
-                     QStringLiteral("EASY SETUP"));
+                     util::i18n::translate("EASY SETUP"));
 
     QFont body_font = util::assets::fonts[util::assets::Font::Inter];
     body_font.setPixelSize(util::layout::scaled(14, w));
@@ -357,13 +485,20 @@ void PrerequisitesIntro::paint_content(QPainter& painter)
     painter.setPen(util::colors::k_text_body);
     painter.drawText(local_rect(w, {55, 70, 550, 24}),
                      Qt::AlignHCenter | Qt::AlignTop,
-                     QStringLiteral("Recommended setup for this computer"));
+                     util::i18n::translate("Recommended setup for this computer"));
 
     QFont note_font = util::assets::fonts[util::assets::Font::Inter];
     note_font.setPixelSize(util::layout::scaled(12, w));
     note_font.setWeight(QFont::Medium);
     painter.setFont(note_font);
     painter.setPen(util::colors::k_text_caption);
+#if defined(Q_OS_MACOS)
+    const QString note = QStringLiteral(
+        "Select another runtime or compatibility profile at any time.");
+#else
+    const QString note = QStringLiteral(
+        "You can still choose a different runtime manually.");
+#endif
     painter.drawText(local_rect(w, {80, 244, 500, 20}), Qt::AlignCenter,
-                     QStringLiteral("You can still choose a different runtime manually."));
+                     util::i18n::translate(note));
 }

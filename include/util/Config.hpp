@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QByteArray>
 #include <QObject>
 #include <QString>
 #include <QStringList>
@@ -7,6 +8,7 @@
 #include "core/game/GameVersion.hpp"
 
 class QFileSystemWatcher;
+class QTimer;
 
 namespace util::config
 {
@@ -22,11 +24,11 @@ namespace util::config
         QString winetricks_binary() const;
         QString rosetta_x87_path() const;
 
-        // Returns the active runtime's configured root:
-        // - Wine: the WINEPREFIX directory
-        // - Proton: the STEAM_COMPAT_DATA_PATH directory (parent of pfx)
-        // The two values are persisted separately so switching runtimes cannot
-        // reinterpret one path as the other.
+
+
+
+
+
         QString wine_prefix() const;
         QString proton_compat_data_root() const;
         QString prefix_root() const;
@@ -36,16 +38,18 @@ namespace util::config
         bool    use_dxvk() const;
         bool    runtime_selected() const;
         QString wine_args() const;
+        QString macos_compatibility_profile() const;
+        bool    macos_deep_diagnostics() const;
 
         bool    prerequisites_confirmed() const;
         QString setup_runtime_preference() const;
-        QString setup_pc_age() const;
         bool    rules_accepted() const;
         bool    keep_signed_in() const;
 
         bool    launch_on_startup() const;
         QString after_game_start() const;
         QString launcher_size() const;
+        QString language() const;
 
         core::game::GameVersion game_version() const;
         QString game_id() const;
@@ -68,16 +72,18 @@ namespace util::config
         void set_use_dxvk(bool value);
         void set_runtime_selected(bool value);
         void set_wine_args(const QString& value);
+        void set_macos_compatibility_profile(const QString& value);
+        void set_macos_deep_diagnostics(bool value);
 
         void set_prerequisites_confirmed(bool value);
         void set_setup_runtime_preference(const QString& value);
-        void set_setup_pc_age(const QString& value);
         void set_rules_accepted(bool value);
         void set_keep_signed_in(bool value);
 
         void set_launch_on_startup(bool value);
         void set_after_game_start(const QString& value);
         void set_launcher_size(const QString& value);
+        void set_language(const QString& value);
 
         void set_game_version(core::game::GameVersion value);
         void set_game_args(const QString& value);
@@ -89,18 +95,24 @@ namespace util::config
 
         QString file_path() const;
         QString env_path() const;
+        QString persistence_error() const;
 
         void reload();
 
+
+        void begin_update();
+        void end_update();
+
     signals:
         void changed();
+        void persistence_failed(const QString& path, const QString& reason);
 
     private:
         explicit Config(QObject* parent = nullptr);
         Config(const Config&) = delete;
         Config& operator=(const Config&) = delete;
 
-        void load();
+        bool load();
         bool save();
         void load_credentials();
         bool save_credentials();
@@ -110,20 +122,34 @@ namespace util::config
         void apply_defaults();
         void probe_system_paths();
         void watch_files();
-        void reload_from_disk();
+        void schedule_reload();
+        void reload_from_disk(bool force = false);
+        void remember_disk_state();
+        [[nodiscard]] bool disk_state_changed() const;
 
         QString derive_game_path(const QString& prefix,
                                  core::game::GameVersion version) const;
         QString normalize_game_path(const QString& path) const;
         QString normalize_wine_prefix(const QString& path) const;
         QString normalize_proton_compat_root(const QString& path) const;
+        void rebase_game_install_paths(const QString& old_prefix,
+                                       const QString& old_playtest_path,
+                                       const QString& old_alicia2_path);
         bool runtime_is_proton() const;
+        void persist_change();
+        void normalize_schema();
         static QString game_install_path_key(core::game::GameVersion version);
 
         class Impl;
         Impl* d {};
 
         QFileSystemWatcher* watcher {};
+        QTimer* reload_timer {};
+        QByteArray config_digest;
+        QByteArray env_digest;
         bool writing {};
+        bool reloading {};
+        int update_depth {};
+        bool update_dirty {};
     };
 }

@@ -25,7 +25,9 @@ extension Courier
                 reportProgress(operationID, courier_phase_verifying,
                                "Verifying (\(index + 1)/\(manifest.count))", percent,
                                0, 0, 0, index + 1, manifest.count)
-                let hash = try md5OfFile(at: local.path) { _ in
+                let hash = try manifestHashOfFile(
+                    at: local.path,
+                    expectedHash: entry.manifest.hash) { _ in
                     self.reportProgress(operationID, courier_phase_verifying,
                                         "Verifying (\(index + 1)/\(manifest.count))", percent,
                                         0, 0, 0, index + 1, manifest.count)
@@ -34,7 +36,7 @@ extension Courier
                     bad += 1
                 }
             }
-            reportDone(operationID, true, "\(bad)")
+            reportDone(operationID, courier_result_completed, "\(bad)")
         }
     }
 }

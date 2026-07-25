@@ -11,21 +11,21 @@
 using core::status::State;
 using core::network::DownloadStatus;
 
-extern "C" void soa_log(int level, const char* message)
-{
-    switch (level)
-    {
-        case 0:  SPDLOG_TRACE("[courier] {}", message ? message : ""); break;
-        case 1:  SPDLOG_DEBUG("[courier] {}", message ? message : ""); break;
-        case 2:  SPDLOG_INFO ("[courier] {}", message ? message : ""); break;
-        case 3:  SPDLOG_WARN ("[courier] {}", message ? message : ""); break;
-        case 4:  SPDLOG_ERROR("[courier] {}", message ? message : ""); break;
-        default: SPDLOG_INFO ("[courier] {}", message ? message : ""); break;
-    }
-}
-
 namespace
 {
+    void on_log_cb(const int level, const char* message, void*)
+    {
+        switch (level)
+        {
+            case 0:  SPDLOG_TRACE("[courier] {}", message ? message : ""); break;
+            case 1:  SPDLOG_DEBUG("[courier] {}", message ? message : ""); break;
+            case 2:  SPDLOG_INFO ("[courier] {}", message ? message : ""); break;
+            case 3:  SPDLOG_WARN ("[courier] {}", message ? message : ""); break;
+            case 4:  SPDLOG_ERROR("[courier] {}", message ? message : ""); break;
+            default: SPDLOG_INFO ("[courier] {}", message ? message : ""); break;
+        }
+    }
+
     const char* phase_name(const courier_phase phase)
     {
         switch (phase)
@@ -71,18 +71,20 @@ namespace
             Qt::QueuedConnection);
     }
 
-    void on_done_cb(const uint64_t operation_id, const bool ok, const char* message, void*)
+    void on_done_cb(const uint64_t operation_id, const courier_result result, const char* message, void*)
     {
         const QString msg = QString::fromUtf8(message ? message : "");
         QMetaObject::invokeMethod(
             &core::network::CourierBridge::instance(),
-            [operation_id, ok, msg]()
+            [operation_id, result, msg]()
             {
                 DownloadStatus ds;
                 ds.operation_id = static_cast<qulonglong>(operation_id);
-                ds.base.state    = ok ? State::Done : State::Failed;
+                ds.result = result;
+                ds.base.state = result == courier_result_failed || result == courier_result_cancelled
+                    ? State::Failed : State::Done;
                 ds.base.message  = msg;
-                ds.base.progress = ok ? 1.0 : -1.0;
+                ds.base.progress = ds.base.state == State::Done ? 1.0 : -1.0;
                 core::network::CourierBridge::instance().report(ds);
             },
             Qt::QueuedConnection);
@@ -91,7 +93,10 @@ namespace
 
 namespace core::network
 {
-    CourierBridge::CourierBridge() : StatusReporter("courier") {}
+    CourierBridge::CourierBridge() : StatusReporter("courier")
+    {
+        courier_set_log_callback(&on_log_cb, nullptr);
+    }
 
     CourierBridge& CourierBridge::instance()
     {

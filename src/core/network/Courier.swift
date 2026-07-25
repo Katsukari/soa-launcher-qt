@@ -38,16 +38,6 @@ final class Courier
         self.sessionConfiguration = config
     }
 
-    private func nextGeneration() -> UInt64
-    {
-        generationLock.lock()
-        defer { generationLock.unlock() }
-        generation = (generation &+ 1) & 0xffff_ffff
-        if generation == 0 { generation = 1 }
-        currentOperationID = (instanceID << 32) | generation
-        return currentOperationID
-    }
-
     private func isCurrent(_ operationID: UInt64) -> Bool
     {
         generationLock.lock()
@@ -72,39 +62,63 @@ final class Courier
         }
     }
 
-    func reportDone(_ operationID: UInt64, _ ok: Bool, _ message: String)
+    func reportDone(_ operationID: UInt64, _ result: courier_result, _ message: String)
     {
-        guard isCurrent(operationID) else { return }
-        message.withCString { c in onDone(operationID, ok, c, ctx) }
+        generationLock.lock()
+        let current = currentOperationID == operationID
+        if current
+        {
+            currentOperationID = 0
+            task = nil
+        }
+        generationLock.unlock()
+
+        guard current else { return }
+        message.withCString { c in onDone(operationID, result, c, ctx) }
     }
 
     func cancel()
     {
         generationLock.lock()
+        let operationID = currentOperationID
         currentOperationID = 0
-        generationLock.unlock()
-        task?.cancel()
+        let activeTask = task
         task = nil
+        generationLock.unlock()
+
+        activeTask?.cancel()
+        guard operationID != 0 else { return }
+        "Cancelled.".withCString { c in onDone(operationID, courier_result_cancelled, c, ctx) }
     }
 
     @discardableResult
     func run(_ body: @escaping (UInt64) async throws -> Void) -> UInt64
     {
-        task?.cancel()
-        let operationID = nextGeneration()
-        task = Task { [self] in
+
+
+
+        generationLock.lock()
+        let previousTask = task
+        generation = (generation &+ 1) & 0xffff_ffff
+        if generation == 0 { generation = 1 }
+        let operationID = (instanceID << 32) | generation
+        currentOperationID = operationID
+        let newTask = Task { [self] in
             do {
                 try await body(operationID)
             } catch is CancellationError {
-                reportDone(operationID, false, "Cancelled.")
+                reportDone(operationID, courier_result_cancelled, "Cancelled.")
             } catch let error as Err {
                 log(4, error.message)
-                reportDone(operationID, false, error.message)
+                reportDone(operationID, courier_result_failed, error.message)
             } catch {
                 log(4, "\(error)")
-                reportDone(operationID, false, "\(error)")
+                reportDone(operationID, courier_result_failed, "\(error)")
             }
         }
+        task = newTask
+        generationLock.unlock()
+        previousTask?.cancel()
         return operationID
     }
 }

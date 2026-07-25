@@ -1,6 +1,13 @@
 import Foundation
 import Soa_Courier
 
+@_cdecl("courier_set_log_callback")
+public func courier_set_log_callback(_ callback: courier_log_cb?,
+                                     _ ctx: UnsafeMutableRawPointer?)
+{
+    CourierLogger.shared.set(callback, context: ctx)
+}
+
 @_cdecl("courier_create")
 public func courier_create(_ cdn: UnsafePointer<CChar>?,
                            _ onProgress: courier_progress_cb?,
@@ -8,8 +15,15 @@ public func courier_create(_ cdn: UnsafePointer<CChar>?,
                            _ ctx: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer?
 {
     guard let cdn, let onProgress, let onDone else { return nil }
+    let base = String(cString: cdn)
+    guard let parsed = URL(string: base), parsed.scheme?.lowercased() == "https",
+          parsed.host != nil, parsed.user == nil, parsed.password == nil,
+          parsed.query == nil, parsed.fragment == nil else {
+        log(4, "Rejected unsafe Courier CDN base URL")
+        return nil
+    }
     let courier = Courier(
-        cdnBaseURL: String(cString: cdn),
+        cdnBaseURL: base,
         onProgress: onProgress,
         onDone: onDone,
         ctx: ctx)

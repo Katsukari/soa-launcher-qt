@@ -7,7 +7,7 @@ endif()
 project(soa_launcher
         LANGUAGES CXX
         DESCRIPTION "Story of Alicia Launcher"
-        VERSION 0.1.0
+        VERSION 1.0.0
 )
 
 if(NOT APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
@@ -27,7 +27,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
-option(BUILD_TESTS "Build tests" ON)
+include(CTest)
+option(SOA_ALLOW_FETCHCONTENT "Allow downloading missing dependencies during configure" ON)
 
 set(SOA_PORTABLE_CXX_OPTIONS)
 
@@ -53,19 +54,23 @@ set(SOA_INCLUDE_DIRS
         include
 )
 
-find_package(Qt6 REQUIRED COMPONENTS ${SOA_QT_COMPONENTS})
+find_package(Qt6 REQUIRED COMPONENTS ${SOA_QT_COMPONENTS} LinguistTools)
 list(TRANSFORM SOA_QT_COMPONENTS PREPEND Qt6:: OUTPUT_VARIABLE SOA_QT_LIBS)
 
-include(FetchContent)
-
-FetchContent_Declare(
-        spdlog
-        GIT_REPOSITORY https://github.com/gabime/spdlog.git
-        GIT_TAG v1.16.0
-        GIT_SHALLOW TRUE
-)
-
-FetchContent_MakeAvailable(spdlog)
+find_package(spdlog 1.12 QUIET)
+if(NOT spdlog_FOUND)
+    if(NOT SOA_ALLOW_FETCHCONTENT)
+        message(FATAL_ERROR "spdlog was not found and SOA_ALLOW_FETCHCONTENT is OFF")
+    endif()
+    include(FetchContent)
+    FetchContent_Declare(
+            spdlog
+            GIT_REPOSITORY https://github.com/gabime/spdlog.git
+            GIT_TAG v1.16.0
+            GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(spdlog)
+endif()
 
 if(SOA_PORTABLE_CXX_OPTIONS AND TARGET spdlog)
     target_compile_options(spdlog PRIVATE
@@ -105,6 +110,7 @@ set(LAUNCHER_SOURCES
         src/main.cpp
         src/MainWindow.cpp
         src/util/Assets.cpp
+        src/util/LanguageManager.cpp
         src/widgets/AliciaChooser.cpp
         src/widgets/PrerequisitesIntro.cpp
         src/widgets/RulesAgreement.cpp
@@ -117,10 +123,18 @@ set(LAUNCHER_SOURCES
         src/widgets/WineInstall.cpp
         src/util/ModalOverlay.cpp
         src/util/SimpleUtils.cpp
+        src/util/LaunchArguments.cpp
+        src/util/DesktopEntry.cpp
         src/util/LauncherLog.cpp
         src/widgets/AdvancedSettings.cpp
         src/core/Log.cpp
+        src/core/discord/DiscordRpc.cpp
         src/core/wine/Shell.cpp
+        src/core/wine/WineProcess.cpp
+        src/core/wine/MacWineRuntime.cpp
+        src/core/runtime/RuntimeManifest.cpp
+        src/core/runtime/RuntimeManager.cpp
+        src/core/runtime/RuntimeProvider.cpp
         src/core/system/SystemProfile.cpp
         src/core/integrity/GameIntegrityWatcher.cpp
         src/core/wine/PrefixInspector.cpp
@@ -143,6 +157,7 @@ set(LAUNCHER_SOURCES
 set(LAUNCHER_HEADERS
         include/MainWindow.hpp
         include/util/Assets.hpp
+        include/util/LanguageManager.hpp
         include/widgets/AliciaChooser.hpp
         include/widgets/PrerequisitesIntro.hpp
         include/widgets/RulesAgreement.hpp
@@ -155,14 +170,22 @@ set(LAUNCHER_HEADERS
         include/widgets/WineInstall.hpp
         include/util/ModalOverlay.hpp
         include/util/SimpleUtils.hpp
+        include/util/LaunchArguments.hpp
+        include/util/DesktopEntry.hpp
         include/widgets/LauncherLog.hpp
         include/widgets/AdvancedSettings.hpp
         include/core/wine/Shell.hpp
+        include/core/wine/WineProcess.hpp
+        include/core/wine/MacWineRuntime.hpp
+        include/core/runtime/RuntimeManifest.hpp
+        include/core/runtime/RuntimeManager.hpp
+        include/core/runtime/RuntimeProvider.hpp
         include/core/system/SystemProfile.hpp
         include/core/integrity/GameIntegrityWatcher.hpp
         include/core/wine/PrefixInspector.hpp
         include/core/QtLogSink.hpp
         include/core/Log.hpp
+        include/core/discord/DiscordRpc.hpp
         include/util/Styles.hpp
         include/core/network/Courier.h
         include/core/network/CourierBridge.hpp
@@ -191,6 +214,11 @@ set(SOA_PLATFORM_RESOURCES)
 
 if(APPLE)
     set(SOA_MACOS_ICON "${CMAKE_CURRENT_SOURCE_DIR}/packaging/macos/soa-launcher.icns")
+    set(SOA_MACOS_RUNTIME_PACKAGE "" CACHE PATH
+        "Runtime package root containing runtime.json and payload/StoryOfAliciaRuntime.app")
+    option(SOA_REQUIRE_BUNDLED_RUNTIME
+        "Fail configuration when the launcher-owned macOS runtime package is unavailable"
+        OFF)
 
     set_source_files_properties(${SOA_MACOS_ICON} PROPERTIES
             MACOSX_PACKAGE_LOCATION "Resources"
@@ -199,6 +227,66 @@ if(APPLE)
     list(APPEND SOA_PLATFORM_RESOURCES
             ${SOA_MACOS_ICON}
     )
+
+    set(SOA_RESOLVED_MACOS_RUNTIME_PACKAGE "")
+    if(SOA_MACOS_RUNTIME_PACKAGE)
+        get_filename_component(SOA_RESOLVED_MACOS_RUNTIME_PACKAGE
+            "${SOA_MACOS_RUNTIME_PACKAGE}" REALPATH)
+    else()
+        file(GLOB _SOA_RUNTIME_MANIFESTS
+            LIST_DIRECTORIES FALSE
+            "${CMAKE_CURRENT_SOURCE_DIR}/../soa_wine_runtime/runtime/out/packages/*/*/runtime.json")
+        if(_SOA_RUNTIME_MANIFESTS)
+            list(SORT _SOA_RUNTIME_MANIFESTS COMPARE NATURAL ORDER ASCENDING)
+            list(GET _SOA_RUNTIME_MANIFESTS -1 _SOA_RUNTIME_MANIFEST)
+            get_filename_component(SOA_RESOLVED_MACOS_RUNTIME_PACKAGE
+                "${_SOA_RUNTIME_MANIFEST}" DIRECTORY)
+        endif()
+        unset(_SOA_RUNTIME_MANIFESTS)
+        unset(_SOA_RUNTIME_MANIFEST)
+    endif()
+
+    if(SOA_RESOLVED_MACOS_RUNTIME_PACKAGE)
+        set(_SOA_RUNTIME_MANIFEST
+            "${SOA_RESOLVED_MACOS_RUNTIME_PACKAGE}/runtime.json")
+        set(_SOA_RUNTIME_APP
+            "${SOA_RESOLVED_MACOS_RUNTIME_PACKAGE}/payload/StoryOfAliciaRuntime.app")
+        set(_SOA_RUNTIME_WINE
+            "${_SOA_RUNTIME_APP}/Contents/Resources/wine/bin/wine")
+        set(_SOA_RUNTIME_SELF_TEST
+            "${_SOA_RUNTIME_APP}/Contents/Resources/tools/self-test-macos.sh")
+        if(NOT EXISTS "${_SOA_RUNTIME_MANIFEST}"
+            OR NOT IS_DIRECTORY "${_SOA_RUNTIME_APP}"
+            OR NOT EXISTS "${_SOA_RUNTIME_WINE}"
+            OR NOT EXISTS "${_SOA_RUNTIME_SELF_TEST}")
+            message(FATAL_ERROR
+                "SOA_MACOS_RUNTIME_PACKAGE is incomplete: ${SOA_RESOLVED_MACOS_RUNTIME_PACKAGE}")
+        endif()
+        find_package(Python3 REQUIRED COMPONENTS Interpreter)
+        execute_process(
+            COMMAND "${Python3_EXECUTABLE}"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/packaging/macos/verify-runtime-package.py"
+                    "${SOA_RESOLVED_MACOS_RUNTIME_PACKAGE}"
+            RESULT_VARIABLE _SOA_RUNTIME_VERIFY_RESULT
+            OUTPUT_VARIABLE _SOA_RUNTIME_VERIFY_OUTPUT
+            ERROR_VARIABLE _SOA_RUNTIME_VERIFY_ERROR
+        )
+        if(NOT _SOA_RUNTIME_VERIFY_RESULT STREQUAL "0")
+            message(FATAL_ERROR
+                "SOA_MACOS_RUNTIME_PACKAGE failed immutable-payload verification:\n"
+                "${_SOA_RUNTIME_VERIFY_OUTPUT}${_SOA_RUNTIME_VERIFY_ERROR}")
+        endif()
+        message(STATUS
+            "Bundling Story of Alicia runtime package: ${SOA_RESOLVED_MACOS_RUNTIME_PACKAGE}")
+    elseif(SOA_REQUIRE_BUNDLED_RUNTIME)
+        message(FATAL_ERROR
+            "A macOS distribution build requires the launcher-owned runtime package. "
+            "Build soa_wine_runtime first or set -DSOA_MACOS_RUNTIME_PACKAGE=/path/to/package.")
+    else()
+        message(WARNING
+            "Building a developer-only macOS launcher without its runtime. "
+            "Distribution builds must set SOA_REQUIRE_BUNDLED_RUNTIME=ON.")
+    endif()
 endif()
 
 qt_add_executable(${PROJECT_NAME}
@@ -207,6 +295,35 @@ qt_add_executable(${PROJECT_NAME}
         src/res/resources.qrc
         ${SOA_PLATFORM_RESOURCES}
 )
+
+set(SOA_TRANSLATION_FILES
+        translations/soa_launcher_nb.ts
+        translations/soa_launcher_nl.ts
+)
+
+if(Qt6_VERSION VERSION_GREATER_EQUAL "6.9")
+    qt_add_translations(${PROJECT_NAME}
+            TS_FILES ${SOA_TRANSLATION_FILES}
+            RESOURCE_PREFIX "/i18n"
+            QT_TRANSLATION_CATALOGS qtbase
+    )
+else()
+    qt_add_translations(${PROJECT_NAME}
+            TS_FILES ${SOA_TRANSLATION_FILES}
+            RESOURCE_PREFIX "/i18n"
+    )
+endif()
+
+if(APPLE AND SOA_RESOLVED_MACOS_RUNTIME_PACKAGE)
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E remove_directory
+                "$<TARGET_BUNDLE_CONTENT_DIR:${PROJECT_NAME}>/Resources/Story of Alicia Runtime"
+        COMMAND /usr/bin/ditto
+                "${SOA_RESOLVED_MACOS_RUNTIME_PACKAGE}"
+                "$<TARGET_BUNDLE_CONTENT_DIR:${PROJECT_NAME}>/Resources/Story of Alicia Runtime"
+        VERBATIM
+        COMMENT "Bundling the verified Story of Alicia runtime package")
+endif()
 
 target_include_directories(${PROJECT_NAME} PRIVATE
         ${SOA_INCLUDE_DIRS}
@@ -305,13 +422,21 @@ if(APPLE)
     include(CPack)
 endif()
 
-if(BUILD_TESTS)
+if(BUILD_TESTING)
     enable_testing()
 
     find_package(Qt6 REQUIRED COMPONENTS Test)
 
     qt_add_executable(launcher_tests
             tests/main.cpp
+            src/util/LaunchArguments.cpp
+            src/util/DesktopEntry.cpp
+            src/core/wine/PrefixInspector.cpp
+            src/core/wine/WineProcess.cpp
+            src/core/wine/MacWineRuntime.cpp
+            src/core/runtime/RuntimeManifest.cpp
+            src/core/runtime/RuntimeManager.cpp
+            src/core/runtime/RuntimeProvider.cpp
     )
 
     target_include_directories(launcher_tests PRIVATE
@@ -344,4 +469,65 @@ if(BUILD_TESTS)
             NAME launcher_tests
             COMMAND launcher_tests
     )
+
+    add_executable(courier_path_tests
+            tests/courier_paths_tests.swift
+            src/core/network/CourierPaths.swift
+    )
+
+    set_target_properties(courier_path_tests PROPERTIES
+            AUTOMOC OFF
+            AUTORCC OFF
+            AUTOUIC OFF
+            Swift_MODULE_NAME SoaCourierPathTests
+    )
+
+    add_test(
+            NAME courier_path_tests
+            COMMAND courier_path_tests
+    )
+
+
+    add_executable(courier_cancel_tests
+            tests/courier_cancel_tests.swift
+            src/core/network/Courier.swift
+    )
+
+    target_compile_options(courier_cancel_tests PRIVATE
+            "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xcc -fmodule-map-file=${CMAKE_CURRENT_SOURCE_DIR}/src/core/network/module.modulemap>"
+    )
+
+    target_include_directories(courier_cancel_tests PRIVATE
+            include
+    )
+
+    set_target_properties(courier_cancel_tests PROPERTIES
+            AUTOMOC OFF
+            AUTORCC OFF
+            AUTOUIC OFF
+            Swift_MODULE_NAME SoaCourierCancelTests
+    )
+
+    add_test(
+            NAME courier_cancel_tests
+            COMMAND courier_cancel_tests
+    )
+
+    add_executable(courier_hash_tests
+            tests/courier_hash_tests.swift
+            src/core/network/MD5.swift
+    )
+
+    set_target_properties(courier_hash_tests PROPERTIES
+            AUTOMOC OFF
+            AUTORCC OFF
+            AUTOUIC OFF
+            Swift_MODULE_NAME SoaCourierHashTests
+    )
+
+    add_test(
+            NAME courier_hash_tests
+            COMMAND courier_hash_tests
+    )
+
 endif()

@@ -19,7 +19,6 @@ public:
     explicit LauncherSettings(QWidget* parent = nullptr);
 
 signals:
-    void launcher_size_changed();
     void connectivity_panel_changed(bool expanded);
 
 private:

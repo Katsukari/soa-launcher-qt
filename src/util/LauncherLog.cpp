@@ -9,6 +9,7 @@
 #include <QApplication>
 #include <QScrollBar>
 #include <QTextDocument>
+#include "util/LanguageManager.hpp"
 
 #include "util/Config.hpp"
 
@@ -63,9 +64,17 @@ LauncherLog::LauncherLog(QWidget* parent) : QDialog(parent)
     connect(lock, &QPushButton::clicked, this, [this, lock]()
     {
         autoscroll = !autoscroll;
-        lock->setText(autoscroll ? "Autoscroll: On" : "Autoscroll: Off");
+        lock->setText(autoscroll ? util::i18n::translate("Autoscroll: On")
+                                  : util::i18n::translate("Autoscroll: Off"));
         if (autoscroll)
             output->verticalScrollBar()->setValue(output->verticalScrollBar()->maximum());
+    });
+
+    connect(&util::i18n::LanguageManager::instance(),
+            &util::i18n::LanguageManager::language_changed, this, [this, lock]()
+    {
+        lock->setText(autoscroll ? util::i18n::translate("Autoscroll: On")
+                                  : util::i18n::translate("Autoscroll: Off"));
     });
 
     auto* bar = new QHBoxLayout;

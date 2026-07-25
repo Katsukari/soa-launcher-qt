@@ -10,6 +10,7 @@
 
 #include "util/Assets.hpp"
 #include "util/Layout.hpp"
+#include "util/LanguageManager.hpp"
 
 namespace dd = util::layout::dropdown;
 
@@ -25,6 +26,13 @@ ImageDropdown::ImageDropdown(QStringList options, QWidget* parent)
     setFocusPolicy(Qt::StrongFocus);
     setAccessibleName(QStringLiteral("Selection menu"));
     setFixedSize(dd::box(window()->size()));
+    connect(&util::i18n::LanguageManager::instance(),
+            &util::i18n::LanguageManager::language_changed,
+            this, [this]()
+    {
+        setAccessibleName(util::i18n::translate("Selection menu"));
+        update();
+    });
 }
 
 QRect ImageDropdown::closed_rect() const
@@ -194,7 +202,8 @@ void ImageDropdown::paintEvent(QPaintEvent*)
             painter.drawPixmap(rect, dropdown_px);
             painter.setPen(text_col);
             painter.drawText(rect.adjusted(pad, 0, -pad, -lip),
-                             Qt::AlignVCenter | Qt::AlignLeft, items[i]);
+                             Qt::AlignVCenter | Qt::AlignLeft,
+                             util::i18n::translate(items[i]));
         }
     }
 
@@ -202,7 +211,8 @@ void ImageDropdown::paintEvent(QPaintEvent*)
     painter.drawPixmap(closed, dropdown_px);
     painter.setPen(text_col);
     painter.drawText(closed.adjusted(pad, 0, -pad, -lip),
-                     Qt::AlignVCenter | Qt::AlignLeft, items.value(current));
+                     Qt::AlignVCenter | Qt::AlignLeft,
+                     util::i18n::translate(items.value(current)));
 
     painter.setPen(QPen(QColor(0xA8, 0x90, 0x78), util::layout::scaled(2, w)));
     const QPoint center = dd::chevron_center(w) + QPoint(0, closed.top());

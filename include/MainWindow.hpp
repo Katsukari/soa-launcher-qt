@@ -24,8 +24,19 @@ namespace core::integrity
 {
     class GameIntegrityWatcher;
 }
+namespace core::discord
+{
+    class DiscordRpc;
+}
 
+class QAction;
+class QActionGroup;
+class QLabel;
+class QFrame;
+class QMenu;
+class QToolButton;
 class QPushButton;
+class QSystemTrayIcon;
 class AliciaChooser;
 class PrerequisitesIntro;
 class RulesAgreement;
@@ -43,6 +54,7 @@ class MainWindow : public QWidget
 
 public:
     explicit MainWindow(QWidget* parent = nullptr);
+    ~MainWindow() override;
 
     void open_launcher_settings();
 
@@ -51,9 +63,6 @@ public:
         return auth;
     }
 
-signals:
-    void launcher_size_change_requested();
-
 protected:
     void paintEvent(QPaintEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
@@ -61,6 +70,9 @@ protected:
 
 private:
     void setup_window_buttons();
+    void setup_system_tray();
+    void setup_launcher_menu();
+    void setup_discord_rpc();
     void setup_version_label();
     void setup_settings();
     void setup_prerequisites();
@@ -82,10 +94,35 @@ private:
     void close_overlay(util::modal_overlay::ModalOverlay* overlay);
     void on_stage_changed(core::state::Stage stage);
     void open_for_current_stage();
+    void show_launcher();
+    void run_game_directly();
+    void refresh_tray_actions();
+    void refresh_language_actions();
+    void set_launcher_menu_visible(bool visible);
+    void raise_persistent_controls();
+    void show_about();
+    void request_quit();
+    void retranslate_dynamic_text();
+    [[nodiscard]] bool can_run_game_directly() const;
 
     bool chrome_hidden {};
     bool repair_active {};
     bool minimized_for_game {};
+    bool force_quit_requested {};
+    QSystemTrayIcon* tray_icon {};
+    QMenu* tray_menu {};
+    QAction* open_launcher_action {};
+    QAction* run_alicia_action {};
+    QAction* tray_quit_action {};
+    QToolButton* launcher_menu_button {};
+    QFrame* launcher_menu_panel {};
+    QMenu* language_menu {};
+    QActionGroup* language_action_group {};
+    QPushButton* language_button {};
+    QPushButton* show_log_button {};
+    QPushButton* about_button {};
+    QPushButton* quit_launcher_button {};
+    QLabel* version_label {};
     QPushButton* close_button {};
     QPushButton* minimize_button {};
     QPushButton* playtest_button {};
@@ -103,6 +140,7 @@ private:
     AuthHandler* auth {};
     core::state::InstallState* install_state {};
     core::integrity::GameIntegrityWatcher* integrity_watcher {};
+    core::discord::DiscordRpc* discord_rpc {};
     core::game::GameVersion game_version {core::game::GameVersion::Playtest};
     core::state::View last_view {core::state::View::Loading};
 };

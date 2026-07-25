@@ -22,13 +22,23 @@ namespace core::status
 
     void StatusReporter::set_status(Status next)
     {
-        next.last_changed = QDateTime::currentDateTime();
+        const QDateTime changedAt = QDateTime::currentDateTime();
+        const bool unchanged = current.state == next.state
+            && current.phase == next.phase
+            && current.message == next.message
+            && current.progress == next.progress
+            && current.watchdog_exempt == next.watchdog_exempt;
+
+
+
+        if (unchanged)
+        {
+            current.last_changed = changedAt;
+            return;
+        }
+
+        next.last_changed = changedAt;
         current = std::move(next);
-
-
-
-
-
 
         const bool noisy_courier_progress =
             name == QStringLiteral("courier")
@@ -48,12 +58,14 @@ namespace core::status
         emit status_changed(current);
     }
 
-    void StatusReporter::working(const QString& phase, double progress)
+    void StatusReporter::working(const QString& phase, const double progress,
+                                 const bool watchdogExempt)
     {
         Status s;
-        s.state    = State::Working;
-        s.phase    = phase;
+        s.state = State::Working;
+        s.phase = phase;
         s.progress = progress;
+        s.watchdog_exempt = watchdogExempt;
         set_status(std::move(s));
     }
 

@@ -2,11 +2,13 @@
 #include "util/Layout.hpp"
 #include "util/SimpleUtils.hpp"
 #include "util/Config.hpp"
+#include "util/LanguageManager.hpp"
 #include "core/auth/AuthHandler.hpp"
 #include "core/wine/Shell.hpp"
 #include "core/state/InstallState.hpp"
 
 #include <QCheckBox>
+#include <QFontMetrics>
 #include <QGraphicsDropShadowEffect>
 #include <QSignalBlocker>
 
@@ -50,7 +52,7 @@ namespace
         "    font-size: 15px;"
         "}"
         "QPushButton:hover { color: #7E6E5E; }"
-        "QPushButton:focus { outline: none; }";
+        "QPushButton:focus { border: 1px solid #2FB4E0; border-radius: 3px; }";
 
     void add_soft_shadow(QWidget* widget, const qreal blur = 22.0, const qreal y = 7.0,
                          const QColor& color = QColor(65, 39, 25, 72))
@@ -67,7 +69,8 @@ namespace
         const QString game_name = version == core::game::GameVersion::Alicia2
             ? QStringLiteral("Story of Alicia 2.0")
             : QStringLiteral("Story of Alicia");
-        return QStringLiteral("Welcome to %1. To participate in the playtest, you have to first %2.")
+        return util::i18n::translate(
+            "Welcome to %1. To participate in the playtest, you have to first %2.")
             .arg(game_name, required_action);
     }
 
@@ -92,10 +95,25 @@ AliciaChooser::AliciaChooser(AuthHandler* auth_, core::wine::Shell* shell_,
     setup_login_state();
     setup_waiting_state();
     setup_signedin_state();
+
+    warning_label = new QLabel(this);
+    warning_label->setTextFormat(Qt::PlainText);
+    warning_label->setWordWrap(true);
+    warning_label->setAlignment(Qt::AlignCenter);
+    warning_label->setStyleSheet(
+        QStringLiteral("QLabel { color: #8A4D12; background: rgba(255,238,196,0.88); "
+                       "border: 1px solid rgba(176,117,43,0.48); border-radius: 5px; "
+                       "font-family: 'Inter'; font-size: 11px; padding: 3px 8px; }"));
+    warning_label->setAccessibleName(QStringLiteral("Launcher warning"));
+    set_warning(install_state->warning_message());
+
     refresh_game_text();
     refresh_keep_signed_in();
+    refresh_session_banner();
     connect(&Config::instance(), &Config::changed,
             this, &AliciaChooser::refresh_keep_signed_in);
+    connect(&Config::instance(), &Config::changed,
+            this, &AliciaChooser::refresh_session_banner);
 
     reset_path_button = new QPushButton("RESET LAUNCHER SETTINGS", this);
     reset_path_button->setCursor(Qt::PointingHandCursor);
@@ -111,6 +129,16 @@ AliciaChooser::AliciaChooser(AuthHandler* auth_, core::wine::Shell* shell_,
     on_stage_changed(install_state->stage());
     connect(install_state, &core::state::InstallState::stage_changed,
             this, &AliciaChooser::on_stage_changed);
+    connect(install_state, &core::state::InstallState::warning_changed,
+            this, &AliciaChooser::set_warning);
+    connect(&util::i18n::LanguageManager::instance(),
+            &util::i18n::LanguageManager::language_changed, this,
+            [this]()
+    {
+        retranslate_dynamic_text();
+        on_stage_changed(current_stage);
+        set_warning(install_state->warning_message());
+    });
 }
 
 void AliciaChooser::set_game_version(const core::game::GameVersion version)
@@ -143,24 +171,47 @@ void AliciaChooser::on_stage_changed(const Stage stage)
     QString message;
     switch (stage)
     {
-        case Stage::Probing:         message = QStringLiteral("Checking launcher state..."); break;
+        case Stage::Probing:         message = util::i18n::translate("Checking launcher state..."); break;
         case Stage::NeedsPrerequisites:
-            message = welcome_message(game_version, QStringLiteral("complete the easy setup assistant"));
+            message = welcome_message(game_version, util::i18n::translate("complete the easy setup assistant"));
             break;
         case Stage::NeedsRuntime:
-            message = welcome_message(game_version, QStringLiteral("choose Wine or Proton"));
+#if defined(Q_OS_MACOS)
+            message = welcome_message(
+                game_version, util::i18n::translate("restore or select a compatible runtime"));
+#else
+            message = welcome_message(game_version, util::i18n::translate("choose Wine or Proton"));
+#endif
             break;
-        case Stage::NeedsPrefix:     message = QStringLiteral("The shared Wine prefix needs to be created before installing the game."); break;
-        case Stage::PrefixBroken:    message = QStringLiteral("The shared Wine prefix is incomplete and needs repair."); break;
-        case Stage::SettingUpPrefix: message = QStringLiteral("Preparing the shared Wine prefix..."); break;
+        case Stage::NeedsPrefix:
+#if defined(Q_OS_MACOS)
+            message = util::i18n::translate("The shared runtime prefix needs to be created before installing the game.");
+#else
+            message = util::i18n::translate("The shared Wine prefix needs to be created before installing the game.");
+#endif
+            break;
+        case Stage::PrefixBroken:
+#if defined(Q_OS_MACOS)
+            message = util::i18n::translate("The shared runtime prefix is incomplete and needs repair.");
+#else
+            message = util::i18n::translate("The shared Wine prefix is incomplete and needs repair.");
+#endif
+            break;
+        case Stage::SettingUpPrefix:
+#if defined(Q_OS_MACOS)
+            message = util::i18n::translate("Preparing the shared runtime prefix...");
+#else
+            message = util::i18n::translate("Preparing the shared Wine prefix...");
+#endif
+            break;
         case Stage::NeedsDownload:
-            message = welcome_message(game_version, QStringLiteral("download the game"));
+            message = welcome_message(game_version, util::i18n::translate("download the game"));
             break;
-        case Stage::CheckingUpdate:  message = QStringLiteral("Checking this game for updates..."); break;
-        case Stage::Downloading:     message = QStringLiteral("Downloading and verifying game files..."); break;
-        case Stage::NeedsUpdate:     message = QStringLiteral("A game update is available and must be installed before launch."); break;
-        case Stage::Updating:        message = QStringLiteral("Updating and verifying game files..."); break;
-        case Stage::NeedsRules:      message = QStringLiteral("The game is installed. Review and accept the playtest rules before signing in."); break;
+        case Stage::CheckingUpdate:  message = util::i18n::translate("Checking this game for updates..."); break;
+        case Stage::Downloading:     message = util::i18n::translate("Downloading and verifying game files..."); break;
+        case Stage::NeedsUpdate:     message = util::i18n::translate("A game update is available and must be installed before launch."); break;
+        case Stage::Updating:        message = util::i18n::translate("Updating and verifying game files..."); break;
+        case Stage::NeedsRules:      message = util::i18n::translate("The game is installed. Review and accept the playtest rules before signing in."); break;
         case Stage::Failed:          message = install_state->error_message(); break;
         default: break;
     }
@@ -174,17 +225,14 @@ void AliciaChooser::on_stage_changed(const Stage stage)
     const auto action = stage == Stage::NeedsUpdate
         ? util::assets::Button::UpdateAvailable
         : util::assets::Button::DownloadGame;
-    download_button->setIcon(QIcon(util::assets::buttons[action].normal));
-
-    if (next == State::SignedIn)
-    {
-        QString name = Config::instance().display_name().trimmed();
-        if (name.isEmpty()) name = QStringLiteral("PLAYER");
-        name = name.left(64).toUpper();
-        signed_in_label->setText(QStringLiteral("  SIGNED IN AS ") + name);
-    }
+    util::simple_utils::set_button_asset(download_button, action);
+    util::simple_utils::set_button_text(
+        download_button, stage == Stage::NeedsUpdate
+            ? QStringLiteral("UPDATE AVAILABLE")
+            : QStringLiteral("DOWNLOAD GAME"));
 
     set_state(next);
+    refresh_session_banner();
     refresh_enter_enabled();
 }
 
@@ -241,9 +289,9 @@ void AliciaChooser::setup_download_state()
     download_button->setFlat(true);
     download_button->setCursor(Qt::PointingHandCursor);
     download_button->setText("");
-    download_button->setStyleSheet("border: none; outline: none; background: transparent;");
+    download_button->setStyleSheet("border: none;  background: transparent;");
 
-    const QPixmap& normal = util::assets::buttons[util::assets::Button::DownloadGame].normal;
+    const QPixmap& normal = util::assets::button(util::assets::Button::DownloadGame).normal;
 
     const int bw = util::layout::alicia_chooser::dl_button_w(w);
     const int bh = qRound(bw * static_cast<double>(normal.height()) / normal.width());
@@ -253,6 +301,10 @@ void AliciaChooser::setup_download_state()
     download_button->setIcon(QIcon(normal));
     download_button->setIconSize(QSize(bw, bh));
     download_button->setGeometry(bx, by, bw, bh);
+    QFont download_font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
+    download_font.setPixelSize(util::layout::scaled(20, w));
+    download_font.setWeight(QFont::Black);
+    util::simple_utils::add_button_text(download_button, util::assets::Button::DownloadGame, QStringLiteral("DOWNLOAD GAME"), download_font);
     download_button->setAccessibleName(QStringLiteral("Open the required game setup action"));
     download_button->installEventFilter(this);
     connect(download_button, &QPushButton::clicked, this, [this]()
@@ -266,7 +318,7 @@ void AliciaChooser::setup_login_state()
     const QSize w = window()->size();
 
     const QRect dr = util::layout::alicia_chooser::discord_button(w);
-    const QPixmap& discord_normal = util::assets::buttons[util::assets::Button::Discord].normal;
+    const QPixmap& discord_normal = util::assets::button(util::assets::Button::Discord).normal;
     const int dw = dr.width();
     const int dh = qRound(dw * static_cast<double>(discord_normal.height()) / discord_normal.width());
 
@@ -274,10 +326,16 @@ void AliciaChooser::setup_login_state()
     discord_button->setFlat(true);
     discord_button->setCursor(Qt::PointingHandCursor);
     discord_button->setText("");
-    discord_button->setStyleSheet("border: none; outline: none; background: transparent;");
+    discord_button->setStyleSheet("border: none;  background: transparent;");
     discord_button->setIcon(QIcon(discord_normal));
     discord_button->setIconSize(QSize(dw, dh));
     discord_button->setGeometry(dr.x(), dr.y(), dw, dh);
+    QFont discord_font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
+    discord_font.setPixelSize(util::layout::scaled(18, w));
+    discord_font.setWeight(QFont::Black);
+    util::simple_utils::add_button_text(
+        discord_button, util::assets::Button::Discord, QStringLiteral("PROCEED WITH DISCORD"), discord_font, QColor(Qt::white),
+        QPoint(util::layout::scaled(18, w), 0));
     discord_button->setAccessibleName(QStringLiteral("Proceed with Discord"));
     discord_button->installEventFilter(this);
     connect(discord_button, &QPushButton::clicked, auth, &AuthHandler::open_login);
@@ -291,9 +349,9 @@ void AliciaChooser::setup_login_state()
     keep_font.setWeight(QFont::Medium);
     keep_signed_button->setFont(keep_font);
     keep_signed_button->setStyleSheet(
-        "QCheckBox { background: transparent; color: #4F1717; spacing: 5px; outline: none; }"
+        "QCheckBox { background: transparent; color: #4F1717; spacing: 5px; }"
         "QCheckBox:hover { color: #321010; }"
-        "QCheckBox:focus { outline: none; }"
+        "QCheckBox:focus { border: 1px solid #2FB4E0; border-radius: 3px; }"
         "QCheckBox::indicator { width: 19px; height: 18px; }"
         "QCheckBox::indicator:unchecked { image: url(:/assets/checkbox.png); }"
         "QCheckBox::indicator:checked { image: url(:/assets/checkbox-ticked.png); }");
@@ -334,9 +392,9 @@ void AliciaChooser::setup_waiting_state()
     steps_label->setWordWrap(true);
     steps_label->setTextFormat(Qt::RichText);
     steps_label->setText(
-        "<b>1.</b>&nbsp; Sign in with Discord via the app or browser.<br>"
-        "<b>2.</b>&nbsp; On your <b>browser</b>, click <b>“Open Story of Alicia Launcher”</b>.<br>"
-        "<b>3.</b>&nbsp; Allow your browser to always open the Launcher when prompted.<br>"
+        "<b>1.</b>&nbsp; Open the exact copied sign-in link in the browser you want to use.<br>"
+        "<b>2.</b>&nbsp; Sign in with Discord and authorize the launcher.<br>"
+        "<b>3.</b>&nbsp; Click <b>“Open Story of Alicia Launcher”</b> when prompted.<br>"
         "<b>4.</b>&nbsp; If login did not work, cancel and try again.");
     steps_label->setStyleSheet(k_note_box);
     steps_label->setGeometry(util::layout::alicia_chooser::steps(w));
@@ -354,7 +412,7 @@ void AliciaChooser::setup_waiting_state()
     try_again_button->setStyleSheet(
         "QPushButton { background: transparent; border: none; color: #988776; }"
         "QPushButton:hover { color: #6F5F50; }"
-        "QPushButton:focus { outline: none; }");
+        "QPushButton:focus { border: 1px solid #2FB4E0; border-radius: 3px; }");
     connect(try_again_button, &QPushButton::clicked, auth, &AuthHandler::cancel_login);
 }
 
@@ -368,7 +426,7 @@ void AliciaChooser::setup_signedin_state()
     signed_in_label->setGeometry(util::layout::alicia_chooser::signed_in_banner(w));
 
     const QRect er = util::layout::alicia_chooser::enter_button(w);
-    const QPixmap& enter_normal = util::assets::buttons[util::assets::Button::Enter].normal;
+    const QPixmap& enter_normal = util::assets::button(util::assets::Button::Enter).normal;
     const int ew = er.width();
     const int eh = qRound(ew * static_cast<double>(enter_normal.height()) / enter_normal.width());
 
@@ -376,10 +434,14 @@ void AliciaChooser::setup_signedin_state()
     enter_button->setFlat(true);
     enter_button->setCursor(Qt::PointingHandCursor);
     enter_button->setText("");
-    enter_button->setStyleSheet("border: none; outline: none; background: transparent;");
+    enter_button->setStyleSheet("border: none;  background: transparent;");
     enter_button->setIcon(QIcon(enter_normal));
     enter_button->setIconSize(QSize(ew, eh));
     enter_button->setGeometry(er.x(), er.y(), ew, eh);
+    QFont enter_font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
+    enter_font.setPixelSize(util::layout::scaled(20, w));
+    enter_font.setWeight(QFont::Black);
+    util::simple_utils::add_button_text(enter_button, util::assets::Button::Enter, QStringLiteral("ENTER THE PLAYTEST"), enter_font);
     enter_button->setEnabled(false);
     enter_button->setAccessibleName(QStringLiteral("Enter the playtest"));
     enter_button->installEventFilter(this);
@@ -418,7 +480,14 @@ void AliciaChooser::apply_state_visibility()
     signed_in_label->setVisible(signedin);
     enter_button->setVisible(signedin);
 
-    reset_path_button->setVisible(!download);
+    reset_path_button->setVisible(
+        !download && (!warning_label || !warning_label->isVisible()));
+    reset_path_button->setEnabled(
+        current_stage != Stage::Launching && current_stage != Stage::Running);
+    reset_path_button->setToolTip(reset_path_button->isEnabled()
+        ? util::i18n::translate(
+              "Reset launcher settings and sign-in without deleting the shared prefix or either game")
+        : util::i18n::translate("Launcher settings cannot be reset while Alicia is active"));
 }
 
 void AliciaChooser::refresh_enter_enabled()
@@ -426,10 +495,105 @@ void AliciaChooser::refresh_enter_enabled()
     const bool ready = current_stage == Stage::Ready;
     enter_button->setEnabled(ready);
     enter_button->setToolTip(current_stage == Stage::Running
-        ? QStringLiteral("Alicia is already running")
+        ? util::i18n::translate("Alicia is already running")
         : current_stage == Stage::Launching
-            ? QStringLiteral("Alicia is starting")
+            ? util::i18n::translate("Alicia is starting")
             : QString());
+}
+
+void AliciaChooser::refresh_session_banner()
+{
+    if (!signed_in_label || !enter_button)
+        return;
+
+    if (current_stage == Stage::Launching)
+    {
+        signed_in_label->setText(util::i18n::translate("  STARTING ALICIA…"));
+        signed_in_label->setAccessibleName(util::i18n::translate("Alicia is starting"));
+        enter_button->setAccessibleDescription(
+            util::i18n::translate("Disabled while Alicia is starting"));
+    }
+    else if (current_stage == Stage::Running)
+    {
+        signed_in_label->setText(util::i18n::translate("  ALICIA IS RUNNING"));
+        signed_in_label->setAccessibleName(util::i18n::translate("Alicia is running"));
+        enter_button->setAccessibleDescription(
+            util::i18n::translate("Disabled while Alicia is running"));
+    }
+    else
+    {
+        const QString account = Config::instance().display_name().trimmed().isEmpty()
+            ? Config::instance().username().trimmed()
+            : Config::instance().display_name().trimmed();
+        signed_in_label->setText(account.isEmpty()
+            ? util::i18n::translate("  SIGNED IN")
+            : util::i18n::translate("  SIGNED IN AS %1").arg(account));
+        signed_in_label->setAccessibleName(
+            account.isEmpty() ? util::i18n::translate("Signed in")
+                              : util::i18n::translate("Signed in as %1").arg(account));
+        enter_button->setAccessibleDescription(
+            util::i18n::translate("Start the selected Alicia playtest"));
+    }
+}
+
+void AliciaChooser::set_warning(const QString& message)
+{
+    if (!warning_label)
+        return;
+    const QString translated_message = util::i18n::translate(message);
+    warning_label->setText(translated_message);
+    warning_label->setToolTip(translated_message);
+    warning_label->setVisible(!message.isEmpty());
+    update_warning_geometry();
+    if (reset_path_button)
+    {
+        reset_path_button->setVisible(
+            state != State::Download && message.isEmpty());
+    }
+}
+
+void AliciaChooser::update_warning_geometry()
+{
+    if (!warning_label)
+        return;
+    const QSize w = window()->size();
+    const QRect available = util::layout::alicia_chooser::warning(w);
+    const int horizontal_margin = util::layout::scaled(20, w);
+    const int vertical_margin = util::layout::scaled(10, w);
+    const QRect bounds = QFontMetrics(warning_label->font()).boundingRect(
+        QRect(0, 0, qMax(1, available.width() - horizontal_margin), 1000),
+        Qt::AlignCenter | Qt::TextWordWrap, warning_label->text());
+    const int minimum_height = util::layout::scaled(34, w);
+    const int required_height = qBound(minimum_height, bounds.height() + vertical_margin, available.height());
+    warning_label->setGeometry(available.x(), available.bottom() - required_height + 1,
+                               available.width(), required_height);
+}
+
+void AliciaChooser::retranslate_dynamic_text()
+{
+    if (reset_path_button)
+    {
+        reset_path_button->setText(util::i18n::translate("RESET LAUNCHER SETTINGS"));
+        reset_path_button->setAccessibleName(util::i18n::translate("Reset launcher settings"));
+        reset_path_button->setToolTip(reset_path_button->isEnabled()
+            ? util::i18n::translate(
+                  "Reset launcher settings and sign-in without deleting the shared prefix or either game")
+            : util::i18n::translate("Launcher settings cannot be reset while Alicia is active"));
+    }
+    if (download_button)
+    {
+        util::simple_utils::set_button_text(
+            download_button, current_stage == Stage::NeedsUpdate
+                ? QStringLiteral("UPDATE AVAILABLE")
+                : QStringLiteral("DOWNLOAD GAME"));
+    }
+    if (discord_button)
+        util::simple_utils::set_button_text(discord_button, QStringLiteral("PROCEED WITH DISCORD"));
+    if (enter_button)
+        util::simple_utils::set_button_text(enter_button, QStringLiteral("ENTER THE PLAYTEST"));
+    refresh_game_text();
+    refresh_keep_signed_in();
+    refresh_session_banner();
 }
 
 void AliciaChooser::refresh_keep_signed_in()
@@ -441,15 +605,17 @@ void AliciaChooser::refresh_keep_signed_in()
     const QSignalBlocker blocker(keep_signed_button);
     keep_signed_button->setChecked(keep);
     keep_signed_button->setToolTip(keep
-        ? QStringLiteral("Your Discord session will be restored next time the launcher starts")
-        : QStringLiteral("Your Discord session will only last until this launcher closes"));
+        ? util::i18n::translate("Your Discord session will be restored next time the launcher starts")
+        : util::i18n::translate("Your Discord session will only last until this launcher closes"));
 }
 
 void AliciaChooser::refresh_game_text()
 {
     const bool alicia_2 = game_version == core::game::GameVersion::Alicia2;
 
-    title_label->setText(alicia_2 ? "STORY OF ALICIA 2.0 PLAYTEST" : "PLAYTEST");
+    title_label->setText(alicia_2
+        ? util::i18n::translate("STORY OF ALICIA 2.0 PLAYTEST")
+        : util::i18n::translate("PLAYTEST"));
 }
 
 void AliciaChooser::paintEvent(QPaintEvent* event)
@@ -477,19 +643,19 @@ bool AliciaChooser::eventFilter(QObject* obj, QEvent* event)
         const auto action = current_stage == Stage::NeedsUpdate
             ? util::assets::Button::UpdateAvailable
             : util::assets::Button::DownloadGame;
-        const auto& button = util::assets::buttons[action];
+        const auto& button = util::assets::button(action);
         util::simple_utils::apply_button_state(event, download_button,
                                                button.normal, button.hover, button.clicked);
     }
     else if (obj == discord_button)
     {
-        const auto& button = util::assets::buttons[util::assets::Button::Discord];
+        const auto& button = util::assets::button(util::assets::Button::Discord);
         util::simple_utils::apply_button_state(event, discord_button,
                                                button.normal, button.hover, button.clicked);
     }
     else if (obj == enter_button)
     {
-        const auto& button = util::assets::buttons[util::assets::Button::Enter];
+        const auto& button = util::assets::button(util::assets::Button::Enter);
         util::simple_utils::apply_button_state(event, enter_button,
                                                button.normal, button.hover, button.clicked);
     }

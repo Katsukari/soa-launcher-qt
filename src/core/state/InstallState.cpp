@@ -1,5 +1,6 @@
 #include "core/state/InstallState.hpp"
 
+#include <QFileInfo>
 #include <QTimer>
 
 #include "core/Log.hpp"
@@ -30,6 +31,11 @@ namespace core::state
 
     InstallState::InstallState(QObject* parent) : QObject(parent)
     {
+        probe_timer = new QTimer(this);
+        probe_timer->setSingleShot(true);
+        probe_timer->setInterval(0);
+        connect(probe_timer, &QTimer::timeout, this, &InstallState::probe);
+
         connect(&StatusBus::instance(), &StatusBus::reporter_status_changed, this,
             [this](StatusReporter* reporter, const Status& status)
             {
@@ -38,7 +44,7 @@ namespace core::state
         connect(&CourierBridge::instance(), &CourierBridge::download_status,
                 this, &InstallState::on_courier_status);
         connect(&util::config::Config::instance(), &util::config::Config::changed,
-                this, [this]() { probe(); });
+                this, &InstallState::schedule_probe, Qt::QueuedConnection);
     }
 
     InstallState::~InstallState()
@@ -69,18 +75,42 @@ namespace core::state
         update_check_in_progress = false;
     }
 
+    void InstallState::schedule_probe()
+    {
+        if (probe_timer && !probe_timer->isActive())
+            probe_timer->start();
+    }
+
     void InstallState::probe()
     {
+        if (probe_timer)
+            probe_timer->stop();
+
         auto& config = util::config::Config::instance();
         const QString prefix = config.prefix_root();
         prerequisites_confirmed = config.prerequisites_confirmed();
         rules_accepted = config.rules_accepted();
         runtime_chosen = config.runtime_selected();
 
+#if defined(Q_OS_MACOS)
+        const bool proton = false;
+#else
         const bool proton = core::wine::WineRegistry::identify(config.wine_binary())
             == core::wine::RuntimeType::Proton;
+#endif
+        const QString runtimeIdentity = proton
+            ? config.wine_binary()
+            : core::wine::WineRegistry::resolve_wine_executable(config.wine_binary());
+#if defined(Q_OS_MACOS)
+        runtime_chosen = runtime_chosen
+            && !runtimeIdentity.isEmpty()
+            && QFileInfo(runtimeIdentity).isFile()
+            && QFileInfo(runtimeIdentity).isExecutable();
+#endif
         const auto inspection = core::wine::PrefixInspector::inspect(
-            prefix, config.wine_binary(), proton);
+            prefix,
+            runtimeIdentity.isEmpty() ? config.wine_binary() : runtimeIdentity,
+            proton);
 
         prefix_exists = inspection.exists;
         prefix_ready = inspection.exists && inspection.marker_valid
@@ -111,12 +141,28 @@ namespace core::state
     {
         if (!probed || !prerequisites_confirmed || !runtime_chosen || !prefix_ready || !game_installed
             || update_check_complete || update_check_in_progress
-            || courier_working || !last_error.isEmpty())
+            || courier_working || wine_state == State::Working || auth_state == State::Working
+            || !last_error.isEmpty())
         {
             return;
         }
 
         auto& config = util::config::Config::instance();
+        const QString installPath = config.game_install_path();
+        if (!config.path_inside_prefix(installPath))
+        {
+            update_check_complete = true;
+#if defined(Q_OS_MACOS)
+            const QString warning = QStringLiteral(
+                "The configured game folder is outside the active runtime prefix.");
+#else
+            const QString warning = QStringLiteral(
+                "The configured game folder is outside the active Wine prefix.");
+#endif
+            set_warning(warning);
+            recompute();
+            return;
+        }
         const auto& game = core::game::profile(config.game_version());
         if (!update_checker)
         {
@@ -136,7 +182,7 @@ namespace core::state
 
         update_check_in_progress = true;
         update_operation_id = courier_update_check(
-            update_checker, config.game_install_path().toUtf8().constData());
+            update_checker, installPath.toUtf8().constData());
         if (update_operation_id == 0)
         {
             update_check_in_progress = false;
@@ -163,7 +209,7 @@ namespace core::state
 
             if (status.base.state == State::Done)
             {
-                update_needed = status.base.message == QStringLiteral("update-available");
+                update_needed = status.result == courier_result_update_available;
                 if (!update_needed)
                     set_warning({});
             }
@@ -190,7 +236,7 @@ namespace core::state
             courier_working = false;
             if (status.base.state == State::Failed)
             {
-                if (status.base.message.compare(QStringLiteral("Cancelled."), Qt::CaseInsensitive) == 0)
+                if (status.result == courier_result_cancelled)
                 {
                     set_warning({});
                 }
@@ -209,7 +255,7 @@ namespace core::state
                 set_warning({});
                 update_check_complete = false;
                 update_needed = false;
-                QTimer::singleShot(0, this, [this]() { probe(); });
+                schedule_probe();
             }
             recompute();
         }
@@ -265,7 +311,7 @@ namespace core::state
         if (status.state == State::Done)
         {
             set_error({});
-            QTimer::singleShot(0, this, [this]() { probe(); });
+            schedule_probe();
         }
         else
         {
@@ -282,14 +328,18 @@ namespace core::state
 
         if (wine_state == State::Working)
         {
-            if (wine_phase == QStringLiteral("game-running")) return Stage::Running;
-            if (wine_phase == QStringLiteral("game-first-launch")) return Stage::Launching;
+            if (wine_phase == QStringLiteral("game-running")
+                || wine_phase == QStringLiteral("game-monitoring-uncertain"))
+            {
+                return Stage::Running;
+            }
+            if (wine_phase.startsWith(QStringLiteral("game-"))) return Stage::Launching;
             return Stage::SettingUpPrefix;
         }
 
+        if (courier_working) return game_installed ? Stage::Updating : Stage::Downloading;
         if (!prefix_exists) return Stage::NeedsPrefix;
         if (!prefix_ready) return Stage::PrefixBroken;
-        if (courier_working) return game_installed ? Stage::Updating : Stage::Downloading;
         if (!game_installed) return Stage::NeedsDownload;
         if (update_check_in_progress) return Stage::CheckingUpdate;
         if (update_needed) return Stage::NeedsUpdate;

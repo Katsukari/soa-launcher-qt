@@ -1,6 +1,7 @@
 #include "MainWindow.hpp"
 
 #include "core/auth/AuthHandler.hpp"
+#include "core/discord/DiscordRpc.hpp"
 #include "core/integrity/GameIntegrityWatcher.hpp"
 #include "core/state/InstallState.hpp"
 #include "core/state/ViewRouter.hpp"
@@ -8,6 +9,7 @@
 #include "util/Assets.hpp"
 #include "util/Config.hpp"
 #include "util/Layout.hpp"
+#include "util/LanguageManager.hpp"
 #include "util/ModalOverlay.hpp"
 #include "util/SimpleUtils.hpp"
 #include "widgets/AliciaChooser.hpp"
@@ -19,17 +21,29 @@
 #include "widgets/Settings.hpp"
 #include "widgets/WineInstall.hpp"
 #include "widgets/WineSelectMenu.hpp"
+#include "widgets/LauncherLog.hpp"
 
+#include <QAction>
+#include <QActionGroup>
 #include <QApplication>
 #include <QCloseEvent>
+#include <QCoreApplication>
+#include <QDesktopServices>
 #include <QGuiApplication>
+#include <QGraphicsDropShadowEffect>
+#include <QFrame>
 #include <QLabel>
+#include <QMenu>
 #include <QMouseEvent>
 #include <QMessageBox>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPushButton>
 #include <QScreen>
+#include <QSystemTrayIcon>
+#include <QToolButton>
+#include <QTimer>
+#include <QUrl>
 #include <QWindow>
 
 using core::game::GameVersion;
@@ -38,11 +52,31 @@ using core::state::View;
 using util::config::Config;
 
 #ifndef SOA_LAUNCHER_VERSION
-#define SOA_LAUNCHER_VERSION "0.1.0"
+#define SOA_LAUNCHER_VERSION "0.3.0"
 #endif
 
 namespace
 {
+    QMessageBox* show_modeless_message(QWidget* parent,
+                                       const QMessageBox::Icon icon,
+                                       const QString& title,
+                                       const QString& message,
+                                       const QString& informative = {})
+    {
+        auto* box = new QMessageBox(
+            icon,
+            util::i18n::translate(title),
+            util::i18n::translate(message),
+            QMessageBox::Ok,
+            parent);
+        box->setAttribute(Qt::WA_DeleteOnClose);
+        box->setWindowModality(Qt::NonModal);
+        if (!informative.isEmpty())
+            box->setInformativeText(util::i18n::translate(informative));
+        box->open();
+        return box;
+    }
+
     QSize configured_window_size()
     {
         const QString configured = Config::instance().launcher_size();
@@ -54,7 +88,7 @@ namespace
             bool height_ok = false;
             const int width = parts[0].toInt(&width_ok);
             const int height = parts[1].toInt(&height_ok);
-            if (width_ok && height_ok && width >= 800 && height >= 480)
+            if (width_ok && height_ok && width >= 640 && height >= 360)
                 requested = QSize(width, height);
         }
 
@@ -65,8 +99,8 @@ namespace
         const double scale = qMin(1.0, qMin(
             static_cast<double>(available.width()) / requested.width(),
             static_cast<double>(available.height()) / requested.height()));
-        return QSize(qMax(800, qRound(requested.width() * scale)),
-                     qMax(480, qRound(requested.height() * scale)));
+        return QSize(qMax(1, qMin(available.width(), qRound(requested.width() * scale))),
+                     qMax(1, qMin(available.height(), qRound(requested.height() * scale))));
     }
     QPixmap make_version_button(const QSize window_size, const QRect button_rect,
                                 const QPixmap& frame, const QPixmap& icon,
@@ -98,7 +132,10 @@ MainWindow::MainWindow(QWidget* parent)
     auth = new AuthHandler(shell, this);
     install_state = new core::state::InstallState(this);
 
+    setup_discord_rpc();
+    setup_system_tray();
     setup_window_buttons();
+    setup_launcher_menu();
     setup_version_label();
     setup_settings();
     setup_alicia_chooser();
@@ -113,6 +150,10 @@ MainWindow::MainWindow(QWidget* parent)
 
     connect(install_state, &core::state::InstallState::stage_changed,
             this, &MainWindow::on_stage_changed);
+    connect(install_state, &core::state::InstallState::stage_changed,
+            this, [this]() { refresh_tray_actions(); });
+    connect(&Config::instance(), &Config::changed,
+            this, [this]() { refresh_tray_actions(); });
     connect(install_state, &core::state::InstallState::error_changed, this,
             [this](const QString& message)
     {
@@ -121,19 +162,46 @@ MainWindow::MainWindow(QWidget* parent)
         if ((game_install && game_install->isVisible())
             || (repair_progress && repair_progress->isVisible()))
             return;
-        QMessageBox box(QMessageBox::Critical, QStringLiteral("Launcher Error"), message,
-                        QMessageBox::Ok, this);
-        box.setInformativeText(QStringLiteral(
-            "The launcher log has been opened with diagnostic details. Close this message, then retry the action."));
-        box.exec();
-        install_state->dismiss_error();
+        QMessageBox* box = show_modeless_message(
+            this, QMessageBox::Critical, QStringLiteral("Launcher Error"), message,
+            QStringLiteral(
+                "The launcher log has diagnostic details. Close this message, then retry the action."));
+        connect(box, &QMessageBox::finished, install_state,
+                [this]() { install_state->dismiss_error(); });
     });
     connect(shell, &core::wine::Shell::user_notice, this, [this](const QString& message)
     {
-        QMessageBox::information(this, QStringLiteral("Story Of Alicia Launcher"), message);
+        show_modeless_message(this, QMessageBox::Information,
+                               QStringLiteral("Story of Alicia Launcher"), message);
     });
+    connect(&Config::instance(), &Config::persistence_failed, this,
+            [this](const QString& path, const QString& reason)
+    {
+        show_modeless_message(
+            this, QMessageBox::Critical, QStringLiteral("Settings Not Saved"),
+            util::i18n::translate(
+                "The launcher could not save config.json.\n\nPath: %1\nReason: %2\n\n"
+                "Your on-screen change is active only for this session.")
+                .arg(path, reason));
+    });
+    if (!Config::instance().persistence_error().isEmpty())
+    {
+        show_modeless_message(
+            this, QMessageBox::Critical, QStringLiteral("Settings Not Saved"),
+            util::i18n::translate(
+                "The launcher could not initialize config.json.\n\nPath: %1\n"
+                "Reason: %2")
+                .arg(Config::instance().file_path(),
+                     Config::instance().persistence_error()));
+    }
     connect(shell, &core::wine::Shell::game_started, this, [this](core::game::GameVersion)
     {
+        const QString proxy_username = Config::instance().display_name().trimmed().isEmpty()
+            ? Config::instance().username()
+            : Config::instance().display_name();
+        if (discord_rpc)
+            discord_rpc->set_game_presence(proxy_username);
+        refresh_tray_actions();
         if (Config::instance().after_game_start() == QStringLiteral("minimize"))
         {
             minimized_for_game = true;
@@ -143,15 +211,117 @@ MainWindow::MainWindow(QWidget* parent)
     connect(shell, &core::wine::Shell::game_exited, this,
             [this](core::game::GameVersion, int, bool)
     {
+        if (discord_rpc)
+            discord_rpc->set_launcher_presence();
+        refresh_tray_actions();
         if (!minimized_for_game)
             return;
         minimized_for_game = false;
-        showNormal();
-        raise();
-        activateWindow();
+        show_launcher();
     });
 
     install_state->probe();
+    shell->detect_existing_game();
+    refresh_tray_actions();
+    raise_persistent_controls();
+
+    connect(&util::i18n::LanguageManager::instance(),
+            &util::i18n::LanguageManager::language_changed, this,
+            [this]()
+    {
+        refresh_language_actions();
+        retranslate_dynamic_text();
+        raise_persistent_controls();
+    });
+}
+
+MainWindow::~MainWindow()
+{
+    if (tray_icon)
+        tray_icon->hide();
+    if (discord_rpc)
+        discord_rpc->shutdown();
+}
+
+void MainWindow::setup_discord_rpc()
+{
+    discord_rpc = new core::discord::DiscordRpc(this);
+    discord_rpc->set_launcher_presence();
+}
+
+void MainWindow::setup_system_tray()
+{
+    if (!QSystemTrayIcon::isSystemTrayAvailable())
+        return;
+
+    tray_menu = new QMenu(this);
+    open_launcher_action = tray_menu->addAction(QStringLiteral("Open Launcher"));
+    run_alicia_action = tray_menu->addAction(QStringLiteral("Run Alicia Directly"));
+    tray_menu->addSeparator();
+    tray_quit_action = tray_menu->addAction(QStringLiteral("Quit Launcher"));
+
+    connect(open_launcher_action, &QAction::triggered, this, &MainWindow::show_launcher);
+    connect(run_alicia_action, &QAction::triggered, this, &MainWindow::run_game_directly);
+    connect(tray_quit_action, &QAction::triggered, this, &MainWindow::request_quit);
+    connect(tray_menu, &QMenu::aboutToShow, this, &MainWindow::refresh_tray_actions);
+
+    tray_icon = new QSystemTrayIcon(QIcon(QStringLiteral(":/assets/soa-logo.png")), this);
+    tray_icon->setToolTip(QStringLiteral("Story Of Alicia Launcher"));
+    tray_icon->setContextMenu(tray_menu);
+    connect(tray_icon, &QSystemTrayIcon::activated, this,
+            [this](const QSystemTrayIcon::ActivationReason reason)
+    {
+        if (reason == QSystemTrayIcon::Trigger || reason == QSystemTrayIcon::DoubleClick)
+            show_launcher();
+    });
+    tray_icon->show();
+}
+
+void MainWindow::show_launcher()
+{
+    setWindowState((windowState() & ~Qt::WindowMinimized) | Qt::WindowActive);
+    show();
+    raise();
+    activateWindow();
+    raise_persistent_controls();
+}
+
+bool MainWindow::can_run_game_directly() const
+{
+    const auto& config = Config::instance();
+    return shell
+        && install_state
+        && install_state->stage() == Stage::Ready
+        && !shell->is_busy()
+        && config.has_auth()
+        && config.game_installed()
+        && config.path_inside_prefix(config.game_install_path())
+        && shell->is_wine_installed();
+}
+
+void MainWindow::run_game_directly()
+{
+    if (!can_run_game_directly())
+    {
+        show_launcher();
+        QMessageBox::information(
+            this,
+            util::i18n::translate("Alicia Is Not Ready"),
+            util::i18n::translate(
+                "Finish setup, install the selected game, and sign in before launching Alicia directly."));
+        return;
+    }
+
+    shell->run_game(Config::instance().username(), Config::instance().token());
+    refresh_tray_actions();
+}
+
+void MainWindow::refresh_tray_actions()
+{
+    if (!run_alicia_action)
+        return;
+
+    run_alicia_action->setEnabled(can_run_game_directly());
 }
 
 void MainWindow::setup_window_buttons()
@@ -179,10 +349,251 @@ void MainWindow::setup_window_buttons()
     });
 }
 
+
+void MainWindow::setup_launcher_menu()
+{
+    const QSize window_size = size();
+
+    launcher_menu_button = new QToolButton(this);
+    launcher_menu_button->setCheckable(true);
+    launcher_menu_button->setCursor(Qt::PointingHandCursor);
+    launcher_menu_button->setGeometry(util::layout::chrome::menu(window_size));
+    launcher_menu_button->setText(QStringLiteral("☰"));
+    launcher_menu_button->setToolButtonStyle(Qt::ToolButtonTextOnly);
+    launcher_menu_button->setAccessibleName(QStringLiteral("Open launcher menu"));
+    QFont menu_icon_font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
+    menu_icon_font.setPixelSize(util::layout::scaled(23, window_size));
+    menu_icon_font.setWeight(QFont::Black);
+    launcher_menu_button->setFont(menu_icon_font);
+    launcher_menu_button->setStyleSheet(QStringLiteral(
+        "QToolButton { background: rgba(247,240,235,232); color: #4F1717; "
+        "border: 1px solid rgba(79,23,23,72); border-radius: 10px; padding: 0px; }"
+        "QToolButton:hover { background: rgba(255,250,247,246); "
+        "border-color: rgba(79,23,23,125); }"
+        "QToolButton:pressed, QToolButton:checked { background: rgba(232,216,206,246); "
+        "border-color: rgba(79,23,23,150); }"));
+
+    launcher_menu_panel = new QFrame(this);
+    launcher_menu_panel->setObjectName(QStringLiteral("launcherMenuPanel"));
+    launcher_menu_panel->setGeometry(
+        util::layout::scaled(QRect(38, 86, 272, 238), window_size));
+    launcher_menu_panel->setStyleSheet(QStringLiteral(
+        "QFrame#launcherMenuPanel { background: rgba(247,240,235,248); "
+        "border: 1px solid rgba(79,23,23,85); border-radius: 12px; }"
+        "QPushButton { background: rgba(255,255,255,132); color: #4F1717; "
+        "border: 1px solid rgba(79,23,23,38); border-radius: 8px; "
+        "padding-left: 17px; text-align: left; }"
+        "QPushButton:hover { background: rgba(235,220,211,224); "
+        "border-color: rgba(79,23,23,92); }"
+        "QPushButton:pressed { background: rgba(219,198,186,236); "
+        "border-color: rgba(79,23,23,125); }"
+        "QPushButton#quitLauncherMenuButton { color: #7D1F1F; }"
+        "QPushButton#quitLauncherMenuButton:hover { background: rgba(238,214,207,232); }"));
+    auto* menu_shadow = new QGraphicsDropShadowEffect(launcher_menu_panel);
+    menu_shadow->setBlurRadius(util::layout::scaled(28, window_size));
+    menu_shadow->setOffset(0, util::layout::scaled(6, window_size));
+    menu_shadow->setColor(QColor(43, 28, 19, 88));
+    launcher_menu_panel->setGraphicsEffect(menu_shadow);
+
+    QFont button_font = util::assets::fonts[util::assets::Font::EurostileBlack];
+    button_font.setPixelSize(util::layout::scaled(15, window_size));
+    button_font.setWeight(QFont::Black);
+
+    const int margin = util::layout::scaled(14, window_size);
+    const int spacing = util::layout::scaled(10, window_size);
+    const int button_height = util::layout::scaled(43, window_size);
+    const int button_width = launcher_menu_panel->width() - margin * 2;
+    const auto make_menu_button = [&](const QString& text, const int row)
+    {
+        auto* button = new QPushButton(text, launcher_menu_panel);
+        button->setCursor(Qt::PointingHandCursor);
+        button->setFont(button_font);
+        button->setGeometry(margin, margin + row * (button_height + spacing),
+                            button_width, button_height);
+        return button;
+    };
+
+    language_button = make_menu_button(QStringLiteral("Language"), 0);
+    show_log_button = make_menu_button(QStringLiteral("Show Launcher Log"), 1);
+    about_button = make_menu_button(QStringLiteral("About"), 2);
+    quit_launcher_button = make_menu_button(QStringLiteral("Quit Launcher"), 3);
+    quit_launcher_button->setObjectName(QStringLiteral("quitLauncherMenuButton"));
+
+    language_menu = new QMenu(this);
+    language_menu->setStyleSheet(QStringLiteral(
+        "QMenu { background: #F7F0EB; color: #4F1717; border: 1px solid #A98678; "
+        "border-radius: 8px; padding: 6px; }"
+        "QMenu::item { min-width: 170px; padding: 9px 28px 9px 12px; "
+        "border-radius: 6px; }"
+        "QMenu::item:selected { background: #EBDCD3; }"
+        "QMenu::indicator { width: 14px; height: 14px; }"));
+    language_action_group = new QActionGroup(this);
+    language_action_group->setExclusive(true);
+    for (const auto& language : util::i18n::LanguageManager::instance().languages())
+    {
+        QAction* action = language_menu->addAction(language.native_name);
+        action->setCheckable(true);
+        action->setData(language.code);
+        language_action_group->addAction(action);
+        connect(action, &QAction::triggered, this, [this, code = language.code]()
+        {
+            util::i18n::LanguageManager::instance().set_language(code);
+            set_launcher_menu_visible(false);
+        });
+    }
+
+    connect(launcher_menu_button, &QToolButton::toggled,
+            this, &MainWindow::set_launcher_menu_visible);
+    connect(language_button, &QPushButton::clicked, this, [this]()
+    {
+        const QPoint popup_position = language_button->mapToGlobal(
+            QPoint(language_button->width() + util::layout::scaled(8, size()), 0));
+        language_menu->popup(popup_position);
+    });
+    connect(show_log_button, &QPushButton::clicked, this, [this]()
+    {
+        set_launcher_menu_visible(false);
+        LauncherLog* log = LauncherLog::instance();
+        log->showNormal();
+        log->raise();
+        log->activateWindow();
+    });
+    connect(about_button, &QPushButton::clicked, this, [this]()
+    {
+        set_launcher_menu_visible(false);
+        show_about();
+    });
+    connect(quit_launcher_button, &QPushButton::clicked,
+            this, &MainWindow::request_quit);
+
+    launcher_menu_panel->hide();
+    refresh_language_actions();
+    retranslate_dynamic_text();
+}
+
+void MainWindow::refresh_language_actions()
+{
+    if (!language_action_group)
+        return;
+    const QString current = util::i18n::LanguageManager::instance().current_language();
+    for (QAction* action : language_action_group->actions())
+        action->setChecked(action->data().toString() == current);
+}
+
+void MainWindow::set_launcher_menu_visible(const bool visible)
+{
+    if (!launcher_menu_panel || !launcher_menu_button)
+        return;
+
+    launcher_menu_button->blockSignals(true);
+    launcher_menu_button->setChecked(visible);
+    launcher_menu_button->blockSignals(false);
+    launcher_menu_panel->setVisible(visible);
+    if (visible)
+    {
+        launcher_menu_panel->raise();
+        launcher_menu_button->raise();
+    }
+    else if (language_menu)
+    {
+        language_menu->close();
+    }
+}
+
+void MainWindow::raise_persistent_controls()
+{
+    if (launcher_menu_panel && launcher_menu_panel->isVisible())
+        launcher_menu_panel->raise();
+    if (launcher_menu_button)
+    {
+        launcher_menu_button->show();
+        launcher_menu_button->raise();
+    }
+    if (!chrome_hidden)
+    {
+        if (close_button) close_button->raise();
+        if (minimize_button) minimize_button->raise();
+    }
+}
+
+void MainWindow::show_about()
+{
+    QMessageBox box(this);
+    box.setIconPixmap(QPixmap(QStringLiteral(":/assets/soa-logo.png")).scaled(72, 72, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    box.setWindowTitle(util::i18n::translate("About Story of Alicia Launcher"));
+    box.setTextFormat(Qt::RichText);
+    box.setText(QStringLiteral("<b>%1</b><br>%2 %3")
+        .arg(util::i18n::translate("Story of Alicia Launcher"),
+             util::i18n::translate("Version"),
+             QString::fromLatin1(SOA_LAUNCHER_VERSION)));
+    box.setInformativeText(QStringLiteral(
+        "<a href=\"https://storyofalicia.com\">%1</a><br>"
+        "<a href=\"https://github.com/Story-Of-Alicia\">%2</a><br>"
+        "<a href=\"mailto:dev@storyofalicia.com\">%3</a><br><br>%4")
+        .arg(util::i18n::translate("Official website"),
+             util::i18n::translate("Source code and issue tracker"),
+             util::i18n::translate("Contact the launcher team"),
+             util::i18n::translate("Built with Qt %1", QString::fromLatin1(qVersion()))));
+    box.setStandardButtons(QMessageBox::Ok);
+    const auto labels = box.findChildren<QLabel*>();
+    for (QLabel* label : labels)
+    {
+        label->setOpenExternalLinks(true);
+        label->setTextInteractionFlags(Qt::TextBrowserInteraction);
+    }
+    box.exec();
+}
+
+void MainWindow::request_quit()
+{
+    force_quit_requested = true;
+    set_launcher_menu_visible(false);
+    if (tray_icon)
+        tray_icon->hide();
+    if (language_menu)
+        language_menu->close();
+    close();
+    QTimer::singleShot(0, qApp, []()
+    {
+        QCoreApplication::exit(0);
+    });
+}
+
+void MainWindow::retranslate_dynamic_text()
+{
+    if (language_button)
+        language_button->setText(util::i18n::translate("Language"));
+    if (show_log_button)
+        show_log_button->setText(util::i18n::translate("Show Launcher Log"));
+    if (about_button)
+        about_button->setText(util::i18n::translate("About"));
+    if (quit_launcher_button)
+        quit_launcher_button->setText(util::i18n::translate("Quit Launcher"));
+    if (open_launcher_action)
+        open_launcher_action->setText(util::i18n::translate("Open Launcher"));
+    if (run_alicia_action)
+        run_alicia_action->setText(util::i18n::translate("Run Alicia Directly"));
+    if (tray_quit_action)
+        tray_quit_action->setText(util::i18n::translate("Quit Launcher"));
+    if (launcher_menu_button)
+    {
+        launcher_menu_button->setText(QStringLiteral("☰"));
+        launcher_menu_button->setToolTip(util::i18n::translate("Open launcher menu"));
+        launcher_menu_button->setAccessibleName(util::i18n::translate("Open launcher menu"));
+    }
+    if (close_button)
+        close_button->setAccessibleName(util::i18n::translate("Close launcher"));
+    if (minimize_button)
+        minimize_button->setAccessibleName(util::i18n::translate("Minimize launcher"));
+    if (version_label)
+        version_label->setText(util::i18n::translate("VERSION") + QLatin1Char(' ')
+            + QString::fromLatin1(SOA_LAUNCHER_VERSION));
+}
+
 void MainWindow::setup_version_label()
 {
     const QSize window_size = size();
-    auto* version_label = new QLabel(QStringLiteral("VERSION ") + QString::fromLatin1(SOA_LAUNCHER_VERSION), this);
+    version_label = new QLabel(this);
 
     QFont font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
     font.setPixelSize(util::layout::scaled(util::layout::text::k_version, window_size));
@@ -192,6 +603,7 @@ void MainWindow::setup_version_label()
     version_label->setStyleSheet("color: #747B82; background: transparent;");
     version_label->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     version_label->setGeometry(util::layout::chrome::version(window_size));
+    retranslate_dynamic_text();
 }
 
 void MainWindow::setup_settings()
@@ -206,12 +618,23 @@ void MainWindow::setup_settings()
     });
     connect(settings, &Settings::repair_requested, this, [this]()
     {
+        const Stage stage = install_state->stage();
+        if (repair_active || (shell && shell->is_busy())
+            || stage == Stage::Launching || stage == Stage::Running
+            || stage == Stage::Downloading || stage == Stage::Updating
+            || stage == Stage::SettingUpPrefix)
+        {
+            show_modeless_message(
+                this, QMessageBox::Warning, QStringLiteral("Repair Unavailable"),
+                QStringLiteral(
+                    "Verify and repair is disabled while Alicia or another launcher "
+                    "operation is active."));
+            return;
+        }
         close_overlay(settings);
         repair_files->refresh();
         open_overlay(repair_files);
     });
-    connect(settings, &Settings::launcher_size_changed,
-            this, &MainWindow::launcher_size_change_requested);
 }
 
 void MainWindow::open_launcher_settings()
@@ -266,6 +689,15 @@ void MainWindow::setup_repair_files()
     });
     connect(repair_files, &RepairFiles::repair_requested, this, [this]()
     {
+        if (shell && shell->is_busy())
+        {
+            show_modeless_message(
+                this, QMessageBox::Warning, QStringLiteral("Repair Unavailable"),
+                QStringLiteral(
+                    "Alicia or another runtime operation is active. Finish it before "
+                    "changing game files."));
+            return;
+        }
         close_overlay(repair_files);
 
         repair_active = true;
@@ -289,8 +721,9 @@ void MainWindow::setup_repair_files()
                 install_state->probe();
                 last_view = View::Loading;
                 on_stage_changed(install_state->stage());
-                QMessageBox::information(this, QStringLiteral("Repair Complete"),
-                                         QStringLiteral("The selected game was verified and repaired."));
+                QMessageBox::information(
+                    this, util::i18n::translate("Repair Complete"),
+                    util::i18n::translate("The selected game was verified and repaired."));
             });
             connect(repair_progress, &DownloadProgress::closed, this, [this]()
             {
@@ -358,11 +791,19 @@ void MainWindow::setup_alicia_chooser()
 
     connect(alicia_chooser, &AliciaChooser::reset_config_requested, this, [this]()
     {
+#if defined(Q_OS_MACOS)
+        const char* preservedData =
+            "The runtime prefix and both game installations will not be deleted.";
+#else
+        const char* preservedData =
+            "The Wine prefix and both game installations will not be deleted.";
+#endif
         const auto answer = QMessageBox::question(
             this,
-            "Reset Launcher Config",
-            "This resets launcher settings, the setup/rules confirmations, and signs you out.\n\n"
-            "The Wine prefix and both game installations will not be deleted.",
+            util::i18n::translate("Reset Launcher Config"),
+            util::i18n::translate(
+                "This resets launcher settings, the setup/rules confirmations, and signs you out.\n\n")
+            + util::i18n::translate(preservedData),
             QMessageBox::Yes | QMessageBox::Cancel,
             QMessageBox::Cancel);
 
@@ -516,7 +957,11 @@ void MainWindow::open_for_current_stage()
 
     if (view == View::Prerequisites) open_overlay(prerequisites_intro);
     else if (view == View::WineSelect) open_overlay(wine_select);
-    else if (view == View::WineInstall) open_overlay(wine_install);
+    else if (view == View::WineInstall)
+    {
+        wine_install->refresh_prefix_path();
+        open_overlay(wine_install);
+    }
     else if (view == View::GameInstall)
     {
         game_install->refresh_game_path();
@@ -529,11 +974,30 @@ void MainWindow::on_stage_changed(const Stage stage)
 {
     set_game_switching_enabled(stage);
 
+    const bool settingsEditable = !repair_active
+        && stage != Stage::SettingUpPrefix
+        && stage != Stage::Downloading
+        && stage != Stage::Updating
+        && stage != Stage::CheckingUpdate
+        && stage != Stage::Authenticating
+        && stage != Stage::Launching
+        && stage != Stage::Running
+        && !(shell && shell->is_busy());
+    if (settings)
+    {
+        settings->set_mutation_enabled(
+            settingsEditable,
+            QStringLiteral(
+                "Settings are read-only while Alicia or another launcher operation is active."));
+    }
+
     if (integrity_watcher)
     {
         const bool files_changing = repair_active
             || stage == Stage::Downloading
-            || stage == Stage::Updating;
+            || stage == Stage::Updating
+            || stage == Stage::Launching
+            || stage == Stage::Running;
         integrity_watcher->set_suspended(files_changing);
     }
 
@@ -567,6 +1031,7 @@ void MainWindow::on_stage_changed(const Stage stage)
             close_overlay(game_install);
             close_overlay(rules_agreement);
             if (stage == Stage::NeedsPrefix) break;
+            wine_install->refresh_prefix_path();
             open_overlay(wine_install);
             break;
 
@@ -575,6 +1040,7 @@ void MainWindow::on_stage_changed(const Stage stage)
             close_overlay(wine_select);
             close_overlay(wine_install);
             close_overlay(rules_agreement);
+            game_install->refresh_game_path();
             open_overlay(game_install);
             break;
 
@@ -617,11 +1083,7 @@ void MainWindow::update_chrome_visibility()
     chrome_hidden = should_hide;
     close_button->setVisible(!chrome_hidden);
     minimize_button->setVisible(!chrome_hidden);
-    if (!chrome_hidden)
-    {
-        close_button->raise();
-        minimize_button->raise();
-    }
+    raise_persistent_controls();
     update();
 }
 
@@ -641,6 +1103,7 @@ void MainWindow::open_overlay(util::modal_overlay::ModalOverlay* overlay)
     {
         overlay->show_over(this);
         on_overlay_opened(overlay);
+        raise_persistent_controls();
     }
 }
 
@@ -650,6 +1113,7 @@ void MainWindow::close_overlay(util::modal_overlay::ModalOverlay* overlay)
     {
         overlay->hide();
         on_overlay_closed(overlay);
+        raise_persistent_controls();
     }
 }
 
@@ -686,6 +1150,14 @@ void MainWindow::paintEvent(QPaintEvent*)
 
 void MainWindow::mousePressEvent(QMouseEvent* event)
 {
+    if (launcher_menu_panel && launcher_menu_panel->isVisible()
+        && !launcher_menu_panel->geometry().contains(event->position().toPoint())
+        && (!launcher_menu_button
+            || !launcher_menu_button->geometry().contains(event->position().toPoint())))
+    {
+        set_launcher_menu_visible(false);
+    }
+
     const int drag_height = util::layout::scaled(58, size());
     if (event->button() == Qt::LeftButton && event->position().y() <= drag_height
         && windowHandle())
@@ -699,24 +1171,48 @@ void MainWindow::mousePressEvent(QMouseEvent* event)
 
 void MainWindow::closeEvent(QCloseEvent* event)
 {
-    if (!shell || !shell->is_game_running())
+    if (force_quit_requested)
     {
         event->accept();
         return;
     }
 
-    QMessageBox box(QMessageBox::Warning,
-                    QStringLiteral("Alicia Is Running"),
-                    QStringLiteral("Closing the launcher may also terminate the running Wine process."),
-                    QMessageBox::NoButton,
-                    this);
-    auto* minimize = box.addButton(QStringLiteral("Minimize Launcher"), QMessageBox::AcceptRole);
-    auto* close = box.addButton(QStringLiteral("Close Anyway"), QMessageBox::DestructiveRole);
+    const bool gameRunning = shell && shell->is_game_running();
+    const bool operationActive = gameRunning
+        || repair_active
+        || (shell && shell->is_busy())
+        || (install_state && (install_state->stage() == core::state::Stage::Downloading
+            || install_state->stage() == core::state::Stage::Updating
+            || install_state->stage() == core::state::Stage::SettingUpPrefix
+            || install_state->stage() == core::state::Stage::CheckingUpdate
+            || install_state->stage() == core::state::Stage::Authenticating
+            || install_state->stage() == core::state::Stage::Launching));
+
+    if (!operationActive)
+    {
+        event->accept();
+        return;
+    }
+
+    QMessageBox box(
+        QMessageBox::Warning,
+        gameRunning ? util::i18n::translate("Alicia Is Running")
+                    : util::i18n::translate("Operation In Progress"),
+        gameRunning
+            ? util::i18n::translate("Closing the launcher stops live diagnostics and process monitoring. Alicia may continue running and will be detected again when the launcher restarts.")
+            : util::i18n::translate("Closing now may interrupt setup, authentication, download, repair, or update work."),
+        QMessageBox::NoButton,
+        this);
+    QPushButton* minimize = nullptr;
+    if (gameRunning)
+        minimize = box.addButton(util::i18n::translate("Minimize Launcher"), QMessageBox::AcceptRole);
+    auto* close = box.addButton(util::i18n::translate("Close Anyway"), QMessageBox::DestructiveRole);
     box.addButton(QMessageBox::Cancel);
-    box.setDefaultButton(minimize);
+    if (minimize)
+        box.setDefaultButton(minimize);
     box.exec();
 
-    if (box.clickedButton() == minimize)
+    if (minimize && box.clickedButton() == minimize)
     {
         showMinimized();
         event->ignore();

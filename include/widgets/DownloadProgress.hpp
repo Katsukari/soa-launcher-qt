@@ -36,7 +36,9 @@ private:
     void setup_buttons();
     void start_download();
     void cancel_download();
+    void cancel_active_operation(const QString& message);
     void set_terminal_error(const QString& message);
+    QString operation_context_key() const;
 
     static QString human_size(qulonglong bytes);
     static QString human_speed(qulonglong bytes_per_sec);
@@ -45,6 +47,8 @@ private:
     Mode mode {Mode::Download};
     courier* downloader {};
     qulonglong active_operation_id {};
+    QString active_operation_key;
+    bool cancellation_in_progress {};
     core::network::DownloadStatus current;
 
     QPushButton* close_button {};

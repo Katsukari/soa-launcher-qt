@@ -8,6 +8,8 @@
 #include "core/state/Stage.hpp"
 #include "core/status/Status.hpp"
 
+class QTimer;
+
 namespace core::state
 {
     class InstallState : public QObject
@@ -20,6 +22,7 @@ namespace core::state
 
         [[nodiscard]] Stage stage() const { return current; }
         [[nodiscard]] QString error_message() const { return last_error; }
+        [[nodiscard]] QString warning_message() const { return last_warning; }
 
         void probe();
         void dismiss_error();
@@ -36,6 +39,7 @@ namespace core::state
         void set_error(const QString& message);
         void set_warning(const QString& message);
         void recompute();
+        void schedule_probe();
         Stage compute() const;
         void start_update_check_if_needed();
         QString current_update_key() const;
@@ -62,6 +66,7 @@ namespace core::state
         QString checked_update_key;
 
         courier* update_checker {};
+        QTimer* probe_timer {};
         qulonglong update_operation_id {};
 
         Stage current {Stage::Probing};

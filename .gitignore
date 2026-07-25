@@ -70,3 +70,9 @@ Testing/
 
 
 .idea/
+/packaging/AppDir/
+/packaging/build-appimage/
+/packaging/linuxdeploy-x86_64.AppImage
+/packaging/linuxdeploy-plugin-qt-x86_64.AppImage
+/packaging/Story_Of_Alicia-*.AppImage
+.DS_Store

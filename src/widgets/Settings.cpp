@@ -2,6 +2,7 @@
 #include <QPushButton>
 #include <QStackedWidget>
 #include "widgets/Settings.hpp"
+#include "util/LanguageManager.hpp"
 
 #include <QApplication>
 #include <QGraphicsScene>
@@ -23,6 +24,26 @@ Settings::Settings(core::wine::Shell * shell, QWidget* parent) : ModalOverlay(pa
     setup_pages();
     setup_close_button();
     setup_tabs();
+    connect(&util::i18n::LanguageManager::instance(),
+            &util::i18n::LanguageManager::language_changed, this, [this]()
+    {
+        set_mutation_enabled(mutation_enabled, mutation_reason);
+    });
+}
+
+void Settings::set_mutation_enabled(const bool enabled, const QString& reason)
+{
+    mutation_enabled = enabled;
+    mutation_reason = reason;
+    if (stack)
+    {
+        const QString translated_reason = util::i18n::translate(reason);
+        stack->setEnabled(enabled);
+        stack->setToolTip(enabled ? QString() : translated_reason);
+        stack->setAccessibleDescription(enabled
+            ? util::i18n::translate("Settings are editable")
+            : translated_reason);
+    }
 }
 
 void Settings::setup_pages()
@@ -30,12 +51,10 @@ void Settings::setup_pages()
     const QSize w = size();
     stack = new QStackedWidget(this);
     stack->setGeometry(util::layout::settings::box_rect(w));
-    stack->setStyleSheet("background: transparent;");
+    stack->setStyleSheet(QStringLiteral("QStackedWidget { background: transparent; }"));
 
     launcher_settings = new LauncherSettings(stack);
     stack->addWidget(launcher_settings);
-    connect(launcher_settings, &LauncherSettings::launcher_size_changed,
-            this, &Settings::launcher_size_changed);
     connect(launcher_settings, &LauncherSettings::connectivity_panel_changed,
             this, [this](const bool expanded)
     {
@@ -85,7 +104,11 @@ void Settings::setup_tabs()
     auto* tab_wine = make_tab(1);
     auto* tab_advanced = make_tab(2);
     tab_general->setAccessibleName(QStringLiteral("Launcher settings tab"));
+#if defined(Q_OS_MACOS)
+    tab_wine->setAccessibleName(QStringLiteral("Runtime settings tab"));
+#else
     tab_wine->setAccessibleName(QStringLiteral("Wine settings tab"));
+#endif
     tab_advanced->setAccessibleName(QStringLiteral("Advanced settings tab"));
 
     connect(tab_general,  &QPushButton::clicked, this, [this]() { set_tab(0); });
@@ -133,8 +156,16 @@ void Settings::paint_content(QPainter& painter)
         tf.setWeight(QFont::Black);
         painter.setFont(tf);
         painter.setPen(util::colors::k_text_maroon);
-        const char* title = (active_tab == 1) ? "WINE SETTINGS" : (active_tab == 2) ? "ADVANCED SETTINGS" : "LAUNCHER SETTINGS";
-        painter.drawText(util::layout::settings::page_title(w, expanded), Qt::AlignCenter, title);
+#if defined(Q_OS_MACOS)
+        const char* runtimeTitle = "RUNTIME SETTINGS";
+#else
+        const char* runtimeTitle = "WINE SETTINGS";
+#endif
+        const char* title =
+            (active_tab == 1) ? runtimeTitle :
+            (active_tab == 2) ? "ADVANCED SETTINGS" : "LAUNCHER SETTINGS";
+        painter.drawText(util::layout::settings::page_title(w, expanded), Qt::AlignCenter,
+                         util::i18n::translate(title));
     }
 
     constexpr QColor active   {0xFB, 0xF6, 0xF0};
@@ -149,7 +180,12 @@ void Settings::paint_content(QPainter& painter)
 
     for (int i = 0; i < 3; ++i)
     {
-        const char* labels[] = { "LAUNCHER", "WINE", "ADVANCED" };
+#if defined(Q_OS_MACOS)
+        const char* runtimeLabel = "RUNTIME";
+#else
+        const char* runtimeLabel = "WINE";
+#endif
+        const char* labels[] = {"LAUNCHER", runtimeLabel, "ADVANCED"};
         const QRect r = util::layout::settings::tab_rect(w, i, expanded);
         const bool  on = i == active_tab;
         QPainterPath p;
@@ -157,6 +193,6 @@ void Settings::paint_content(QPainter& painter)
         p.addRoundedRect(QRectF(r), radius, radius);
         painter.fillPath(p, on ? active : inactive);
         painter.setPen(on ? textCol : textCol.lighter(140));
-        painter.drawText(r, Qt::AlignCenter, labels[i]);
+        painter.drawText(r, Qt::AlignCenter, util::i18n::translate(labels[i]));
     }
 }

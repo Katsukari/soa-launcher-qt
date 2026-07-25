@@ -23,10 +23,9 @@ namespace util::styles
         "    font-family: 'Eurostile';"
         "    font-weight: 900;"
         "    font-size: 11px;"
-        "    outline: none;"
         "}"
         "QPushButton:hover { background: #E6DCD0; }"
-        "QPushButton:focus { outline: none; }";
+        "QPushButton:focus { border: 2px solid #2FB4E0; }";
 
     inline constexpr const char* k_primary_button =
         "QPushButton"
@@ -38,20 +37,18 @@ namespace util::styles
         "    font-family: 'Eurostile';"
         "    font-weight: 900;"
         "    font-size: 11px;"
-        "    outline: none;"
         "}"
         "QPushButton:hover { background: #4FC4EF; }"
-        "QPushButton:focus { outline: none; }";
+        "QPushButton:focus { border: 2px solid #4F1717; }";
 
     inline constexpr const char* k_flat_transparent =
-        "border:none; outline:none; background:transparent;";
+        "border:none; background:transparent;";
 
     inline constexpr const char* k_link_blue =
         "QPushButton"
         "{"
         "    background: transparent;"
         "    border: none;"
-        "    outline: none;"
         "    color: #2FB4E0;"
         "    font-family: 'Inter';"
         "    font-size: 13px;"
@@ -59,19 +56,18 @@ namespace util::styles
         "    text-decoration: underline;"
         "}"
         "QPushButton:hover { color: #6FD4EF; }"
-        "QPushButton:focus { outline: none; border: none; }";
+        "QPushButton:focus { border: 1px solid #2FB4E0; border-radius: 3px; }";
 
     inline constexpr const char* k_link_blue_lg =
         "QPushButton"
         "{"
         "    background: transparent;"
         "    border: none;"
-        "    outline: none;"
         "    color: #2FB4E0;"
         "    font-family: 'Inter';"
         "    font-size: 15px;"
         "    text-decoration: underline;"
         "}"
-        "QPushButton:hover { color: #6FD4EF; outline: none; border: none; }"
-        "QPushButton:focus { outline: none; border: none; }";
+        "QPushButton:hover { color: #6FD4EF; }"
+        "QPushButton:focus { border: 1px solid #2FB4E0; border-radius: 3px; }";
 }

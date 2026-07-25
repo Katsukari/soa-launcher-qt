@@ -78,8 +78,12 @@ namespace util::assets
     void load_buttons();
     void load_images();
     void load_all();
+    void set_translated_button_assets(bool translated);
+    [[nodiscard]] bool translated_button_assets_active();
+    [[nodiscard]] const ButtonAsset& button(Button key);
 
     inline std::unordered_map<Image, QPixmap> images;
-    inline std::unordered_map<Button, ButtonAsset> buttons;
+    inline std::unordered_map<Button, ButtonAsset> english_buttons;
+    inline std::unordered_map<Button, ButtonAsset> translated_buttons;
     inline std::unordered_map<Font, QFont> fonts;
 }

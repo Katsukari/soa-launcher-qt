@@ -1,12 +1,38 @@
 import Foundation
 import Soa_Courier
 
-func log(_ level: Int32, _ message: String)
+final class CourierLogger: @unchecked Sendable
 {
-    message.withCString { soa_log(level, $0) }
+    static let shared = CourierLogger()
+
+    private let lock = NSLock()
+    private var callback: courier_log_cb?
+    private var context: UnsafeMutableRawPointer?
+
+    func set(_ callback: courier_log_cb?, context: UnsafeMutableRawPointer?)
+    {
+        lock.lock()
+        self.callback = callback
+        self.context = context
+        lock.unlock()
+    }
+
+    func write(_ level: Int32, _ message: String)
+    {
+        lock.lock()
+        let currentCallback = callback
+        let currentContext = context
+        lock.unlock()
+
+        guard let currentCallback else { return }
+        message.withCString { currentCallback(level, $0, currentContext) }
+    }
 }
 
-
+func log(_ level: Int32, _ message: String)
+{
+    CourierLogger.shared.write(level, message)
+}
 
 func logSafe(_ value: String) -> String
 {

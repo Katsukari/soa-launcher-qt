@@ -20,6 +20,7 @@ namespace core::status
         QString   phase {};
         QString   message {};
         double    progress = -1.0;
+        bool      watchdog_exempt {};
         QDateTime last_changed {};
     };
 

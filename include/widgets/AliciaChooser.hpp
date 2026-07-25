@@ -59,6 +59,10 @@ private:
     void refresh_enter_enabled();
     void refresh_keep_signed_in();
     void refresh_game_text();
+    void refresh_session_banner();
+    void set_warning(const QString& message);
+    void update_warning_geometry();
+    void retranslate_dynamic_text();
 
     AuthHandler* auth {};
     core::wine::Shell* shell {};
@@ -78,5 +82,6 @@ private:
     QPushButton* try_again_button {};
     QLabel* signed_in_label {};
     QPushButton* enter_button {};
+    QLabel* warning_label {};
     QPushButton* reset_path_button {};
 };

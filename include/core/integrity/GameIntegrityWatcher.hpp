@@ -5,6 +5,7 @@
 #include <QObject>
 #include <QSet>
 #include <QStringList>
+#include <QtGlobal>
 
 #include "core/game/GameVersion.hpp"
 
@@ -34,11 +35,12 @@ namespace core::integrity
             QString version;
             QHash<QString, QByteArray> hashes;
             QHash<QString, qint64> sizes;
-            QSet<QString> baseline_files;
             QSet<QString> watched_files;
             QSet<QString> watched_directories;
             bool ready {};
             bool alerted {};
+            bool directory_scan_in_progress {};
+            bool directory_scan_pending {};
         };
 
         void clear_watchers();
@@ -51,10 +53,8 @@ namespace core::integrity
         void report_change(core::game::GameVersion version, const QStringList& paths);
         void reset_after_suspension();
         static int key(core::game::GameVersion version);
-        static bool ignored_path(const QString& relative);
         static QString safe_relative_path(const QString& value);
-        static QByteArray md5_file(const QString& path);
-        static QSet<QString> scan_files(const QString& root);
+        static QByteArray hash_file(const QString& path, qsizetype expected_hex_length);
 
         QFileSystemWatcher* watcher {};
         QNetworkAccessManager network;
@@ -62,6 +62,8 @@ namespace core::integrity
         QHash<int, Context> contexts;
         QHash<QString, int> file_versions;
         QHash<QString, int> directory_versions;
+        QSet<QString> reported_watch_failures;
+        QSet<QString> reported_restore_failures;
         bool suspended {};
         bool pending_refresh {};
     };

@@ -49,6 +49,8 @@ namespace util::credentials
 #ifdef Q_OS_LINUX
         QString secret_tool()
         {
+            if (qEnvironmentVariableIsEmpty("DBUS_SESSION_BUS_ADDRESS"))
+                return {};
             return QStandardPaths::findExecutable(QStringLiteral("secret-tool"));
         }
 
@@ -61,12 +63,12 @@ namespace util::credentials
             QProcess process;
             process.setProcessChannelMode(QProcess::SeparateChannels);
             process.start(executable, arguments);
-            if (!process.waitForStarted(3000))
+            if (!process.waitForStarted(1000))
                 return false;
             if (!input.isEmpty())
                 process.write(input);
             process.closeWriteChannel();
-            if (!process.waitForFinished(5000))
+            if (!process.waitForFinished(2500))
             {
                 process.kill();
                 process.waitForFinished(1000);

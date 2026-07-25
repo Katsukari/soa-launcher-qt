@@ -4,10 +4,13 @@
 #include "util/Assets.hpp"
 #include "util/Config.hpp"
 #include "util/Layout.hpp"
+#include "util/LanguageManager.hpp"
 #include "util/SimpleUtils.hpp"
+#include "util/DesktopEntry.hpp"
 
 #include <QAbstractSocket>
 #include <QApplication>
+#include <QByteArray>
 #include <QClipboard>
 #include <QCoreApplication>
 #include <QDir>
@@ -29,8 +32,17 @@
 #include <QTextStream>
 #include <QTimer>
 #include <QUrl>
+#include <unistd.h>
 
 #include <utility>
+
+#ifdef Q_OS_MACOS
+#include <unistd.h>
+#endif
+
+#ifndef SOA_LAUNCHER_VERSION
+#define SOA_LAUNCHER_VERSION "0.3.0"
+#endif
 
 using util::config::Config;
 namespace ls = util::layout::settings;
@@ -50,10 +62,7 @@ namespace
 
     QString desktop_exec(const QString& executable)
     {
-        QString escaped = executable;
-        escaped.replace(QStringLiteral("\\"), QStringLiteral("\\\\"));
-        escaped.replace(QStringLiteral("\""), QStringLiteral("\\\""));
-        return QStringLiteral("\"") + escaped + QStringLiteral("\"");
+        return util::desktop_entry::quoted_exec_argument(executable);
     }
 
     bool configure_linux_startup(const bool enabled, QString& error)
@@ -117,8 +126,11 @@ namespace
         const QString directory = QDir::home().filePath(QStringLiteral("Library/LaunchAgents"));
         const QString path = QDir(directory).filePath(
             QStringLiteral("com.storyofalicia.launcher.plist"));
+        const QString domain = QStringLiteral("gui/%1").arg(static_cast<qulonglong>(getuid()));
         if (!enabled)
         {
+            if (QFile::exists(path))
+                QProcess::execute(QStringLiteral("/bin/launchctl"), {QStringLiteral("bootout"), domain, path});
             if (!QFile::exists(path) || QFile::remove(path))
                 return true;
             error = QStringLiteral("The launcher login item could not be removed.");
@@ -166,6 +178,14 @@ namespace
             error = QStringLiteral("The launcher login item could not be written.");
             return false;
         }
+
+        QProcess::execute(QStringLiteral("/bin/launchctl"), {QStringLiteral("bootout"), domain, path});
+        if (QProcess::execute(QStringLiteral("/bin/launchctl"),
+                              {QStringLiteral("bootstrap"), domain, path}) != 0)
+        {
+            error = QStringLiteral("The launcher login item was written but could not be activated.");
+            return false;
+        }
         return true;
     }
 
@@ -193,6 +213,11 @@ LauncherSettings::LauncherSettings(QWidget* parent) : QWidget(parent)
     setup_after_game_start_option();
     setup_run_connectivity_test_option();
     setup_launcher_size_option();
+    connect(&util::i18n::LanguageManager::instance(),
+            &util::i18n::LanguageManager::language_changed, this, [this]()
+    {
+        refresh_connectivity_report();
+    });
 }
 
 void LauncherSettings::setup_launch_on_startup_option()
@@ -217,7 +242,8 @@ void LauncherSettings::setup_launch_on_startup_option()
         QString error;
         if (!configure_startup(enabled, error))
         {
-            QMessageBox::critical(this, QStringLiteral("Startup Setting Failed"), error);
+            QMessageBox::critical(this, util::i18n::translate("Startup Setting Failed"),
+                                  util::i18n::translate(error));
             set_startup_button_state(previous);
             return;
         }
@@ -232,7 +258,7 @@ void LauncherSettings::set_startup_button_state(const bool enabled)
         return;
     const auto asset = enabled ? util::assets::Button::SliderOn
                                : util::assets::Button::SliderOff;
-    startup_button->setIcon(QIcon(util::assets::buttons[asset].normal.scaled(
+    startup_button->setIcon(QIcon(util::assets::button(asset).normal.scaled(
         startup_button->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
 }
 
@@ -271,8 +297,13 @@ void LauncherSettings::setup_run_connectivity_test_option()
     connectivity_button->setGeometry(button_rect);
     connectivity_button->setIconSize(button_rect.size());
     connectivity_button->setIcon(QIcon(
-        util::assets::buttons[util::assets::Button::RunCheck].normal.scaled(
+        util::assets::button(util::assets::Button::RunCheck).normal.scaled(
             button_rect.size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
+    QFont connectivity_font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
+    connectivity_font.setPixelSize(util::layout::scaled(11, w));
+    connectivity_font.setWeight(QFont::Black);
+    util::simple_utils::add_button_text(
+        connectivity_button, util::assets::Button::RunCheck, QStringLiteral("RUN CHECK"), connectivity_font);
     connectivity_button->setAccessibleName(QStringLiteral("Run connectivity check"));
 
     connectivity_panel = new QFrame(this);
@@ -294,7 +325,7 @@ void LauncherSettings::setup_run_connectivity_test_option()
     copy_report_button->setStyleSheet(
         "QPushButton { background: transparent; border: none; color: #9E8E7E; font-family: 'Inter'; font-size: 10px; font-weight: 700; }"
         "QPushButton:hover { color: #6F5F50; }"
-        "QPushButton:focus { outline: none; }");
+        "QPushButton:focus { border: 1px solid #2FB4E0; border-radius: 3px; }");
     connect(copy_report_button, &QPushButton::clicked, this, [this]()
     {
         if (QApplication::clipboard())
@@ -324,9 +355,7 @@ void LauncherSettings::run_connectivity_check()
     connectivity_success.clear();
     pending_connectivity_checks = connectivity_order.size();
     connectivity_button->setEnabled(false);
-    connectivity_button->setIcon(QIcon(
-        util::assets::buttons[util::assets::Button::RunCheck].loading.scaled(
-            connectivity_button->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
+    util::simple_utils::set_button_loading(connectivity_button, true);
     connectivity_panel->show();
     refresh_connectivity_report();
 
@@ -433,7 +462,9 @@ void LauncherSettings::start_http_check(const QString& label, const QUrl& url)
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
                          QNetworkRequest::NoLessSafeRedirectPolicy);
     request.setTransferTimeout(7000);
-    request.setRawHeader("User-Agent", "Story-Of-Alicia-Launcher/0.1");
+    request.setRawHeader(
+        "User-Agent",
+        QByteArray("Story-Of-Alicia-Launcher/") + SOA_LAUNCHER_VERSION);
 
     const auto timer = QSharedPointer<QElapsedTimer>::create();
     timer->start();
@@ -494,9 +525,9 @@ void LauncherSettings::refresh_connectivity_report()
         return QStringLiteral(
             "<td width=\"50%\" style=\"padding:1px 10px 2px 0; white-space:nowrap;\">"
             "<b>%1:</b> <span style=\"color:%2\">%3</span></td>")
-            .arg(escaped_html(label))
+            .arg(escaped_html(util::i18n::translate(label)))
             .arg(color)
-            .arg(escaped_html(detail));
+            .arg(escaped_html(util::i18n::translate(detail)));
     };
 
     QString html = QStringLiteral("<table width=\"100%\" cellspacing=\"0\" cellpadding=\"0\">");
@@ -512,7 +543,8 @@ void LauncherSettings::refresh_connectivity_report()
         const QString detail = connectivity_details.contains(label)
             ? connectivity_details.value(label)
             : QStringLiteral("checking...");
-        plain += QStringLiteral("%1: %2\n").arg(label, detail);
+        plain += QStringLiteral("%1: %2\n")
+            .arg(util::i18n::translate(label), util::i18n::translate(detail));
     }
 
     connectivity_label->setText(html);
@@ -522,9 +554,7 @@ void LauncherSettings::refresh_connectivity_report()
 void LauncherSettings::finish_connectivity_check()
 {
     connectivity_button->setEnabled(true);
-    connectivity_button->setIcon(QIcon(
-        util::assets::buttons[util::assets::Button::RunCheck].normal.scaled(
-            connectivity_button->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
+    util::simple_utils::set_button_loading(connectivity_button, false);
 }
 
 void LauncherSettings::setup_launcher_size_option()
@@ -539,7 +569,7 @@ void LauncherSettings::setup_launcher_size_option()
     launcher_size_title->setStyleSheet(QStringLiteral("color: #4F1717; background: transparent;"));
 
     launcher_size_description = new QLabel(
-        QStringLiteral("Choose your preferred window size for the launcher."), this);
+        QStringLiteral("Choose the window size used the next time the launcher starts."), this);
     launcher_size_description->setWordWrap(true);
     QFont description_font = util::assets::fonts[util::assets::Font::Inter];
     description_font.setPixelSize(util::layout::scaled(util::layout::text::k_desc, w));
@@ -549,20 +579,22 @@ void LauncherSettings::setup_launcher_size_option()
         QStringLiteral("color: #4F1717; background: transparent;"));
 
     const QStringList sizes {
+        QStringLiteral("900x544"),
         QStringLiteral("1120x677"),
         QStringLiteral("1400x846"),
         QStringLiteral("1600x967"),
         QStringLiteral("1920x1160")
     };
     launcher_size_dropdown = new ImageDropdown(
-        {QStringLiteral("Small (1120x677)"),
+        {QStringLiteral("Compact (900x544)"),
+         QStringLiteral("Small (1120x677)"),
          QStringLiteral("Default (1400x846)"),
          QStringLiteral("Large (1600x967)"),
          QStringLiteral("Extra Large (1920x1160)")}, this);
 
     int index = sizes.indexOf(Config::instance().launcher_size());
     if (index < 0)
-        index = 1;
+        index = 2;
     launcher_size_dropdown->set_index(index);
 
     connect(launcher_size_dropdown, &ImageDropdown::changed, this, [this, sizes](const int selected)
@@ -572,7 +604,10 @@ void LauncherSettings::setup_launcher_size_option()
         if (Config::instance().launcher_size() == sizes[selected])
             return;
         Config::instance().set_launcher_size(sizes[selected]);
-        emit launcher_size_changed();
+        QMessageBox::information(
+            this,
+            util::i18n::translate("Launcher Size Saved"),
+            util::i18n::translate("The new launcher size will be used after you restart the launcher."));
     });
 
     apply_dynamic_layout();

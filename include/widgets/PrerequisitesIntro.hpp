@@ -15,41 +15,52 @@ class PrerequisitesIntro : public util::modal_overlay::ModalOverlay
 {
     Q_OBJECT
 
-public:
-    explicit PrerequisitesIntro(QWidget* parent = nullptr);
+    public:
+        explicit PrerequisitesIntro(QWidget* parent = nullptr);
 
-signals:
-    void accepted();
-    void choose_own_requested();
+        signals:
+            void accepted();
+        void choose_own_requested();
 
-protected:
-    void paint_content(QPainter& painter) override;
-    void showEvent(QShowEvent* event) override;
+    protected:
+        void paint_content(QPainter& painter) override;
+        void showEvent(QShowEvent* event) override;
 
-private:
-    void setup_controls();
-    void start_detection();
-    void finish_detection();
-    void update_recommendation();
-    void apply_recommendation();
+    private:
+        struct DetectionResult
+        {
+            core::system::SystemProfile profile;
+            QVector<core::wine::WineInstall> runtimes;
+    #if !defined(Q_OS_MACOS)
+            bool winetricks_ready {};
+    #endif
+            bool umu_ready {};
+        };
 
-    [[nodiscard]] core::wine::RuntimeType recommended_runtime() const;
-    [[nodiscard]] const core::wine::WineInstall* best_runtime(core::wine::RuntimeType type) const;
-    [[nodiscard]] bool recommended_dxvk() const;
-    [[nodiscard]] QStringList missing_requirements(core::wine::RuntimeType type) const;
-    [[nodiscard]] bool profile_ready(QString* blocker = nullptr) const;
+        void setup_controls();
+        void start_detection();
+        void finish_detection();
+        void update_recommendation();
+        void apply_recommendation();
 
-    QFutureWatcher<core::system::SystemProfile>* detector {};
-    core::system::SystemProfile system_profile;
-    QVector<core::wine::WineInstall> runtimes;
+        [[nodiscard]] core::wine::RuntimeType recommended_runtime() const;
+        [[nodiscard]] const core::wine::WineInstall* best_runtime(core::wine::RuntimeType type) const;
+        [[nodiscard]] QStringList missing_requirements(core::wine::RuntimeType type) const;
+        [[nodiscard]] bool profile_ready(QString* blocker = nullptr) const;
 
-    QLabel* recommendation_title {};
-    QLabel* recommendation_body {};
+        QFutureWatcher<DetectionResult>* detector {};
+        core::system::SystemProfile system_profile;
+        QVector<core::wine::WineInstall> runtimes;
 
-    QPushButton* continue_button {};
-    QPushButton* choose_own_button {};
+        QLabel* recommendation_title {};
+        QLabel* recommendation_body {};
 
-    bool detection_complete {};
-    bool winetricks_ready {};
-    bool umu_ready {};
+        QPushButton* continue_button {};
+        QPushButton* choose_own_button {};
+
+        bool detection_complete {};
+    #if !defined(Q_OS_MACOS)
+        bool winetricks_ready {};
+    #endif
+        bool umu_ready {};
 };

@@ -25,6 +25,7 @@ class RulesAgreement : public util::modal_overlay::ModalOverlay
 
     private:
         void setup_controls();
+        void retranslate_content();
         void update_agree_button();
 
         QTextBrowser* rules_text {};

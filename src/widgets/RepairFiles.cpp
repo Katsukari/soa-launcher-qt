@@ -1,4 +1,5 @@
 #include "widgets/RepairFiles.hpp"
+#include "util/LanguageManager.hpp"
 
 #include "core/game/GameVersion.hpp"
 #include "util/Assets.hpp"
@@ -41,7 +42,8 @@ void RepairFiles::refresh()
     detected_message.clear();
     game_version = Config::instance().game_version();
     install_path = Config::instance().game_install_path(game_version);
-    repair_button->setEnabled(QFileInfo::exists(install_path));
+    repair_button->setEnabled(QFileInfo::exists(install_path)
+        && Config::instance().path_inside_prefix(install_path));
     update();
 }
 
@@ -49,7 +51,8 @@ void RepairFiles::set_game_version(const core::game::GameVersion version)
 {
     game_version = version;
     install_path = Config::instance().game_install_path(version);
-    repair_button->setEnabled(QFileInfo::exists(install_path));
+    repair_button->setEnabled(QFileInfo::exists(install_path)
+        && Config::instance().path_inside_prefix(install_path));
     update();
 }
 
@@ -87,12 +90,16 @@ void RepairFiles::setup_buttons()
         emit closed();
     });
 
-    const auto& cancel = util::assets::buttons[util::assets::Button::Cancel];
+    const auto& cancel = util::assets::button(util::assets::Button::Cancel);
     const QSize cancel_size = util::layout::scaled(cancel.normal.size(), w);
     cancel_button = util::simple_utils::make_flat_button(this);
     cancel_button->setIcon(QIcon(cancel.normal));
     cancel_button->setIconSize(cancel_size);
     cancel_button->setGeometry(local_rect(w, {70, 315, 193, 41}));
+    QFont cancel_font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
+    cancel_font.setPixelSize(util::layout::scaled(12, w));
+    cancel_font.setWeight(QFont::Black);
+    util::simple_utils::add_button_text(cancel_button, util::assets::Button::Cancel, QStringLiteral("CANCEL"), cancel_font);
     cancel_button->setAccessibleName(QStringLiteral("Cancel repair"));
     cancel_button->installEventFilter(this);
     connect(cancel_button, &QPushButton::clicked, this, [this]()
@@ -101,12 +108,16 @@ void RepairFiles::setup_buttons()
         emit closed();
     });
 
-    const auto& repair = util::assets::buttons[util::assets::Button::Repair];
+    const auto& repair = util::assets::button(util::assets::Button::Repair);
     const QSize repair_size = util::layout::scaled(repair.normal.size(), w);
     repair_button = util::simple_utils::make_flat_button(this);
     repair_button->setIcon(QIcon(repair.normal));
     repair_button->setIconSize(repair_size);
     repair_button->setGeometry(local_rect(w, {298, 315, 193, 41}));
+    QFont repair_font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
+    repair_font.setPixelSize(util::layout::scaled(12, w));
+    repair_font.setWeight(QFont::Black);
+    util::simple_utils::add_button_text(repair_button, util::assets::Button::Repair, QStringLiteral("REPAIR FILES"), repair_font);
     repair_button->setAccessibleName(QStringLiteral("Verify and repair files"));
     repair_button->installEventFilter(this);
     connect(repair_button, &QPushButton::clicked, this, [this]()
@@ -129,7 +140,7 @@ void RepairFiles::paint_content(QPainter& painter)
     painter.setFont(title_font);
     painter.setPen(util::colors::k_text_maroon);
     painter.drawText(local_rect(w, {30, 36, 500, 34}), Qt::AlignCenter,
-                     QStringLiteral("VERIFY AND REPAIR GAME"));
+                     util::i18n::translate("VERIFY AND REPAIR GAME"));
 
     QFont body_font = util::assets::fonts[util::assets::Font::Inter];
     body_font.setPixelSize(util::layout::scaled(14, w));
@@ -139,7 +150,7 @@ void RepairFiles::paint_content(QPainter& painter)
     const QString game_name = QString::fromLatin1(core::game::profile(game_version).display_name);
     painter.drawText(local_rect(w, {45, 80, 470, 44}),
                      Qt::AlignHCenter | Qt::AlignTop | Qt::TextWordWrap,
-                     QStringLiteral("The launcher will verify every %1 file against the current CDN manifest.")
+                     util::i18n::translate("The launcher will verify every %1 file against the current CDN manifest.")
                          .arg(game_name));
 
     const QRect path_box = local_rect(w, {45, 139, 470, 57});
@@ -167,21 +178,21 @@ void RepairFiles::paint_content(QPainter& painter)
                                        -util::layout::scaled(18, w), -util::layout::scaled(10, w)),
                      Qt::AlignLeft | Qt::AlignVCenter | Qt::TextWordWrap,
                      detected_message.isEmpty()
-                         ? QStringLiteral("Missing or damaged files will be downloaded again. Valid files and resumable partial downloads are kept, so the repair does not restart the whole game.")
-                         : detected_message + QStringLiteral(" Verify and repair before launching again."));
+                         ? util::i18n::translate("Missing or damaged files will be downloaded again. Valid files and resumable partial downloads are kept, so the repair does not restart the whole game.")
+                         : util::i18n::translate("%1 Verify and repair before launching again.").arg(detected_message));
 }
 
 bool RepairFiles::eventFilter(QObject* object, QEvent* event)
 {
     if (object == cancel_button)
     {
-        const auto& asset = util::assets::buttons[util::assets::Button::Cancel];
+        const auto& asset = util::assets::button(util::assets::Button::Cancel);
         util::simple_utils::apply_button_state(
             event, cancel_button, asset.normal, asset.hover, asset.clicked);
     }
     else if (object == repair_button && repair_button->isEnabled())
     {
-        const auto& asset = util::assets::buttons[util::assets::Button::Repair];
+        const auto& asset = util::assets::button(util::assets::Button::Repair);
         util::simple_utils::apply_button_state(
             event, repair_button, asset.normal, asset.hover, asset.clicked);
     }

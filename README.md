@@ -1,58 +1,85 @@
-# soa-launcher-qt
+# Story of Alicia Launcher
 
-Story Of Alicia launcher for Linux and macOS.
+The official **Story of Alicia** launcher for Linux and macOS.
 
-> **Naming:** this repository is `soa-launcher-qt`, but the built application is
-> just **soa-launcher** (shown as **Story Of Alicia**). The `-qt` suffix only
-> distinguishes this cross-platform port from the original Windows launcher.
+The launcher can:
 
-## About
+- Install and update the game
+- Verify and repair damaged files
+- Manage both supported game versions
+- Set up Wine or Proton on Linux
+- Use the bundled Story of Alicia runtime on macOS
+- Sign in through Discord
+- Start the game and collect useful diagnostics when something goes wrong
 
-A Qt6/C++ port of the Story Of Alicia launcher, bringing native Linux and macOS
-support to a launcher that was previously Windows-only. Handles installing,
-updating, verifying, and launching the game.
+The launcher is designed to work for regular players without requiring knowledge of Wine, Proton, prefixes, or command-line tools.
 
-On Linux and macOS the game runs through Wine/Proton, so the launcher also manages
-the Wine prefix, DXVK, and a custom Wine/Proton binary path and also configuration the
-Windows original never needed.
+> This project is a launcher only. It does not contain the game itself.
 
-## Architecture
+## Supported platforms
 
-The launcher is primarily **C++/Qt6**, which provides the cross-platform UI and
-core logic on every supported OS.
+| Platform                      | Status                                                               |
+|-------------------------------|----------------------------------------------------------------------|
+| Linux x86_64                  | AppImage  in releases                                                |
+| Linux ARM64                   | On the todo list                                                     |
+| macOS Intel and Apple Silicon | Experimental DMG (under heavy development with its own wine runtime) |
+| Windows                       | Use the original Windows launcher                                    |
 
-The download / verification engine is written in **Swift**, bridged to the C++ side
-through a small C interface. C++ has no networking in its standard library. The
-alternatives are a C-style API (libcurl) or a heavy framework (Boost.Asio) where as
-Swift ships first-class async networking (`URLSession`) and hashing (`CryptoKit`).
+## Installing the launcher
 
-Swift is a **build-time** dependency only. The shipped binary is native linked code,
-so end users never need a Swift toolchain installed, only people compiling from
-source do.
+Download the newest package from the project's **Releases** page.
 
-## Building
+### Linux
 
-Requirements:
-- Qt 6
-- CMake
-- A C++ compiler (C++20 or later)
-- A Swift toolchain (build-time only, for the download engine)
+1. Download the AppImage.
+2. Allow it to run:
+
+   ```sh
+   chmod +x Story_Of_Alicia-x86_64.AppImage
+   ```
+
+3. Open it:
+
+   ```sh
+   ./Story_Of_Alicia-x86_64.AppImage
+   ```
+
+Linux users can choose between Wine, Proton through UMU, or a custom runtime.
+
+### macOS
+
+1. Download the DMG.
+2. Open it and move the launcher into Applications.
+3. Start the launcher and follow the setup instructions.
+
+Apple Silicon Macs use the bundled Intel game runtime through Rosetta. The launcher will explain how to install Rosetta when it is required.
+
+## Documentation
+
+- [`BUILDING.md`](docs/BUILDING.md) — building the launcher from source
+- [`CONTRIBUTING.md`](docs/CONTRIBUTING.md) — contributing code, translations, or documentation
+- [`SECURITY.md`](docs/SECURITY.md) — reporting security problems
+- [`SECURITY_INTEGRATION.md`](docs/SECURITY_INTEGRATION.md) — launcher and server security boundaries
+- [`CONFIG_REFERENCE.md`](docs/CONFIG_REFERENCE.md) — persisted launcher configuration
+- [`RUNTIME_ARCHITECTURE.md`](docs/RUNTIME_ARCHITECTURE.md) — macOS runtime package structure
+- [`PLATFORM_LINUX.md`](docs/PLATFORM_LINUX.md) — Linux behavior and packaging
+- [`PLATFORM_MACOS.md`](docs/PLATFORM_MACOS.md) — macOS behavior and packaging
+- [`TRANSLATING.md`](docs/TRANSLATING.md) — adding or updating launcher translations
+
+## Diagnostics
+
+The launcher writes diagnostic logs when setup, updating, or game launching fails.
+
+On macOS, a diagnostic archive can also be created with:
 
 ```sh
-cmake -B build
-cmake --build build
+./packaging/macos/collect-diagnostics.sh
 ```
 
-The resulting binary is `soa-launcher`.
+Diagnostic archives are automatically redacted where possible, but they should still be reviewed before sharing.
 
-## Platforms
+## License and assets
 
-| Platform | Status        |
-|----------|---------------|
-| Linux    | Supported     |
-| macOS    | Supported     |
-| Windows  | Use the original Windows launcher |
+The launcher source code is distributed under the license in `LICENSE`.
 
-## License
-
-See [LICENSE](LICENSE).
+Artwork, logos, fonts, game files, and modified textless versions of existing artwork remain owned by their respective copyright holders and are not automatically covered by the launcher's source-code license.

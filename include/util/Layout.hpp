@@ -95,6 +95,7 @@ namespace util::layout
 
     namespace chrome
     {
+        inline constexpr QRect k_menu          {38, 34, 48, 44};
         inline constexpr QRect k_close         {1315, 40, 40, 40};
         inline constexpr QSize k_close_icon    {35, 35};
         inline constexpr QRect k_minimize      {1270, 37, 50, 50};
@@ -108,6 +109,7 @@ namespace util::layout
         inline constexpr QRect k_version =
             anchor_bottom_right(region::k_default, 35, 33, {245, 20});
 
+        QRect  menu(QSize win);
         QRect  close(QSize win);
         QSize  close_icon(QSize win);
         QRect  minimize(QSize win);
@@ -148,6 +150,7 @@ namespace util::layout
 
         inline constexpr QRect k_signed_in_banner {105, 104, 430, 48};
         inline constexpr QRect k_enter_button     {104, 174, 432, 67};
+        inline constexpr QRect k_warning          {70, 286, 500, 62};
 
         QRect  rect(QSize win);
         QPoint pos(QSize win);
@@ -172,6 +175,7 @@ namespace util::layout
 
         QRect  signed_in_banner(QSize win);
         QRect  enter_button(QSize win);
+        QRect  warning(QSize win);
     }
 
     namespace settings
@@ -206,7 +210,9 @@ namespace util::layout
         inline constexpr int   k_desc_h    = 40;
         inline constexpr int   k_title_h   = 26;
 
-        inline constexpr int   k_row_top         = 62;
+
+
+        inline constexpr int   k_row_top         = 82;
         inline constexpr int   k_row_bottom      = 455;
         inline constexpr int   k_row_bottom_foot = 410;
 
@@ -261,7 +267,7 @@ namespace util::layout
     namespace advanced_settings
     {
         inline constexpr int k_row_single = 78;
-        int row(int i = 0);
+        int row(int i = 0, int count = 3);
     }
 
     namespace dropdown

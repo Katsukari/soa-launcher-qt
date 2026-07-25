@@ -10,6 +10,8 @@
 #include <QMessageBox>
 #include <QPainter>
 #include <QPushButton>
+#include <QTimer>
+#include "util/LanguageManager.hpp"
 
 #include "core/network/CourierBridge.hpp"
 #include "core/Log.hpp"
@@ -41,13 +43,15 @@ DownloadProgress::DownloadProgress(const Mode mode_, QWidget* parent)
             current = status;
 
             const char* operation = mode == Mode::Repair ? "repair" : "download";
+            const bool cancelled = status.result == courier_result_cancelled;
             if (status.base.state == State::Done)
                 SPDLOG_INFO("{}: finished - {}", operation, status.base.message.toStdString());
+            else if (cancelled)
+                SPDLOG_INFO("{}: cancelled - {}", operation, status.base.message.toStdString());
             else if (status.base.state == State::Failed)
                 SPDLOG_ERROR("{}: failed - {}", operation, status.base.message.toStdString());
 
-            const bool retryable_failure = status.base.state == State::Failed
-                && status.base.message.compare("Cancelled.", Qt::CaseInsensitive) != 0;
+            const bool retryable_failure = status.base.state == State::Failed && !cancelled;
             retry_button->setVisible(retryable_failure);
             update();
 
@@ -55,9 +59,42 @@ DownloadProgress::DownloadProgress(const Mode mode_, QWidget* parent)
             {
                 CourierBridge::instance().clear_operation(active_operation_id);
                 active_operation_id = 0;
+                active_operation_key.clear();
+                cancellation_in_progress = false;
                 emit download_finished(status.base.state == State::Done);
             }
         });
+
+    connect(&Config::instance(), &Config::changed, this, [this]()
+    {
+        if (active_operation_id == 0 || cancellation_in_progress
+            || operation_context_key() == active_operation_key)
+        {
+            return;
+        }
+
+        QTimer::singleShot(0, this, [this]()
+        {
+            if (active_operation_id == 0 || cancellation_in_progress
+                || operation_context_key() == active_operation_key)
+            {
+                return;
+            }
+
+            SPDLOG_WARN("{}: cancelling because the active prefix or game path changed",
+                        mode == Mode::Repair ? "repair" : "download");
+#if defined(Q_OS_MACOS)
+            const QString reason = QStringLiteral(
+                "Cancelled because the runtime prefix or game install settings changed.");
+#else
+            const QString reason = QStringLiteral(
+                "Cancelled because the Wine prefix or game install settings changed.");
+#endif
+            cancel_active_operation(reason);
+            hide();
+            emit closed();
+        });
+    });
 }
 
 DownloadProgress::~DownloadProgress()
@@ -106,29 +143,60 @@ void DownloadProgress::cancel_download()
     {
         const auto answer = QMessageBox::question(
             this,
-            mode == Mode::Repair ? "Cancel Repair" : "Cancel Download",
             mode == Mode::Repair
-                ? "Cancel the current repair? Verified and partial files will be kept so a later retry can continue."
-                : "Cancel the current game download? Verified and partial files will be kept so a later retry can continue.",
+                ? util::i18n::translate("Cancel Repair")
+                : util::i18n::translate("Cancel Download"),
+            mode == Mode::Repair
+                ? util::i18n::translate("Cancel the current repair? Verified and partial files will be kept so a later retry can continue.")
+                : util::i18n::translate("Cancel the current game download? Verified and partial files will be kept so a later retry can continue."),
             QMessageBox::Yes | QMessageBox::No,
             QMessageBox::No);
         if (answer != QMessageBox::Yes)
             return;
     }
 
-    if (downloader)
-        courier_cancel(downloader);
-    CourierBridge::instance().clear_operation(active_operation_id);
-    active_operation_id = 0;
-    current = DownloadStatus{};
+    cancel_active_operation(QStringLiteral("Cancelled."));
     hide();
     emit closed();
+}
+
+void DownloadProgress::cancel_active_operation(const QString& message)
+{
+    if (active_operation_id == 0 || cancellation_in_progress)
+        return;
+
+    cancellation_in_progress = true;
+    const qulonglong operation_id = active_operation_id;
+
+    if (downloader)
+        courier_cancel(downloader);
+
+    DownloadStatus cancelled;
+    cancelled.operation_id = operation_id;
+    cancelled.result = courier_result_cancelled;
+    cancelled.base.state = State::Failed;
+    cancelled.base.message = message;
+    cancelled.base.progress = -1.0;
+    CourierBridge::instance().report(cancelled);
+
+    if (active_operation_id == operation_id)
+    {
+        CourierBridge::instance().clear_operation(operation_id);
+        active_operation_id = 0;
+        active_operation_key.clear();
+        current = cancelled;
+        emit download_finished(false);
+    }
+
+    cancellation_in_progress = false;
 }
 
 void DownloadProgress::set_terminal_error(const QString& message)
 {
     CourierBridge::instance().clear_operation(active_operation_id);
     active_operation_id = 0;
+    active_operation_key.clear();
+    cancellation_in_progress = false;
     current = DownloadStatus{};
     current.base.state = State::Failed;
     current.base.message = message;
@@ -144,6 +212,19 @@ void DownloadProgress::start_download()
     const auto version = config.game_version();
     const auto& game = core::game::profile(version);
     const QString install = config.game_install_path();
+
+    if (!config.path_inside_prefix(install))
+    {
+#if defined(Q_OS_MACOS)
+        const QString error = QStringLiteral(
+            "The selected game folder is outside the runtime prefix. Choose a safe install folder first.");
+#else
+        const QString error = QStringLiteral(
+            "The selected game folder is outside the Wine prefix. Choose a safe install folder first.");
+#endif
+        set_terminal_error(error);
+        return;
+    }
 
     retry_button->hide();
     current = DownloadStatus{};
@@ -192,8 +273,20 @@ void DownloadProgress::start_download()
             : QStringLiteral("The download could not be started."));
         return;
     }
+    active_operation_key = operation_context_key();
     CourierBridge::instance().begin_operation(active_operation_id);
     emit download_started();
+}
+
+QString DownloadProgress::operation_context_key() const
+{
+    const auto& config = Config::instance();
+    const auto version = config.game_version();
+    const auto& game = core::game::profile(version);
+    return core::game::to_string(version)
+        + QLatin1Char('|') + config.prefix_root()
+        + QLatin1Char('|') + config.game_install_path()
+        + QLatin1Char('|') + QString::fromLatin1(game.cdn_base_url);
 }
 
 QString DownloadProgress::human_size(const qulonglong bytes)
@@ -201,21 +294,24 @@ QString DownloadProgress::human_size(const qulonglong bytes)
     constexpr double kb = 1'000.0;
     constexpr double mb = 1'000'000.0;
     constexpr double gb = 1'000'000'000.0;
-    if (bytes >= gb) return QString::number(bytes / gb, 'f', 1) + " GB";
-    if (bytes >= mb) return QString::number(bytes / mb, 'f', 1) + " MB";
-    if (bytes >= kb) return QString::number(bytes / kb, 'f', 0) + " KB";
-    return QString::number(bytes) + " B";
+    if (bytes >= gb)
+        return util::i18n::translate("%1 GB").arg(QString::number(bytes / gb, 'f', 1));
+    if (bytes >= mb)
+        return util::i18n::translate("%1 MB").arg(QString::number(bytes / mb, 'f', 1));
+    if (bytes >= kb)
+        return util::i18n::translate("%1 KB").arg(QString::number(bytes / kb, 'f', 0));
+    return util::i18n::translate("%1 B").arg(QString::number(bytes));
 }
 
 QString DownloadProgress::human_speed(const qulonglong bytes_per_sec)
 {
     if (bytes_per_sec == 0) return "--";
-    return human_size(bytes_per_sec) + "/s";
+    return util::i18n::translate("%1/s").arg(human_size(bytes_per_sec));
 }
 
 QString DownloadProgress::human_eta(const qulonglong remaining, const qulonglong throughput)
 {
-    if (throughput == 0) return "Estimating...";
+    if (throughput == 0) return util::i18n::translate("Estimating...");
 
     const qulonglong total_seconds = (remaining + throughput - 1) / throughput;
     const qulonglong hours = total_seconds / 3600;
@@ -223,12 +319,14 @@ QString DownloadProgress::human_eta(const qulonglong remaining, const qulonglong
     const qulonglong seconds = total_seconds % 60;
 
     if (hours > 0)
-        return minutes > 0 ? QString("%1h %2m").arg(hours).arg(minutes)
-                           : QString("%1h").arg(hours);
+        return minutes > 0
+            ? util::i18n::translate("%1h %2m").arg(hours).arg(minutes)
+            : util::i18n::translate("%1h").arg(hours);
     if (minutes > 0)
-        return seconds > 0 ? QString("%1m %2s").arg(minutes).arg(seconds)
-                           : QString("%1m").arg(minutes);
-    return QString("%1s").arg(seconds);
+        return seconds > 0
+            ? util::i18n::translate("%1m %2s").arg(minutes).arg(seconds)
+            : util::i18n::translate("%1m").arg(minutes);
+    return util::i18n::translate("%1s").arg(seconds);
 }
 
 void DownloadProgress::paint_content(QPainter& painter)
@@ -242,25 +340,33 @@ void DownloadProgress::paint_content(QPainter& painter)
 
     QString title_text;
     if (done)
-        title_text = mode == Mode::Repair ? "REPAIR COMPLETE" : "DOWNLOAD COMPLETE";
+        title_text = mode == Mode::Repair
+            ? util::i18n::translate("REPAIR COMPLETE")
+            : util::i18n::translate("DOWNLOAD COMPLETE");
     else if (failed)
-        title_text = mode == Mode::Repair ? "REPAIR FAILED" : "DOWNLOAD FAILED";
+        title_text = mode == Mode::Repair
+            ? util::i18n::translate("REPAIR FAILED")
+            : util::i18n::translate("DOWNLOAD FAILED");
     else
     {
         switch (current.phase)
         {
             case courier_phase_preparing:
-                title_text = mode == Mode::Repair ? "PREPARING REPAIR" : "PREPARING";
+                title_text = mode == Mode::Repair
+                    ? util::i18n::translate("PREPARING REPAIR")
+                    : util::i18n::translate("PREPARING");
                 break;
             case courier_phase_checking:
                 title_text = files > 0
-                    ? QString("CHECKING FILES (%1/%2)").arg(current.file_index).arg(files)
-                    : "CHECKING FILES";
+                    ? util::i18n::translate("CHECKING FILES (%1/%2)")
+                        .arg(current.file_index).arg(files)
+                    : util::i18n::translate("CHECKING FILES");
                 break;
             case courier_phase_verifying:
                 title_text = files > 0
-                    ? QString("VERIFYING FILES (%1/%2)").arg(current.file_index).arg(files)
-                    : "VERIFYING FILES";
+                    ? util::i18n::translate("VERIFYING FILES (%1/%2)")
+                        .arg(current.file_index).arg(files)
+                    : util::i18n::translate("VERIFYING FILES");
                 break;
             case courier_phase_downloading:
             default:
@@ -268,10 +374,12 @@ void DownloadProgress::paint_content(QPainter& painter)
                 const bool resuming = current.base.message.startsWith(
                     QStringLiteral("Resuming"), Qt::CaseInsensitive);
                 const QString action = mode == Mode::Repair
-                    ? (resuming ? QStringLiteral("RESUMING REPAIR") : QStringLiteral("REPAIRING"))
-                    : (resuming ? QStringLiteral("RESUMING") : QStringLiteral("DOWNLOADING"));
+                    ? (resuming ? util::i18n::translate("RESUMING REPAIR")
+                                : util::i18n::translate("REPAIRING"))
+                    : (resuming ? util::i18n::translate("RESUMING")
+                                : util::i18n::translate("DOWNLOADING"));
                 title_text = files > 0
-                    ? QStringLiteral("%1 FILES (%2/%3)")
+                    ? util::i18n::translate("%1 FILES (%2/%3)")
                         .arg(action).arg(current.file_index).arg(files)
                     : action;
                 break;
@@ -297,17 +405,17 @@ void DownloadProgress::paint_content(QPainter& painter)
     if (failed)
     {
         const QString message = painter.fontMetrics().elidedText(
-            current.base.message, Qt::ElideRight, info.width());
+            util::i18n::translate(current.base.message), Qt::ElideRight, info.width());
         painter.drawText(info, Qt::AlignCenter, message);
     }
     else if (done)
     {
-        painter.drawText(info, Qt::AlignCenter, current.base.message);
+        painter.drawText(info, Qt::AlignCenter, util::i18n::translate(current.base.message));
     }
     else if (current.phase == courier_phase_downloading)
     {
         painter.drawText(info, Qt::AlignLeft | Qt::AlignVCenter,
-                         "Time remaining: " + human_eta(remaining, current.speed));
+                         util::i18n::translate("Time remaining: %1").arg(human_eta(remaining, current.speed)));
         painter.drawText(info, Qt::AlignRight | Qt::AlignVCenter,
                          human_speed(current.speed));
     }
@@ -321,6 +429,6 @@ void DownloadProgress::paint_content(QPainter& painter)
     painter.setPen(failed ? util::colors::k_warning : util::colors::k_text_maroon);
     const int shown = current.base.progress < 0.0 ? 0 : qRound(current.base.progress * 100.0);
     painter.drawText(dl::under_row(window_size), Qt::AlignCenter,
-                     failed ? "Retry continues from saved files"
+                     failed ? util::i18n::translate("Retry continues from saved files")
                             : QString("%1%").arg(qBound(0, shown, 100)));
 }

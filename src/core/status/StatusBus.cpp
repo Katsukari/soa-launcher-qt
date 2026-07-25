@@ -11,7 +11,20 @@ namespace core::status
     namespace
     {
         constexpr int   k_watchdog_interval_ms = 5000;
-        constexpr qint64 k_stall_threshold_s   = 120;
+        qint64 stall_threshold_seconds(const QString& reporter, const QString& phase)
+        {
+            if (reporter == QStringLiteral("courier"))
+                return phase == QStringLiteral("downloading") ? 180 : 300;
+            if (reporter == QStringLiteral("wine"))
+            {
+                if (phase.contains(QStringLiteral("prefix"), Qt::CaseInsensitive)) return 600;
+                if (phase.contains(QStringLiteral("component"), Qt::CaseInsensitive)) return 900;
+                if (phase.contains(QStringLiteral("launch"), Qt::CaseInsensitive)) return 180;
+                return 300;
+            }
+            if (reporter == QStringLiteral("auth")) return 300;
+            return 180;
+        }
     }
 
     StatusBus& StatusBus::instance()
@@ -35,6 +48,8 @@ namespace core::status
 
         connect(r, &StatusReporter::status_changed, this, [this, r](const Status& now)
         {
+
+            stall_reported.remove(r);
             emit reporter_status_changed(r, now);
         });
 
@@ -45,6 +60,7 @@ namespace core::status
     void StatusBus::unregister_reporter(StatusReporter* r)
     {
         items.removeAll(r);
+        stall_reported.remove(r);
     }
 
     bool StatusBus::any_working() const
@@ -67,11 +83,17 @@ namespace core::status
         for (auto* r : items)
         {
             const Status& s = r->status();
-            if (s.state != State::Working) continue;
+            if (s.state != State::Working)
+                continue;
+
+            if (s.watchdog_exempt)
+                continue;
 
             const qint64 secs = s.last_changed.secsTo(now);
-            if (secs >= k_stall_threshold_s)
+            const qint64 threshold = stall_threshold_seconds(r->reporter_name(), s.phase);
+            if (secs >= threshold && !stall_reported.contains(r))
             {
+                stall_reported.insert(r);
                 SPDLOG_WARN("status bus: '{}' stalled in Working for {}s (phase '{}')",
                             r->reporter_name().toStdString(), secs, s.phase.toStdString());
                 emit stalled(r, secs);

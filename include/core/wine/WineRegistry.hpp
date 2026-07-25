@@ -16,6 +16,12 @@ namespace core::wine
         QString     name;
         QString     path;
         RuntimeType type { RuntimeType::Wine };
+        QString version;
+        QString architectures;
+        QString issue;
+        bool requires_rosetta {};
+        bool rosetta_available {true};
+        bool usable {};
     };
 
     QString winetricks_path();
@@ -29,5 +35,8 @@ namespace core::wine
             static QVector<WineInstall> scan();
             static QVector<QString>& extra_search_dirs();
             static RuntimeType identify(const QString& path, bool* ok = nullptr);
+            static bool inspect_path(const QString& path, WineInstall& install,
+                                     QString* error = nullptr);
+            static QString resolve_wine_executable(const QString& path);
     };
 }

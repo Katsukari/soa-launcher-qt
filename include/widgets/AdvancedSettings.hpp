@@ -20,6 +20,8 @@ signals:
 private:
     void setup_game_args_option();
     void setup_game_path_option();
+    void setup_macos_compatibility_option();
+    void setup_macos_deep_diagnostics_option();
     void setup_repair_option();
 
     QLineEdit* game_path_field {};

@@ -1,5 +1,6 @@
 #include "util/Config.hpp"
 
+#include <QCryptographicHash>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -9,13 +10,16 @@
 #include <QSaveFile>
 #include <QStandardPaths>
 #include <QTextStream>
+#include <QRegularExpression>
 #include <QTimer>
 #include <QVariantMap>
 
 #include <utility>
 
 #include "core/Log.hpp"
+#include "core/runtime/RuntimeProvider.hpp"
 #include "core/wine/WineRegistry.hpp"
+#include "core/wine/MacWineRuntime.hpp"
 #include "util/CredentialStore.hpp"
 #include <spdlog/spdlog.h>
 
@@ -40,6 +44,18 @@ namespace util::config
             return candidate == root || candidate.startsWith(root + QDir::separator());
         }
 
+        QByteArray file_digest(const QString& path)
+        {
+            const QFileInfo info(path);
+            if (!info.exists())
+                return QByteArrayLiteral("<missing>");
+
+            QFile file(path);
+            if (!file.open(QIODevice::ReadOnly))
+                return QByteArrayLiteral("<unreadable>");
+            return QCryptographicHash::hash(file.readAll(), QCryptographicHash::Sha256);
+        }
+
         bool existing_chain_has_symlink(const QString& root, const QString& candidate)
         {
             const QString relative = QDir(root).relativeFilePath(candidate);
@@ -60,6 +76,48 @@ namespace util::config
         }
     }
 
+        QString normalized_launcher_size(const QString& value)
+        {
+            static const QRegularExpression pattern(QStringLiteral(R"(^(\d{3,4})x(\d{3,4})$)"));
+            const auto match = pattern.match(value.trimmed());
+            if (!match.hasMatch()) return QStringLiteral("1400x846");
+            const int width = qBound(900, match.captured(1).toInt(), 3840);
+            const int height = qBound(544, match.captured(2).toInt(), 2160);
+            return QStringLiteral("%1x%2").arg(width).arg(height);
+        }
+
+
+        QString normalized_language(const QString& value)
+        {
+            const QString candidate = value.trimmed().toLower().replace(QLatin1Char('_'), QLatin1Char('-'));
+            if (candidate == QStringLiteral("no") || candidate.startsWith(QStringLiteral("no-"))
+                || candidate.startsWith(QStringLiteral("nb-")))
+                return QStringLiteral("nb");
+            if (candidate.startsWith(QStringLiteral("nl-")))
+                return QStringLiteral("nl");
+            if (candidate.startsWith(QStringLiteral("en-")))
+                return QStringLiteral("en");
+            if (candidate == QStringLiteral("nb") || candidate == QStringLiteral("nl"))
+                return candidate;
+            return QStringLiteral("en");
+        }
+
+        QString normalized_after_launch(const QString& value)
+        {
+            const QString candidate = value.trimmed().toLower();
+            return candidate == QStringLiteral("minimize")
+                ? candidate : QStringLiteral("keep");
+        }
+
+        QString bounded_arguments(const QString& value)
+        {
+            QString normalized = value;
+            normalized.remove(QChar(u'\0'));
+            if (normalized.size() > 8192)
+                normalized.truncate(8192);
+            return normalized;
+        }
+
     class Config::Impl
     {
     public:
@@ -67,6 +125,7 @@ namespace util::config
         QString username;
         QString token;
         QString display_name;
+        QString persistence_error;
     };
 
     Config& Config::instance()
@@ -81,8 +140,9 @@ namespace util::config
         if (!QDir().mkpath(directory))
             SPDLOG_ERROR("config: could not create config directory {}", directory.toStdString());
 
-        load();
+        (void)load();
         apply_defaults();
+        normalize_schema();
         if (keep_signed_in())
         {
             load_credentials();
@@ -98,15 +158,16 @@ namespace util::config
         save();
 
         watcher = new QFileSystemWatcher(this);
+        reload_timer = new QTimer(this);
+        reload_timer->setSingleShot(true);
+        reload_timer->setInterval(150);
+        connect(reload_timer, &QTimer::timeout, this, [this]() { reload_from_disk(); });
+        connect(watcher, &QFileSystemWatcher::fileChanged, this,
+                [this](const QString&) { schedule_reload(); });
+        connect(watcher, &QFileSystemWatcher::directoryChanged, this,
+                [this](const QString&) { schedule_reload(); });
         watch_files();
-        const auto schedule_reload = [this](const QString&)
-        {
-            if (writing)
-                return;
-            QTimer::singleShot(50, this, [this]() { reload_from_disk(); });
-        };
-        connect(watcher, &QFileSystemWatcher::fileChanged, this, schedule_reload);
-        connect(watcher, &QFileSystemWatcher::directoryChanged, this, schedule_reload);
+        remember_disk_state();
     }
 
     Config::~Config()
@@ -116,14 +177,24 @@ namespace util::config
 
     QString Config::file_path() const
     {
+#if defined(Q_OS_MACOS)
+        return QDir(core::wine::macos::application_support_root())
+            .filePath(QStringLiteral("state/config.json"));
+#else
         return QDir(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation))
             .filePath(QStringLiteral("config.json"));
+#endif
     }
 
     QString Config::env_path() const
     {
+#if defined(Q_OS_MACOS)
+        return QDir(core::wine::macos::application_support_root())
+            .filePath(QStringLiteral("state/.env"));
+#else
         return QDir(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation))
             .filePath(QStringLiteral(".env"));
+#endif
     }
 
     void Config::watch_files()
@@ -143,25 +214,33 @@ namespace util::config
         }
     }
 
-    void Config::load()
+    bool Config::load()
     {
-        QVariantMap loaded;
-        QFile file(file_path());
-        if (file.open(QIODevice::ReadOnly))
+        const QString path = file_path();
+        if (!QFileInfo::exists(path))
         {
-            QJsonParseError error;
-            const QJsonDocument document = QJsonDocument::fromJson(file.readAll(), &error);
-            if (error.error == QJsonParseError::NoError && document.isObject())
-                loaded = document.object().toVariantMap();
-            else
-                SPDLOG_ERROR("config: failed to parse config.json: {}", error.errorString().toStdString());
-        }
-        else
-        {
-            SPDLOG_DEBUG("config: no existing file at {}, will create", file_path().toStdString());
+            SPDLOG_DEBUG("config: no existing file at {}, will create", path.toStdString());
+            d->values.clear();
+            return true;
         }
 
-        d->values = std::move(loaded);
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly))
+        {
+            SPDLOG_ERROR("config: could not open {} for reading", path.toStdString());
+            return false;
+        }
+
+        QJsonParseError error;
+        const QJsonDocument document = QJsonDocument::fromJson(file.readAll(), &error);
+        if (error.error != QJsonParseError::NoError || !document.isObject())
+        {
+            SPDLOG_ERROR("config: failed to parse config.json: {}", error.errorString().toStdString());
+            return false;
+        }
+
+        d->values = document.object().toVariantMap();
+        return true;
     }
 
     bool Config::save()
@@ -181,11 +260,110 @@ namespace util::config
             ok = file.write(document.toJson(QJsonDocument::Indented)) >= 0 && file.commit();
         }
         if (!ok)
+        {
+            d->persistence_error = file.errorString();
             SPDLOG_ERROR("config: failed to save {}", file_path().toStdString());
+            emit persistence_failed(file_path(), d->persistence_error);
+        }
+        else
+        {
+            d->persistence_error.clear();
+        }
 
         writing = false;
         watch_files();
+        remember_disk_state();
         return ok;
+    }
+
+    void Config::begin_update()
+    {
+        ++update_depth;
+    }
+
+    void Config::end_update()
+    {
+        if (update_depth <= 0)
+        {
+            update_depth = 0;
+            return;
+        }
+        --update_depth;
+        if (update_depth == 0 && update_dirty)
+        {
+            update_dirty = false;
+            save();
+            emit changed();
+        }
+    }
+
+    void Config::persist_change()
+    {
+        if (update_depth > 0)
+        {
+            update_dirty = true;
+            return;
+        }
+        save();
+        emit changed();
+    }
+
+    void Config::normalize_schema()
+    {
+#if defined(Q_OS_MACOS)
+        d->values[QStringLiteral("wine_arch")] = QStringLiteral("win64");
+#else
+        const QString arch = d->values.value(QStringLiteral("wine_arch")).toString().toLower();
+        d->values[QStringLiteral("wine_arch")] = arch == QStringLiteral("win32")
+            ? QStringLiteral("win32") : QStringLiteral("win64");
+#endif
+        d->values[QStringLiteral("after_game_start")] = normalized_after_launch(
+            d->values.value(QStringLiteral("after_game_start")).toString());
+        d->values[QStringLiteral("launcher_size")] = normalized_launcher_size(
+            d->values.value(QStringLiteral("launcher_size")).toString());
+        d->values[QStringLiteral("language")] = normalized_language(
+            d->values.value(QStringLiteral("language")).toString());
+        d->values[QStringLiteral("wine_args")] = bounded_arguments(
+            d->values.value(QStringLiteral("wine_args")).toString());
+        d->values[QStringLiteral("game_args")] = bounded_arguments(
+            d->values.value(QStringLiteral("game_args")).toString());
+        d->values[QStringLiteral("use_dxvk")] =
+            d->values.value(QStringLiteral("use_dxvk")).toBool();
+        d->values[QStringLiteral("runtime_selected")] =
+            d->values.value(QStringLiteral("runtime_selected")).toBool();
+        d->values[QStringLiteral("macos_deep_diagnostics")] =
+            d->values.value(QStringLiteral("macos_deep_diagnostics")).toBool();
+        d->values[QStringLiteral("prerequisites_confirmed")] =
+            d->values.value(QStringLiteral("prerequisites_confirmed")).toBool();
+        d->values[QStringLiteral("rules_accepted")] =
+            d->values.value(QStringLiteral("rules_accepted")).toBool();
+        d->values[QStringLiteral("keep_signed_in")] =
+            d->values.value(QStringLiteral("keep_signed_in")).toBool();
+        d->values[QStringLiteral("launch_on_startup")] =
+            d->values.value(QStringLiteral("launch_on_startup")).toBool();
+        d->values[QStringLiteral("setup_assistant_version")] =
+            qMax(0, d->values.value(QStringLiteral("setup_assistant_version")).toInt());
+
+        const QString profile =
+            d->values.value(QStringLiteral("macos_compatibility_profile"))
+                .toString().trimmed().toLower();
+        d->values[QStringLiteral("macos_compatibility_profile")] =
+            profile == QStringLiteral("safe-display")
+                || profile == QStringLiteral("low-graphics")
+                || profile == QStringLiteral("gl-behind")
+            ? profile : QStringLiteral("default");
+
+        d->values[QStringLiteral("game_version")] =
+            core::game::to_string(core::game::game_version_from_string(
+                d->values.value(QStringLiteral("game_version")).toString()));
+        const QString preference = d->values.value(QStringLiteral("setup_runtime_preference")).toString().toLower();
+#if defined(Q_OS_MACOS)
+        d->values[QStringLiteral("setup_runtime_preference")] = QStringLiteral("wine");
+#else
+        d->values[QStringLiteral("setup_runtime_preference")] =
+            preference == QStringLiteral("wine") || preference == QStringLiteral("proton")
+                ? preference : QStringLiteral("recommended");
+#endif
     }
 
     bool Config::load_env_fallback()
@@ -206,7 +384,7 @@ namespace util::config
             return has_auth();
         }
 
-        // Backward-compatible migration from the original KEY=value format.
+
         const QString text = QString::fromUtf8(contents);
         for (const QString& rawLine : text.split(QLatin1Char('\n')))
         {
@@ -276,8 +454,10 @@ namespace util::config
         {
             SPDLOG_ERROR("config: could not restrict .env permissions");
             QFile::remove(env_path());
+            remember_disk_state();
             return false;
         }
+        remember_disk_state();
         return true;
     }
 
@@ -287,6 +467,7 @@ namespace util::config
             || util::credentials::CredentialStore::clear();
         const bool fallback_cleared = !QFileInfo::exists(env_path()) || QFile::remove(env_path());
         watch_files();
+        remember_disk_state();
         return store_cleared && fallback_cleared;
     }
 
@@ -304,6 +485,7 @@ namespace util::config
         {
             QFile::remove(env_path());
             watch_files();
+            remember_disk_state();
             return true;
         }
 
@@ -350,10 +532,16 @@ namespace util::config
                 d->values[key] = found;
         };
 
+#if !defined(Q_OS_MACOS)
         probe(QStringLiteral("wine_binary"), QStringLiteral("wine"));
         if (d->values.value(QStringLiteral("wine_binary")).toString().isEmpty())
             probe(QStringLiteral("wine_binary"), QStringLiteral("wine64"));
         probe(QStringLiteral("winetricks_binary"), QStringLiteral("winetricks"));
+#else
+
+
+        Q_UNUSED(probe);
+#endif
     }
 
     void Config::apply_defaults()
@@ -365,14 +553,18 @@ namespace util::config
                 d->values[key] = value;
         };
 
+#if defined(Q_OS_MACOS)
+        const QString defaultPrefix = core::wine::macos::default_prefix_root();
+#else
         const QString defaultPrefix = QDir(QDir::homePath()).filePath(QStringLiteral("soa-launcher"));
+#endif
         const bool hadProtonRoot = d->values.contains(QStringLiteral("proton_compat_data_root"));
         const QString legacyPrefix = d->values.value(QStringLiteral("wine_prefix"), defaultPrefix).toString();
 
         if (!hadProtonRoot && runtime_is_proton())
         {
-            // Older builds stored the active runtime path in wine_prefix. Preserve
-            // that Proton selection while creating an independent Wine prefix.
+
+
             d->values[QStringLiteral("proton_compat_data_root")] =
                 normalize_proton_compat_root(legacyPrefix);
             d->values[QStringLiteral("wine_prefix")] = defaultPrefix;
@@ -384,19 +576,23 @@ namespace util::config
         }
 
         setIfMissing(QStringLiteral("wine_arch"), QStringLiteral("win64"));
+        setIfMissing(QStringLiteral("wine_binary"), QString());
+        setIfMissing(QStringLiteral("winetricks_binary"), QString());
         setIfMissing(QStringLiteral("use_dxvk"), false);
         setIfMissing(QStringLiteral("runtime_selected"), false);
         setIfMissing(QStringLiteral("wine_args"), QString());
+        setIfMissing(QStringLiteral("macos_compatibility_profile"), QStringLiteral("default"));
+        setIfMissing(QStringLiteral("macos_deep_diagnostics"), false);
         setIfMissing(QStringLiteral("rosetta_x87_path"), QString());
         setIfMissing(QStringLiteral("prerequisites_confirmed"), false);
         setIfMissing(QStringLiteral("setup_assistant_version"), 0);
         setIfMissing(QStringLiteral("setup_runtime_preference"), QStringLiteral("recommended"));
-        setIfMissing(QStringLiteral("setup_pc_age"), QStringLiteral("unknown"));
         setIfMissing(QStringLiteral("rules_accepted"), false);
         setIfMissing(QStringLiteral("keep_signed_in"), false);
         setIfMissing(QStringLiteral("launch_on_startup"), false);
         setIfMissing(QStringLiteral("after_game_start"), QStringLiteral("keep"));
         setIfMissing(QStringLiteral("launcher_size"), QStringLiteral("1400x846"));
+        setIfMissing(QStringLiteral("language"), QStringLiteral("en"));
         setIfMissing(QStringLiteral("game_version"), QStringLiteral("1.0"));
         setIfMissing(QStringLiteral("game_args"), QString());
 
@@ -405,39 +601,174 @@ namespace util::config
         setIfMissing(QStringLiteral("game_install_path_2_0"), QString());
         d->values.remove(QStringLiteral("game_install_path"));
         d->values.remove(QStringLiteral("game_id"));
+        d->values.remove(QStringLiteral("setup_pc_age"));
 
+#if defined(Q_OS_MACOS)
+        const QString defaultRuntime = core::runtime::RuntimeProvider::default_selector();
+
+
+        const QString oldDefault = QDir(QDir::homePath()).filePath(QStringLiteral("soa-launcher"));
+        const QString storedPrefix = absolute_clean_path(
+            d->values.value(QStringLiteral("wine_prefix")).toString());
+        if (storedPrefix == absolute_clean_path(oldDefault) && !QDir(oldDefault).exists())
+            d->values[QStringLiteral("wine_prefix")] = defaultPrefix;
+        d->values[QStringLiteral("wine_arch")] = QStringLiteral("win64");
+        d->values[QStringLiteral("use_dxvk")] = false;
+        d->values[QStringLiteral("winetricks_binary")] = QString();
+        if (d->values.value(QStringLiteral("setup_runtime_preference")).toString() == QStringLiteral("proton"))
+            d->values[QStringLiteral("setup_runtime_preference")] = QStringLiteral("wine");
+        if (core::wine::WineRegistry::identify(
+                d->values.value(QStringLiteral("wine_binary")).toString())
+            == core::wine::RuntimeType::Proton)
+        {
+            SPDLOG_INFO("config: clearing Linux Proton selection on macOS");
+            d->values[QStringLiteral("wine_binary")] = QString();
+            d->values[QStringLiteral("runtime_selected")] = false;
+        }
+        QString selectedRuntime =
+            d->values.value(QStringLiteral("wine_binary")).toString().trimmed();
+        if (selectedRuntime.isEmpty())
+            selectedRuntime = defaultRuntime;
+        d->values[QStringLiteral("wine_binary")] = selectedRuntime;
+        d->values[QStringLiteral("runtime_selected")] = !selectedRuntime.isEmpty();
+#endif
         d->values[QStringLiteral("wine_prefix")] = normalize_wine_prefix(
             d->values.value(QStringLiteral("wine_prefix")).toString());
         d->values[QStringLiteral("proton_compat_data_root")] = normalize_proton_compat_root(
             d->values.value(QStringLiteral("proton_compat_data_root")).toString());
+
+        const QString activePrefix = absolute_clean_path(prefix_root());
+        for (const auto version : {core::game::GameVersion::Playtest,
+                                   core::game::GameVersion::Alicia2})
+        {
+            const QString key = game_install_path_key(version);
+            const QString stored = d->values.value(key).toString().trimmed();
+            const QString normalized = stored.isEmpty()
+                ? derive_game_path(activePrefix, version)
+                : normalize_game_path(stored);
+
+            if (path_has_prefix(normalized, activePrefix))
+            {
+                d->values[key] = normalized;
+                continue;
+            }
+
+            const QString fallback = derive_game_path(activePrefix, version);
+            SPDLOG_WARN("config: replacing game path {} outside active prefix {} with {}",
+                        normalized.toStdString(), activePrefix.toStdString(),
+                        fallback.toStdString());
+            d->values[key] = fallback;
+        }
     }
 
-    void Config::reload_from_disk()
+    void Config::schedule_reload()
     {
-        if (writing)
+        if (writing || reloading || !reload_timer)
             return;
+        reload_timer->start();
+    }
+
+    void Config::remember_disk_state()
+    {
+        config_digest = file_digest(file_path());
+        env_digest = file_digest(env_path());
+    }
+
+    bool Config::disk_state_changed() const
+    {
+        return config_digest != file_digest(file_path())
+            || env_digest != file_digest(env_path());
+    }
+
+    void Config::reload_from_disk(const bool force)
+    {
+        if (writing || reloading)
+            return;
+
+        watch_files();
+        if (!force && !disk_state_changed())
+            return;
+
+        reloading = true;
+        const QVariantMap previousValues = d->values;
+        const bool previouslyKeptSignedIn = keep_signed_in();
+        const QString sessionUser = d->username;
+        const QString sessionToken = d->token;
+        const QString sessionDisplayName = d->display_name;
+        const bool hadSessionCredentials = !sessionUser.isEmpty() && !sessionToken.isEmpty();
+
         SPDLOG_INFO("config: files changed externally, reloading");
-        load();
+        if (!load())
+        {
+            d->values = previousValues;
+            reloading = false;
+            watch_files();
+            SPDLOG_WARN("config: ignored incomplete or unreadable external config change");
+            return;
+        }
         apply_defaults();
+        normalize_schema();
+
         if (keep_signed_in())
         {
-            load_credentials();
+            if (!previouslyKeptSignedIn && hadSessionCredentials)
+            {
+
+                d->username = sessionUser;
+                d->token = sessionToken;
+                d->display_name = sessionDisplayName;
+                if (!save_credentials())
+                    SPDLOG_WARN("config: could not persist active session after enabling keep-signed-in externally");
+            }
+            else
+            {
+                load_credentials();
+                if (!has_auth() && hadSessionCredentials)
+                {
+                    d->username = sessionUser;
+                    d->token = sessionToken;
+                    d->display_name = sessionDisplayName;
+                }
+            }
         }
         else
         {
-            d->username.clear();
-            d->token.clear();
-            d->display_name.clear();
-            if (!clear_saved_credentials())
-                SPDLOG_WARN("config: could not fully clear non-persistent credentials after reload");
+
+            d->username = sessionUser;
+            d->token = sessionToken;
+            d->display_name = sessionDisplayName;
+
+
+
+            if ((previouslyKeptSignedIn || QFileInfo::exists(env_path()))
+                && !clear_saved_credentials())
+            {
+                SPDLOG_WARN("config: could not fully clear credentials after keep-signed-in was disabled");
+            }
         }
-        watch_files();
-        emit changed();
+
+        const bool valuesChanged = previousValues != d->values;
+        const bool credentialsChanged = sessionUser != d->username
+            || sessionToken != d->token
+            || sessionDisplayName != d->display_name;
+
+        if (valuesChanged)
+            (void)save();
+        else
+        {
+            watch_files();
+            remember_disk_state();
+        }
+        reloading = false;
+        if (valuesChanged || credentialsChanged)
+            emit changed();
+        else
+            SPDLOG_DEBUG("config: external rewrite contained no effective changes");
     }
 
     void Config::reload()
     {
-        reload_from_disk();
+        reload_from_disk(true);
     }
 
     QString Config::wine_binary() const { return d->values.value(QStringLiteral("wine_binary")).toString(); }
@@ -451,6 +782,23 @@ namespace util::config
     bool Config::use_dxvk() const { return d->values.value(QStringLiteral("use_dxvk")).toBool(); }
     bool Config::runtime_selected() const { return d->values.value(QStringLiteral("runtime_selected")).toBool(); }
     QString Config::wine_args() const { return d->values.value(QStringLiteral("wine_args")).toString(); }
+    QString Config::macos_compatibility_profile() const
+    {
+        const QString value = d->values.value(QStringLiteral("macos_compatibility_profile"))
+                                  .toString().trimmed().toLower();
+        return value == QStringLiteral("safe-display")
+            || value == QStringLiteral("low-graphics")
+            || value == QStringLiteral("gl-behind")
+            ? value : QStringLiteral("default");
+    }
+    bool Config::macos_deep_diagnostics() const
+    {
+#if defined(Q_OS_MACOS)
+        return d->values.value(QStringLiteral("macos_deep_diagnostics")).toBool();
+#else
+        return false;
+#endif
+    }
     bool Config::prerequisites_confirmed() const
     {
         return d->values.value(QStringLiteral("prerequisites_confirmed")).toBool()
@@ -459,14 +807,12 @@ namespace util::config
     QString Config::setup_runtime_preference() const
     {
         const QString value = d->values.value(QStringLiteral("setup_runtime_preference")).toString().toLower();
+#if defined(Q_OS_MACOS)
+        return value == QStringLiteral("wine") ? value : QStringLiteral("recommended");
+#else
         return value == QStringLiteral("wine") || value == QStringLiteral("proton")
             ? value : QStringLiteral("recommended");
-    }
-    QString Config::setup_pc_age() const
-    {
-        const QString value = d->values.value(QStringLiteral("setup_pc_age")).toString().toLower();
-        return value == QStringLiteral("older") || value == QStringLiteral("modern")
-            ? value : QStringLiteral("unknown");
+#endif
     }
     bool Config::rules_accepted() const { return d->values.value(QStringLiteral("rules_accepted")).toBool(); }
     bool Config::keep_signed_in() const { return d->values.value(QStringLiteral("keep_signed_in")).toBool(); }
@@ -480,6 +826,10 @@ namespace util::config
     {
         const QString value = d->values.value(QStringLiteral("launcher_size")).toString();
         return value.isEmpty() ? QStringLiteral("1400x846") : value;
+    }
+    QString Config::language() const
+    {
+        return normalized_language(d->values.value(QStringLiteral("language")).toString());
     }
 
     core::game::GameVersion Config::game_version() const
@@ -498,17 +848,35 @@ namespace util::config
         return d->values.value(QStringLiteral("game_args")).toString();
     }
 
+    QString Config::persistence_error() const
+    {
+        return d->persistence_error;
+    }
+
     bool Config::runtime_is_proton() const
     {
+#if defined(Q_OS_MACOS)
+
+
+
+        return false;
+#else
         return core::wine::WineRegistry::identify(wine_binary())
             == core::wine::RuntimeType::Proton;
+#endif
     }
 
     QString Config::normalize_wine_prefix(const QString& path) const
     {
         QString configured = path.trimmed();
         if (configured.isEmpty())
+        {
+#if defined(Q_OS_MACOS)
+            configured = core::wine::macos::default_prefix_root();
+#else
             configured = QDir(QDir::homePath()).filePath(QStringLiteral("soa-launcher"));
+#endif
+        }
         return absolute_clean_path(configured);
     }
 
@@ -609,44 +977,119 @@ namespace util::config
 
     void Config::set_wine_binary(const QString& value)
     {
+        if (wine_binary() == value)
+            return;
+
+        const QString oldPrefix = prefix_root();
+        const QString oldPlaytestPath = game_install_path(core::game::GameVersion::Playtest);
+        const QString oldAlicia2Path = game_install_path(core::game::GameVersion::Alicia2);
+
         d->values[QStringLiteral("wine_binary")] = value;
-        save(); emit changed();
+        rebase_game_install_paths(oldPrefix, oldPlaytestPath, oldAlicia2Path);
+        persist_change();
     }
-    void Config::set_winetricks_binary(const QString& value) { d->values[QStringLiteral("winetricks_binary")] = value; save(); emit changed(); }
-    void Config::set_rosetta_x87_path(const QString& value) { d->values[QStringLiteral("rosetta_x87_path")] = value; save(); emit changed(); }
-    void Config::set_wine_arch(const QString& value) { d->values[QStringLiteral("wine_arch")] = value; save(); emit changed(); }
-    void Config::set_use_dxvk(const bool value) { d->values[QStringLiteral("use_dxvk")] = value; save(); emit changed(); }
-    void Config::set_runtime_selected(const bool value) { d->values[QStringLiteral("runtime_selected")] = value; save(); emit changed(); }
-    void Config::set_wine_args(const QString& value) { d->values[QStringLiteral("wine_args")] = value; save(); emit changed(); }
+    void Config::set_winetricks_binary(const QString& value)
+    {
+        if (winetricks_binary() == value) return;
+        d->values[QStringLiteral("winetricks_binary")] = value; persist_change();
+    }
+    void Config::set_rosetta_x87_path(const QString& value)
+    {
+        if (rosetta_x87_path() == value) return;
+        d->values[QStringLiteral("rosetta_x87_path")] = value; persist_change();
+    }
+    void Config::set_wine_arch(const QString& value)
+    {
+#if defined(Q_OS_MACOS)
+        Q_UNUSED(value);
+        const QString normalized = QStringLiteral("win64");
+#else
+        const QString normalized = value.trimmed().toLower() == QStringLiteral("win32") ? QStringLiteral("win32") : QStringLiteral("win64");
+#endif
+        if (wine_arch() == normalized) return;
+        d->values[QStringLiteral("wine_arch")] = normalized; persist_change();
+    }
+    void Config::set_use_dxvk(const bool value)
+    {
+#if defined(Q_OS_MACOS)
+        const bool normalized = false;
+        Q_UNUSED(value);
+#else
+        const bool normalized = value;
+#endif
+        if (use_dxvk() == normalized) return;
+        d->values[QStringLiteral("use_dxvk")] = normalized; persist_change();
+    }
+    void Config::set_runtime_selected(const bool value)
+    {
+        if (runtime_selected() == value) return;
+        d->values[QStringLiteral("runtime_selected")] = value; persist_change();
+    }
+    void Config::set_wine_args(const QString& value)
+    {
+        const QString normalized = bounded_arguments(value);
+        if (wine_args() == normalized) return;
+        d->values[QStringLiteral("wine_args")] = normalized; persist_change();
+    }
+    void Config::set_macos_compatibility_profile(const QString& value)
+    {
+        const QString candidate = value.trimmed().toLower();
+        const QString normalized = candidate == QStringLiteral("safe-display")
+            || candidate == QStringLiteral("low-graphics")
+            || candidate == QStringLiteral("gl-behind")
+            ? candidate : QStringLiteral("default");
+        if (macos_compatibility_profile() == normalized) return;
+        d->values[QStringLiteral("macos_compatibility_profile")] = normalized;
+        persist_change();
+    }
+    void Config::set_macos_deep_diagnostics(const bool value)
+    {
+#if defined(Q_OS_MACOS)
+        if (macos_deep_diagnostics() == value)
+            return;
+        d->values[QStringLiteral("macos_deep_diagnostics")] = value;
+        persist_change();
+#else
+        Q_UNUSED(value);
+#endif
+    }
     void Config::set_prerequisites_confirmed(const bool value)
     {
+        const bool assistantAlreadyCurrent = d->values.value(QStringLiteral("setup_assistant_version")).toInt() == 1;
+        if (prerequisites_confirmed() == value && (!value || assistantAlreadyCurrent))
+            return;
         d->values[QStringLiteral("prerequisites_confirmed")] = value;
         if (value)
             d->values[QStringLiteral("setup_assistant_version")] = 1;
-        save(); emit changed();
+        persist_change();
     }
     void Config::set_setup_runtime_preference(const QString& value)
     {
+#if defined(Q_OS_MACOS)
+        const QString normalized = value == QStringLiteral("wine")
+            ? value : QStringLiteral("recommended");
+#else
         const QString normalized = value == QStringLiteral("wine") || value == QStringLiteral("proton")
             ? value : QStringLiteral("recommended");
+#endif
+        if (setup_runtime_preference() == normalized)
+            return;
         d->values[QStringLiteral("setup_runtime_preference")] = normalized;
-        save(); emit changed();
+        persist_change();
     }
-    void Config::set_setup_pc_age(const QString& value)
+    void Config::set_rules_accepted(const bool value)
     {
-        const QString normalized = value == QStringLiteral("older") || value == QStringLiteral("modern")
-            ? value : QStringLiteral("unknown");
-        d->values[QStringLiteral("setup_pc_age")] = normalized;
-        save(); emit changed();
+        if (rules_accepted() == value) return;
+        d->values[QStringLiteral("rules_accepted")] = value; persist_change();
     }
-    void Config::set_rules_accepted(const bool value) { d->values[QStringLiteral("rules_accepted")] = value; save(); emit changed(); }
     void Config::set_keep_signed_in(const bool value)
     {
         if (keep_signed_in() == value)
             return;
 
         d->values[QStringLiteral("keep_signed_in")] = value;
-        save();
+        if (update_depth > 0) update_dirty = true;
+        else save();
 
         if (value)
         {
@@ -658,33 +1101,119 @@ namespace util::config
             SPDLOG_WARN("config: could not fully remove saved credentials after disabling keep-signed-in");
         }
 
-        emit changed();
+        if (update_depth == 0) emit changed();
     }
-    void Config::set_launch_on_startup(const bool value) { d->values[QStringLiteral("launch_on_startup")] = value; save(); emit changed(); }
-    void Config::set_after_game_start(const QString& value) { d->values[QStringLiteral("after_game_start")] = value; save(); emit changed(); }
-    void Config::set_launcher_size(const QString& value) { d->values[QStringLiteral("launcher_size")] = value; save(); emit changed(); }
-    void Config::set_game_version(const core::game::GameVersion value) { d->values[QStringLiteral("game_version")] = core::game::to_string(value); save(); emit changed(); }
-    void Config::set_game_args(const QString& value) { d->values[QStringLiteral("game_args")] = value; save(); emit changed(); }
+    void Config::set_launch_on_startup(const bool value)
+    {
+        if (launch_on_startup() == value) return;
+        d->values[QStringLiteral("launch_on_startup")] = value; persist_change();
+    }
+    void Config::set_after_game_start(const QString& value)
+    {
+        const QString normalized = normalized_after_launch(value);
+        if (after_game_start() == normalized) return;
+        d->values[QStringLiteral("after_game_start")] = normalized; persist_change();
+    }
+    void Config::set_launcher_size(const QString& value)
+    {
+        const QString normalized = normalized_launcher_size(value);
+        if (launcher_size() == normalized) return;
+        d->values[QStringLiteral("launcher_size")] = normalized; persist_change();
+    }
+    void Config::set_language(const QString& value)
+    {
+        const QString normalized = normalized_language(value);
+        if (language() == normalized) return;
+        d->values[QStringLiteral("language")] = normalized; persist_change();
+    }
+    void Config::set_game_version(const core::game::GameVersion value)
+    {
+        if (game_version() == value) return;
+        d->values[QStringLiteral("game_version")] = core::game::to_string(value); persist_change();
+    }
+    void Config::set_game_args(const QString& value)
+    {
+        const QString normalized = bounded_arguments(value);
+        if (game_args() == normalized) return;
+        d->values[QStringLiteral("game_args")] = normalized; persist_change();
+    }
 
     void Config::set_wine_prefix(const QString& value)
     {
-        if (runtime_is_proton())
-            d->values[QStringLiteral("proton_compat_data_root")] = normalize_proton_compat_root(value);
+        const bool proton = runtime_is_proton();
+        const QString normalized = proton
+            ? normalize_proton_compat_root(value)
+            : normalize_wine_prefix(value);
+        if (wine_prefix() == normalized)
+            return;
+
+        const QString oldPrefix = prefix_root();
+        const QString oldPlaytestPath = game_install_path(core::game::GameVersion::Playtest);
+        const QString oldAlicia2Path = game_install_path(core::game::GameVersion::Alicia2);
+
+        if (proton)
+            d->values[QStringLiteral("proton_compat_data_root")] = normalized;
         else
-            d->values[QStringLiteral("wine_prefix")] = normalize_wine_prefix(value);
-        save(); emit changed();
+            d->values[QStringLiteral("wine_prefix")] = normalized;
+
+        rebase_game_install_paths(oldPrefix, oldPlaytestPath, oldAlicia2Path);
+        persist_change();
+    }
+
+    void Config::rebase_game_install_paths(const QString& old_prefix,
+                                           const QString& old_playtest_path,
+                                           const QString& old_alicia2_path)
+    {
+        const QString oldPrefix = absolute_clean_path(old_prefix);
+        const QString newPrefix = absolute_clean_path(prefix_root());
+        if (oldPrefix == newPrefix)
+            return;
+
+        const auto rebase = [this, &oldPrefix, &newPrefix](
+            const core::game::GameVersion version, const QString& oldPath)
+        {
+            const QString key = game_install_path_key(version);
+            const QString candidate = absolute_clean_path(oldPath);
+            if (!path_has_prefix(candidate, oldPrefix))
+            {
+                SPDLOG_WARN("config: resetting stale game path {} after prefix changed to {}",
+                            candidate.toStdString(), newPrefix.toStdString());
+                d->values[key] = derive_game_path(newPrefix, version);
+                return;
+            }
+
+            const QString relative = QDir(oldPrefix).relativeFilePath(candidate);
+            const QString rebased = relative == QStringLiteral(".")
+                ? newPrefix
+                : QDir::cleanPath(QDir(newPrefix).filePath(relative));
+            d->values[key] = rebased;
+            SPDLOG_INFO("config: rebased game path {} to {}",
+                        candidate.toStdString(), rebased.toStdString());
+        };
+
+        rebase(core::game::GameVersion::Playtest, old_playtest_path);
+        rebase(core::game::GameVersion::Alicia2, old_alicia2_path);
     }
 
     void Config::set_game_install_path(const QString& value)
     {
-        d->values[game_install_path_key(game_version())] = normalize_game_path(value);
-        save(); emit changed();
+        const QString normalized = value.trimmed().isEmpty()
+            ? derive_game_path(prefix_root(), game_version())
+            : normalize_game_path(value);
+        if (game_install_path() == normalized)
+            return;
+        d->values[game_install_path_key(game_version())] = normalized;
+        persist_change();
     }
 
     void Config::forget_game_install_path()
     {
-        d->values[game_install_path_key(game_version())] = QString();
-        save(); emit changed();
+        const QString key = game_install_path_key(game_version());
+        const QString defaultPath = derive_game_path(prefix_root(), game_version());
+        if (d->values.value(key).toString() == defaultPath)
+            return;
+        d->values[key] = defaultPath;
+        persist_change();
     }
 
     bool Config::game_installed() const
@@ -742,6 +1271,7 @@ namespace util::config
         d->display_name.clear();
         const bool credentialsCleared = save_credentials();
         apply_defaults();
+        normalize_schema();
         writing = false;
         const bool saved = save();
         watch_files();

@@ -48,6 +48,7 @@ namespace util::layout
 
     namespace chrome
     {
+        QRect menu(const QSize win)          { return scaled(k_menu, win); }
         QRect close(const QSize win)         { return scaled(k_close, win); }
         QSize close_icon(const QSize win)    { return scaled(k_close_icon, win); }
         QRect minimize(const QSize win)      { return scaled(k_minimize, win); }
@@ -86,6 +87,7 @@ namespace util::layout
 
         QRect  signed_in_banner(const QSize win)  { return scaled(k_signed_in_banner, win); }
         QRect  enter_button(const QSize win)      { return scaled(k_enter_button, win); }
+        QRect  warning(const QSize win)            { return scaled(k_warning, win); }
     }
 
     namespace settings
@@ -227,10 +229,13 @@ namespace util::layout
 
     namespace advanced_settings
     {
-        int row(const int i)
+        int row(const int i, const int count)
         {
             static constexpr int ys[3] = {104, 218, 332};
-            return (i >= 0 && i < 3) ? ys[i] : ys[0];
+            if (count == 3)
+                return (i >= 0 && i < 3) ? ys[i] : ys[0];
+            return settings::row_y(qBound(0, i, qMax(0, count - 1)),
+                                   qMax(1, count), false);
         }
     }
 

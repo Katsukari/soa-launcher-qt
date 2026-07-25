@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QObject>
+#include <QSet>
 #include <QVector>
 #include "core/status/Status.hpp"
 
@@ -35,6 +36,7 @@ namespace core::status
             void check_for_stalls();
 
             QVector<StatusReporter*> items;
+            QSet<StatusReporter*> stall_reported;
             QTimer * watchdog {};
     };
 }

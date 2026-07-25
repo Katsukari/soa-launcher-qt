@@ -8,13 +8,13 @@
 #include <QLocalServer>
 #include <QLocalSocket>
 #include <QLockFile>
+#include <QPointer>
 #include <QStandardPaths>
 #include <QScreen>
 #include <QThread>
 #include <QTimer>
 #include <QUrl>
 
-#include <functional>
 #include <utility>
 
 #include "MainWindow.hpp"
@@ -22,12 +22,13 @@
 #include "core/auth/AuthHandler.hpp"
 #include "core/network/Courier.h"
 #include "util/Assets.hpp"
+#include "util/LanguageManager.hpp"
 #include "widgets/LauncherLog.hpp"
 
 #include <spdlog/spdlog.h>
 
 #ifndef SOA_LAUNCHER_VERSION
-#define SOA_LAUNCHER_VERSION "0.1.0"
+#define SOA_LAUNCHER_VERSION "0.3.0"
 #endif
 
 namespace
@@ -151,10 +152,9 @@ int main(int argc, char* argv[])
     app.setOrganizationName(QStringLiteral("Story Of Alicia"));
     app.setOrganizationDomain(QStringLiteral("storyofalicia.com"));
     app.setStyleSheet(QStringLiteral(
-        "QPushButton:focus { outline: none; }"
-        "QToolButton:focus { outline: none; }"
-        "QCheckBox:focus { outline: none; }"
-        "QRadioButton:focus { outline: none; }"));
+        "QPushButton:focus, QToolButton:focus, QCheckBox:focus, QLineEdit:focus, "
+        "QComboBox:focus, QListView:focus, QTreeView:focus { "
+        "border: 2px solid #2FB4E0; }"));
 
     QString url = soa_url_from_args(app.arguments());
     if (url.isEmpty())
@@ -179,7 +179,7 @@ int main(int argc, char* argv[])
     }
 
     core::log::init();
-    LauncherLog::instance();
+    LauncherLog* launcher_log = LauncherLog::instance();
     SPDLOG_INFO("Running Story Of Alicia for Linux and macOS");
     SPDLOG_INFO("Version: {}", SOA_LAUNCHER_VERSION);
     util::assets::load_all();
@@ -193,62 +193,11 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    MainWindow* window = nullptr;
-    std::function<void()> rebuild_window;
-
-    const auto attach_window = [&](MainWindow* created)
-    {
-        QObject::connect(created, &MainWindow::launcher_size_change_requested, &app, [&]()
-        {
-            QTimer::singleShot(0, &app, [&]()
-            {
-                rebuild_window();
-            });
-        });
-    };
-
-    rebuild_window = [&]()
-    {
-        MainWindow* previous = window;
-        QPoint center;
-        if (previous)
-            center = previous->frameGeometry().center();
-        else if (QScreen* primary = QGuiApplication::primaryScreen())
-            center = primary->availableGeometry().center();
-
-        auto* replacement = new MainWindow;
-        attach_window(replacement);
-        QRect geometry(QPoint(0, 0), replacement->size());
-        geometry.moveCenter(center);
-        QScreen* screen = QGuiApplication::screenAt(center);
-        if (!screen)
-            screen = QGuiApplication::primaryScreen();
-        if (screen)
-        {
-            const QRect available = screen->availableGeometry();
-            if (geometry.left() < available.left())
-                geometry.moveLeft(available.left());
-            if (geometry.top() < available.top())
-                geometry.moveTop(available.top());
-            if (geometry.right() > available.right())
-                geometry.moveRight(available.right());
-            if (geometry.bottom() > available.bottom())
-                geometry.moveBottom(available.bottom());
-        }
-        replacement->move(geometry.topLeft());
-        replacement->show();
-        replacement->open_launcher_settings();
-        window = replacement;
-
-        if (previous)
-        {
-            previous->hide();
-            previous->deleteLater();
-        }
-    };
-
-    window = new MainWindow;
-    attach_window(window);
+    MainWindow* window = new MainWindow;
+    auto& language_manager = util::i18n::LanguageManager::instance();
+    language_manager.register_tree(window);
+    language_manager.register_tree(launcher_log);
+    language_manager.apply_configured_language();
     window->show();
 
     const auto handle_command = [&window](const QJsonObject& command)
@@ -262,7 +211,14 @@ int main(int argc, char* argv[])
 
         const QString incoming = command.value(QStringLiteral("url")).toString();
         if (is_auth_url(incoming))
-            window->auth_handler()->handle_url(incoming);
+        {
+            QPointer<AuthHandler> handler(window->auth_handler());
+            QTimer::singleShot(0, handler, [handler, incoming]()
+            {
+                if (handler)
+                    handler->handle_url(incoming);
+            });
+        }
 
         window->setWindowState((window->windowState() & ~Qt::WindowMinimized) | Qt::WindowActive);
         window->show();

@@ -22,7 +22,7 @@ namespace core::status
         protected:
             void set_status(Status next);
 
-            void working(const QString& phase, double progress = -1.0);
+            void working(const QString& phase, double progress = -1.0, bool watchdog_exempt = false);
             void done(const QString& message = {});
             void fail(const QString& message);
             void retry(const QString& message);

@@ -77,10 +77,48 @@ extension Courier
     private func readStagingManifest(installRoot: URL) -> StagingManifest?
     {
         let url = installRoot.appendingPathComponent(stagingManifestFileName)
-        guard let data = try? Data(contentsOf: url), data.count <= 64 * 1024 * 1024 else {
+        guard let data = try? Data(contentsOf: url), data.count <= 16 * 1024 * 1024 else {
             return nil
         }
         return try? JSONDecoder().decode(StagingManifest.self, from: data)
+    }
+
+    private func quarantineRecoveryState(installRoot: URL) throws -> URL
+    {
+        let manager = FileManager.default
+        let formatter = ISO8601DateFormatter()
+        let suffix = formatter.string(from: Date())
+            .replacingOccurrences(of: ":", with: "-")
+        let quarantine = installRoot.appendingPathComponent(
+            ".soa-recovery-quarantine-\(suffix)-\(UUID().uuidString)", isDirectory: true)
+        try manager.createDirectory(at: quarantine, withIntermediateDirectories: true)
+        for name in [journalFileName, backupDirectoryName, stagingDirectoryName, stagingManifestFileName] {
+            let source = installRoot.appendingPathComponent(name)
+            guard manager.fileExists(atPath: source.path) else { continue }
+            let destination = quarantine.appendingPathComponent(name)
+            try manager.moveItem(at: source, to: destination)
+        }
+        return quarantine
+    }
+
+
+    private func pruneRecoveryQuarantines(installRoot: URL, keep: Int = 2)
+    {
+        let manager = FileManager.default
+        guard let entries = try? manager.contentsOfDirectory(
+            at: installRoot,
+            includingPropertiesForKeys: [.contentModificationDateKey],
+            options: []) else { return }
+        let quarantines = entries.filter {
+            $0.lastPathComponent.hasPrefix(".soa-recovery-quarantine-")
+        }.sorted {
+            let left = (try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+            let right = (try? $1.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+            return left > right
+        }
+        for stale in quarantines.dropFirst(max(0, keep)) {
+            try? manager.removeItem(at: stale)
+        }
     }
 
     func recoverInterruptedUpdate(installRoot: URL) throws
@@ -95,18 +133,25 @@ extension Courier
             return
         }
 
-        let data = try Data(contentsOf: journalURL)
-        guard data.count <= 4 * 1024 * 1024 else {
-            throw Err("Update recovery journal is unexpectedly large")
-        }
-        let journal = try JSONDecoder().decode(UpdateJournal.self, from: data)
-        guard (journal.schemaVersion == 1 || journal.schemaVersion == 2),
-              journal.replacementPaths.count == journal.replacementHadOriginal.count else {
-            throw Err("Update recovery journal is invalid")
-        }
-        if let staged = journal.replacementStagedPaths,
-           staged.count != journal.replacementPaths.count {
-            throw Err("Update recovery journal has invalid staging metadata")
+        let journal: UpdateJournal
+        do {
+            let data = try Data(contentsOf: journalURL)
+            guard data.count <= 4 * 1024 * 1024 else {
+                throw Err("Update recovery journal is unexpectedly large")
+            }
+            journal = try JSONDecoder().decode(UpdateJournal.self, from: data)
+            guard (journal.schemaVersion == 1 || journal.schemaVersion == 2),
+                  journal.replacementPaths.count == journal.replacementHadOriginal.count else {
+                throw Err("Update recovery journal is invalid")
+            }
+            if let staged = journal.replacementStagedPaths,
+               staged.count != journal.replacementPaths.count {
+                throw Err("Update recovery journal has invalid staging metadata")
+            }
+        } catch {
+            let quarantine = try? quarantineRecoveryState(installRoot: installRoot)
+            let detail = quarantine?.lastPathComponent ?? "a recovery quarantine"
+            throw Err("The interrupted update journal was corrupt and was moved to \(detail). Run repair again.")
         }
 
         let backupRoot = try prepareInternalDirectory(
@@ -191,7 +236,7 @@ extension Courier
             try recoverInterruptedUpdate(installRoot: installRoot)
             let remote = try await fetchRemoteVersion()
             let local = readLocalVersion(installPath: installPath)
-            reportDone(operationID, true, local == remote ? "up-to-date" : "update-available")
+            reportDone(operationID, local == remote ? courier_result_up_to_date : courier_result_update_available, local == remote ? "up-to-date" : "update-available")
         }
     }
 
@@ -230,7 +275,9 @@ extension Courier
                 reportProgress(operationID, courier_phase_checking,
                                "Checking (\(index + 1)/\(manifest.count))", percent,
                                0, 0, 0, index + 1, manifest.count)
-                let hash = try md5OfFile(at: destination.path) { _ in
+                let hash = try manifestHashOfFile(
+                    at: destination.path,
+                    expectedHash: entry.manifest.hash) { _ in
                     self.reportProgress(operationID, courier_phase_checking,
                                         "Checking (\(index + 1)/\(manifest.count))", percent,
                                         0, 0, 0, index + 1, manifest.count)
@@ -303,9 +350,23 @@ extension Courier
                 resumableBytes += min(storedSize, UInt64(planned.entry.manifest.size))
             }
             let remainingBytes = totalBytes > resumableBytes ? totalBytes - resumableBytes : 0
-            if remainingBytes > 0, let free = availableDiskSpace(at: installRoot),
-               free < remainingBytes + 64 * 1024 * 1024 {
-                throw Err("Not enough free disk space to finish this update")
+            var backupBytes: UInt64 = 0
+            for relative in needed.map(\.targetRelativePath) + obsolete {
+                let destination = try safeDestination(root: installRoot, relativePath: relative)
+                if let number = try? fileManager.attributesOfItem(atPath: destination.path)[.size] as? NSNumber {
+                    let (sum, overflow) = backupBytes.addingReportingOverflow(number.uint64Value)
+                    if overflow { throw Err("Update backup size is too large") }
+                    backupBytes = sum
+                }
+            }
+            let reserve: UInt64 = 256 * 1024 * 1024
+            let (downloadAndBackup, firstOverflow) = remainingBytes.addingReportingOverflow(backupBytes)
+            let (requiredBytes, secondOverflow) = downloadAndBackup.addingReportingOverflow(reserve)
+            if firstOverflow || secondOverflow {
+                throw Err("Update disk-space requirement is too large")
+            }
+            if requiredBytes > 0, let free = availableDiskSpace(at: installRoot), free < requiredBytes {
+                throw Err("Not enough free disk space to stage, back up, and finish this update")
             }
 
             var completedBytes: UInt64 = 0
@@ -385,7 +446,10 @@ extension Courier
                             : 0,
                         completedBytes, totalBytes, throughput, index + 1, needed.count)
 
-                    let actualHash = try md5OfFile(at: staged.path, progress: { _ in
+                    let actualHash = try manifestHashOfFile(
+                        at: staged.path,
+                        expectedHash: planned.entry.manifest.hash,
+                        progress: { _ in
                         self.reportProgress(
                             operationID, courier_phase_verifying,
                             "Verifying (\(index + 1)/\(needed.count))",
@@ -474,6 +538,7 @@ extension Courier
                 try? removeIfPresent(stagingRoot)
                 try? removeIfPresent(stagingManifestURL)
                 try? removeIfPresent(backupRoot)
+                pruneRecoveryQuarantines(installRoot: installRoot)
             } catch {
                 do {
                     try recoverInterruptedUpdate(installRoot: installRoot)
@@ -491,7 +556,7 @@ extension Courier
             }
             reportProgress(operationID, courier_phase_downloading, message, 100,
                            totalBytes, totalBytes, 0, needed.count, needed.count)
-            reportDone(operationID, true, message)
+            reportDone(operationID, courier_result_completed, message)
         }
     }
 }

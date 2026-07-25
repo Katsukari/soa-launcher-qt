@@ -7,7 +7,9 @@
 extern "C" {
 #endif
 
-void soa_log(int level, const char* message);
+typedef void (*courier_log_cb)(int level, const char* message, void* ctx);
+
+void courier_set_log_callback(courier_log_cb callback, void* ctx);
 
 typedef struct courier courier;
 
@@ -30,10 +32,19 @@ typedef void (*courier_progress_cb)(uint64_t    operation_id,
                                     int           file_count,
                                     void*         ctx);
 
-typedef void (*courier_done_cb)(uint64_t  operation_id,
-                                bool      ok,
-                                const char* message,
-                                void*     ctx);
+typedef enum
+{
+    courier_result_completed        = 0,
+    courier_result_up_to_date       = 1,
+    courier_result_update_available = 2,
+    courier_result_cancelled        = 3,
+    courier_result_failed           = 4
+} courier_result;
+
+typedef void (*courier_done_cb)(uint64_t       operation_id,
+                                courier_result result,
+                                const char*    message,
+                                void*          ctx);
 
 courier* courier_create(const char* cdn_base_url,
                         courier_progress_cb on_progress,

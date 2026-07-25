@@ -2,6 +2,39 @@
     <qresource prefix="/">
 
         <file>../../assets/2.0 ICON.png</file>
+        <file>../../assets/agree-loading-blank.png</file>
+        <file>../../assets/agree_clicked-blank.png</file>
+        <file>../../assets/agree_hover-blank.png</file>
+        <file>../../assets/agree_normal-blank.png</file>
+        <file>../../assets/btn-cancel-clicked-blank.png</file>
+        <file>../../assets/btn-cancel-hover-blank.png</file>
+        <file>../../assets/btn-cancel-normal-blank.png</file>
+        <file>../../assets/btn-discord-clicked-blank.png</file>
+        <file>../../assets/btn-discord-hover-blank.png</file>
+        <file>../../assets/btn-discord-loading-blank.png</file>
+        <file>../../assets/btn-discord-normal-blank.png</file>
+        <file>../../assets/btn-download-game-clicked-blank.png</file>
+        <file>../../assets/btn-download-game-hover-blank.png</file>
+        <file>../../assets/btn-download-game-loading-blank.png</file>
+        <file>../../assets/btn-download-game-normal-blank.png</file>
+        <file>../../assets/btn-install-clicked-blank.png</file>
+        <file>../../assets/btn-install-hover-blank.png</file>
+        <file>../../assets/btn-install-loading-blank.png</file>
+        <file>../../assets/btn-install-normal-blank.png</file>
+        <file>../../assets/btn-repair-blank.png</file>
+        <file>../../assets/btn-repair-clicked-blank.png</file>
+        <file>../../assets/btn-repair-hover-blank.png</file>
+        <file>../../assets/btn-run-check-clicked-blank.png</file>
+        <file>../../assets/btn-run-check-hover-blank.png</file>
+        <file>../../assets/btn-run-check-loading-blank.png</file>
+        <file>../../assets/btn-run-check-normal-blank.png</file>
+        <file>../../assets/btn-update-available-blank.png</file>
+        <file>../../assets/btn-update-available-clicked-blank.png</file>
+        <file>../../assets/btn-update-available-hover-blank.png</file>
+        <file>../../assets/enter_clicked-blank.png</file>
+        <file>../../assets/enter_hover-blank.png</file>
+        <file>../../assets/enter_loading-blank.png</file>
+        <file>../../assets/enter_normal-blank.png</file>
         <file>../../assets/BG1.0.png</file>
         <file>../../assets/BG2.0.png</file>
         <file>../../assets/Minimize.png</file>

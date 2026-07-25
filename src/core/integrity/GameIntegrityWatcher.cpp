@@ -4,16 +4,19 @@
 
 #include <QCryptographicHash>
 #include <QDir>
-#include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
 #include <QFileSystemWatcher>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QFutureWatcher>
+#include <QRegularExpression>
+#include <QtConcurrent/QtConcurrentRun>
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QTimer>
+#include <spdlog/spdlog.h>
 
 namespace core::integrity
 {
@@ -51,8 +54,14 @@ namespace core::integrity
         if (suspended == value)
             return;
         suspended = value;
-        if (!suspended)
-            reset_after_suspension();
+        if (suspended)
+        {
+            refresh_timer->stop();
+            pending_refresh = true;
+            clear_watchers();
+            return;
+        }
+        reset_after_suspension();
     }
 
     void GameIntegrityWatcher::reset_after_suspension()
@@ -120,11 +129,19 @@ namespace core::integrity
         QNetworkRequest request(QUrl(QStringLiteral("%1/%2/manifest.json").arg(base, build)));
         request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
                              QNetworkRequest::NoLessSafeRedirectPolicy);
+        request.setTransferTimeout(15000);
         QNetworkReply* reply = network.get(request);
+        connect(reply, &QNetworkReply::downloadProgress, reply,
+                [reply](const qint64 received, const qint64)
+        {
+            if (received > 32 * 1024 * 1024)
+                reply->abort();
+        });
         connect(reply, &QNetworkReply::finished, this, [this, reply, version, root, build]()
         {
             const QByteArray payload = reply->readAll();
-            const bool ok = reply->error() == QNetworkReply::NoError;
+            const bool ok = reply->error() == QNetworkReply::NoError
+                && payload.size() <= 32 * 1024 * 1024;
             reply->deleteLater();
             auto it = contexts.find(key(version));
             if (!ok || it == contexts.end() || it->root != root || it->version != build)
@@ -166,16 +183,26 @@ namespace core::integrity
         if (files.isEmpty())
             return;
 
+        if (files.size() > 50000)
+            return;
+
         it->hashes.clear();
         it->sizes.clear();
+        QSet<QString> collisionKeys;
+        static const QRegularExpression hashPattern(
+            QStringLiteral("^(?:[0-9a-fA-F]{32}|[0-9a-fA-F]{64})$"));
         for (const QJsonValue& value : files)
         {
             const QJsonObject object = value.toObject();
             const QString relative = safe_relative_path(object.value(QStringLiteral("path")).toString());
-            const QByteArray hash = object.value(QStringLiteral("hash")).toString().toLatin1().toLower();
+            const QString hashText = object.value(QStringLiteral("hash")).toString();
+            const QByteArray hash = hashText.toLatin1().toLower();
             const qint64 size = object.value(QStringLiteral("size")).toVariant().toLongLong();
-            if (relative.isEmpty() || hash.isEmpty() || size < 0)
-                continue;
+            const QString collisionKey = relative.toCaseFolded();
+            if (relative.isEmpty() || !hashPattern.match(hashText).hasMatch() || size < 0
+                || collisionKeys.contains(collisionKey))
+                return;
+            collisionKeys.insert(collisionKey);
             it->hashes.insert(relative, hash);
             it->sizes.insert(relative, size);
         }
@@ -183,36 +210,46 @@ namespace core::integrity
         if (it->hashes.isEmpty())
             return;
 
-        it->baseline_files = scan_files(it->root);
-        it->ready = true;
-        install_watchers(version);
-    }
-
-    QSet<QString> GameIntegrityWatcher::scan_files(const QString& root)
-    {
-        QSet<QString> result;
-        QDirIterator iterator(root, QDir::Files | QDir::NoDotAndDotDot,
-                              QDirIterator::Subdirectories);
-        const QDir base(root);
-        while (iterator.hasNext())
+        const int contextKey = key(version);
+        const QString root = it->root;
+        const QString build = it->version;
+        const auto hashes = it->hashes;
+        const auto sizes = it->sizes;
+        auto* verification = new QFutureWatcher<QStringList>(this);
+        connect(verification, &QFutureWatcher<QStringList>::finished, this,
+                [this, verification, contextKey, version, root, build]()
         {
-            const QString absolute = iterator.next();
-            const QString relative = QDir::cleanPath(base.relativeFilePath(absolute));
-            if (!ignored_path(relative))
-                result.insert(relative);
-        }
-        return result;
-    }
+            const QStringList changed = verification->result();
+            verification->deleteLater();
+            auto context = contexts.find(contextKey);
+            if (context == contexts.end() || suspended
+                || context->root != root || context->version != build)
+                return;
+            context->ready = true;
+            install_watchers(version);
+            if (!changed.isEmpty())
+                report_change(version, changed);
+        });
+        verification->setFuture(QtConcurrent::run([root, hashes, sizes]()
+        {
 
-    bool GameIntegrityWatcher::ignored_path(const QString& relative)
-    {
-        const QString lower = relative.toLower();
-        return lower == QStringLiteral("version.json")
-            || lower.endsWith(QStringLiteral(".download"))
-            || lower.endsWith(QStringLiteral(".partial"))
-            || lower.endsWith(QStringLiteral(".tmp"))
-            || lower.contains(QStringLiteral(".update-staging/"))
-            || lower.contains(QStringLiteral(".rollback/"));
+
+            QStringList changed;
+            const QDir base(root);
+            for (auto file = hashes.cbegin(); file != hashes.cend(); ++file)
+            {
+                const QString absolute = QDir::cleanPath(base.filePath(file.key()));
+                const QFileInfo info(absolute);
+                if (!info.exists() || info.size() != sizes.value(file.key(), -1)
+                    || GameIntegrityWatcher::hash_file(
+                           absolute, file.value().size()) != file.value())
+                {
+                    changed.append(file.key());
+                }
+            }
+            changed.removeDuplicates();
+            return changed;
+        }));
     }
 
     void GameIntegrityWatcher::install_watchers(const core::game::GameVersion version)
@@ -221,9 +258,12 @@ namespace core::integrity
         if (it == contexts.end() || !it->ready)
             return;
 
+        const int contextKey = key(version);
         const QDir root(it->root);
-        QSet<QString> directories;
-        directories.insert(it->root);
+        QSet<QString> requestedFiles;
+        QSet<QString> requestedDirectories;
+        requestedDirectories.insert(it->root);
+
         for (auto file = it->hashes.cbegin(); file != it->hashes.cend(); ++file)
         {
             const QString absolute = QDir::cleanPath(root.filePath(file.key()));
@@ -231,38 +271,72 @@ namespace core::integrity
             QString directory = info.absolutePath();
             while (directory.startsWith(it->root))
             {
-                directories.insert(directory);
+                requestedDirectories.insert(directory);
                 if (directory == it->root)
                     break;
                 directory = QFileInfo(directory).dir().absolutePath();
             }
-            if (info.exists())
+            if (info.isFile())
+                requestedFiles.insert(absolute);
+        }
+
+        for (auto directory = requestedDirectories.begin(); directory != requestedDirectories.end();)
+        {
+            if (!QFileInfo(*directory).isDir())
+                directory = requestedDirectories.erase(directory);
+            else
+                ++directory;
+        }
+
+        const QStringList failedFiles = requestedFiles.isEmpty()
+            ? QStringList{} : watcher->addPaths(requestedFiles.values());
+        const QStringList failedDirectories = requestedDirectories.isEmpty()
+            ? QStringList{} : watcher->addPaths(requestedDirectories.values());
+        QSet<QString> failedFileSet;
+        for (const QString& path : failedFiles)
+            failedFileSet.insert(path);
+        QSet<QString> failedDirectorySet;
+        for (const QString& path : failedDirectories)
+            failedDirectorySet.insert(path);
+
+        for (const QString& path : requestedFiles)
+        {
+            if (failedFileSet.contains(path))
+                continue;
+            it->watched_files.insert(path);
+            file_versions.insert(path, contextKey);
+        }
+        for (const QString& path : requestedDirectories)
+        {
+            if (failedDirectorySet.contains(path))
+                continue;
+            it->watched_directories.insert(path);
+            directory_versions.insert(path, contextKey);
+        }
+
+        if (!failedFiles.isEmpty() || !failedDirectories.isEmpty())
+        {
+            const QString signature = QStringLiteral("%1|%2|%3")
+                .arg(it->root).arg(failedFiles.size()).arg(failedDirectories.size());
+            if (!reported_watch_failures.contains(signature))
             {
-                it->watched_files.insert(absolute);
-                file_versions.insert(absolute, key(version));
+                reported_watch_failures.insert(signature);
+                SPDLOG_WARN(
+                    "integrity watcher has limited coverage for {}: {} file(s), {} directory path(s) could not be watched",
+                    it->root.toStdString(), failedFiles.size(), failedDirectories.size());
             }
         }
-
-        for (const QString& directory : directories)
-        {
-            if (!QFileInfo(directory).isDir())
-                continue;
-            it->watched_directories.insert(directory);
-            directory_versions.insert(directory, key(version));
-        }
-
-        if (!it->watched_files.isEmpty())
-            watcher->addPaths(it->watched_files.values());
-        if (!it->watched_directories.isEmpty())
-            watcher->addPaths(it->watched_directories.values());
     }
 
-    QByteArray GameIntegrityWatcher::md5_file(const QString& path)
+    QByteArray GameIntegrityWatcher::hash_file(
+        const QString& path, const qsizetype expectedHexLength)
     {
         QFile file(path);
         if (!file.open(QIODevice::ReadOnly))
             return {};
-        QCryptographicHash hash(QCryptographicHash::Md5);
+        const QCryptographicHash::Algorithm algorithm = expectedHexLength == 64
+            ? QCryptographicHash::Sha256 : QCryptographicHash::Md5;
+        QCryptographicHash hash(algorithm);
         if (!hash.addData(&file))
             return {};
         return hash.result().toHex().toLower();
@@ -286,22 +360,52 @@ namespace core::integrity
 
         const QString relative = QDir(it->root).relativeFilePath(path);
         const QFileInfo info(path);
-        bool changed = !info.exists();
-        if (!changed)
+        const auto version = context_key == 2 ? core::game::GameVersion::Alicia2
+                                              : core::game::GameVersion::Playtest;
+        const qint64 expected_size = it->sizes.value(relative, -1);
+        if (!info.exists() || (expected_size >= 0 && info.size() != expected_size))
         {
-            const qint64 expected_size = it->sizes.value(relative, -1);
-            changed = expected_size >= 0 && info.size() != expected_size;
-            if (!changed)
-                changed = md5_file(path) != it->hashes.value(relative);
-            if (!watcher->files().contains(path))
-                watcher->addPath(path);
+            report_change(version, {relative});
+            return;
         }
-        if (changed)
+
+        const QByteArray expected_hash = it->hashes.value(relative);
+        const QString root = it->root;
+        const QString build = it->version;
+        auto* verification = new QFutureWatcher<QByteArray>(this);
+        connect(verification, &QFutureWatcher<QByteArray>::finished, this,
+                [this, verification, context_key, version, root, build, path, relative, expected_hash]()
         {
-            report_change(context_key == 2 ? core::game::GameVersion::Alicia2
-                                           : core::game::GameVersion::Playtest,
-                          {relative});
-        }
+            const QByteArray actual_hash = verification->result();
+            verification->deleteLater();
+            auto context = contexts.find(context_key);
+            if (context == contexts.end() || suspended || context->alerted
+                || context->root != root || context->version != build)
+                return;
+            if (actual_hash != expected_hash)
+            {
+                report_change(version, {relative});
+                return;
+            }
+            if (QFileInfo::exists(path) && !watcher->files().contains(path))
+            {
+                if (watcher->addPath(path))
+                {
+                    reported_restore_failures.remove(path);
+                }
+                else if (!reported_restore_failures.contains(path))
+                {
+                    reported_restore_failures.insert(path);
+                    SPDLOG_WARN("integrity watcher could not restore file watch for {}",
+                                path.toStdString());
+                }
+            }
+        });
+        verification->setFuture(QtConcurrent::run([path, expected_hash]()
+        {
+            return GameIntegrityWatcher::hash_file(
+                path, expected_hash.size());
+        }));
     }
 
     void GameIntegrityWatcher::inspect_directory(const QString& path)
@@ -319,37 +423,94 @@ namespace core::integrity
         auto it = contexts.find(context_key);
         if (it == contexts.end() || !it->ready || it->alerted)
             return;
-
-        QStringList changed;
-        const QDir root(it->root);
-        for (auto file = it->hashes.cbegin(); file != it->hashes.cend(); ++file)
+        if (it->directory_scan_in_progress)
         {
-            const QString absolute = QDir::cleanPath(root.filePath(file.key()));
-            const QFileInfo info(absolute);
-            if (!info.exists() || info.size() != it->sizes.value(file.key(), -1))
-                changed.append(file.key());
-            else if (!watcher->files().contains(absolute))
+            it->directory_scan_pending = true;
+            return;
+        }
+
+        it->directory_scan_in_progress = true;
+        const QString root = it->root;
+        const QString build = it->version;
+        const auto hashes = it->hashes;
+        const auto sizes = it->sizes;
+        const auto version = context_key == 2 ? core::game::GameVersion::Alicia2
+                                              : core::game::GameVersion::Playtest;
+
+        auto* verification = new QFutureWatcher<QStringList>(this);
+        connect(verification, &QFutureWatcher<QStringList>::finished, this,
+                [this, verification, context_key, version, root, build, path]()
+        {
+            QStringList changed = verification->result();
+            verification->deleteLater();
+            auto context = contexts.find(context_key);
+            if (context == contexts.end() || context->root != root || context->version != build)
+                return;
+            context->directory_scan_in_progress = false;
+            const bool rescan = context->directory_scan_pending;
+            context->directory_scan_pending = false;
+            if (suspended || context->alerted)
+                return;
+
+            if (!changed.isEmpty())
             {
-                watcher->addPath(absolute);
-                file_versions.insert(absolute, context_key);
+                changed.removeDuplicates();
+                report_change(version, changed);
+                return;
             }
-        }
 
-        const QSet<QString> current = scan_files(it->root);
-        const QSet<QString> additions = current - it->baseline_files;
-        for (const QString& relative : additions)
+            const QDir base(root);
+            const QStringList watched = watcher->files();
+            for (auto file = context->hashes.cbegin(); file != context->hashes.cend(); ++file)
+            {
+                const QString absolute = QDir::cleanPath(base.filePath(file.key()));
+                if (QFileInfo::exists(absolute) && !watched.contains(absolute))
+                {
+                    if (watcher->addPath(absolute))
+                    {
+                        context->watched_files.insert(absolute);
+                        file_versions.insert(absolute, context_key);
+                        reported_restore_failures.remove(absolute);
+                    }
+                    else if (!reported_restore_failures.contains(absolute))
+                    {
+                        reported_restore_failures.insert(absolute);
+                        SPDLOG_WARN("integrity watcher could not restore file watch for {}",
+                                    absolute.toStdString());
+                    }
+                }
+            }
+            if (QFileInfo(path).isDir() && !watcher->directories().contains(path))
+            {
+                if (watcher->addPath(path))
+                {
+                    context->watched_directories.insert(path);
+                    directory_versions.insert(path, context_key);
+                    reported_restore_failures.remove(path);
+                }
+                else if (!reported_restore_failures.contains(path))
+                {
+                    reported_restore_failures.insert(path);
+                    SPDLOG_WARN("integrity watcher could not restore directory watch for {}",
+                                path.toStdString());
+                }
+            }
+            if (rescan)
+                QTimer::singleShot(0, this, [this, path]() { inspect_directory(path); });
+        });
+        verification->setFuture(QtConcurrent::run([root, hashes, sizes]()
         {
-            if (!it->hashes.contains(relative))
-                changed.append(relative);
-        }
-
-        if (!changed.isEmpty())
-        {
-            changed.removeDuplicates();
-            report_change(context_key == 2 ? core::game::GameVersion::Alicia2
-                                           : core::game::GameVersion::Playtest,
-                          changed);
-        }
+            QStringList changed;
+            const QDir base(root);
+            for (auto file = hashes.cbegin(); file != hashes.cend(); ++file)
+            {
+                const QString absolute = QDir::cleanPath(base.filePath(file.key()));
+                const QFileInfo info(absolute);
+                if (!info.exists() || info.size() != sizes.value(file.key(), -1))
+                    changed.append(file.key());
+            }
+            return changed;
+        }));
     }
 
     void GameIntegrityWatcher::report_change(const core::game::GameVersion version,

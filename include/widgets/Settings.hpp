@@ -1,4 +1,5 @@
 #pragma once
+#include <QString>
 #include <QWidget>
 
 #include "util/Assets.hpp"
@@ -20,10 +21,10 @@ class Settings : public util::modal_overlay::ModalOverlay
     Q_OBJECT
     public:
         explicit Settings(core::wine::Shell* shell, QWidget* parent = nullptr);
+        void set_mutation_enabled(bool enabled, const QString& reason = {});
 
     signals:
         void repair_requested();
-        void launcher_size_changed();
 
     protected:
         void paint_content(QPainter& painter) override;
@@ -36,6 +37,8 @@ class Settings : public util::modal_overlay::ModalOverlay
         void update_panel_geometry();
         int active_tab {};
         bool launcher_panel_expanded {};
+        bool mutation_enabled {true};
+        QString mutation_reason;
 
         QPushButton* close_button {};
         QPushButton* tab_buttons[3] {};

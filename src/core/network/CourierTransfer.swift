@@ -25,6 +25,9 @@ private final class StreamingDownloadDelegate: NSObject, URLSessionDataDelegate,
     private let destination: URL
     private let expectedSize: Int
     private let startingOffset: Int64
+    private let allowedScheme: String
+    private let allowedHost: String
+    private let allowedPort: Int?
     private let onBytes: (Int, UInt64) -> Void
     private let queue: OperationQueue
 
@@ -38,16 +41,37 @@ private final class StreamingDownloadDelegate: NSObject, URLSessionDataDelegate,
     private var completed = false
 
     init(destination: URL, expectedSize: Int, startingOffset: Int64,
+         origin: URL,
          onBytes: @escaping (Int, UInt64) -> Void)
     {
         self.destination = destination
         self.expectedSize = expectedSize
         self.startingOffset = startingOffset
+        self.allowedScheme = origin.scheme?.lowercased() ?? ""
+        self.allowedHost = origin.host?.lowercased() ?? ""
+        self.allowedPort = origin.port
         self.onBytes = onBytes
         self.received = UInt64(max(0, startingOffset))
         self.queue = OperationQueue()
         self.queue.maxConcurrentOperationCount = 1
         self.queue.qualityOfService = .utility
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask,
+                    willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest,
+                    completionHandler: @escaping (URLRequest?) -> Void)
+    {
+        guard let destination = request.url,
+              destination.scheme?.lowercased() == allowedScheme,
+              destination.host?.lowercased() == allowedHost,
+              destination.port == allowedPort else {
+            terminalError = Err(
+                "Download redirected to an untrusted origin")
+            completionHandler(nil)
+            return
+        }
+        completionHandler(request)
     }
 
     func start(request: URLRequest, configuration: URLSessionConfiguration) async throws
@@ -197,6 +221,7 @@ extension Courier
                 destination: destination,
                 expectedSize: expectedSize,
                 startingOffset: existing > 0 && existing < expectedSize ? existing : 0,
+                origin: url,
                 onBytes: onBytes)
 
             do {

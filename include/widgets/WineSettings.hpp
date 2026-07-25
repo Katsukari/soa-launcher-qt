@@ -1,8 +1,6 @@
 #pragma once
 #include <QWidget>
 
-class QPlainTextEdit;
-
 namespace core::wine
 {
     class Shell;
@@ -11,15 +9,16 @@ namespace core::wine
 class WineSettings : public QWidget
 {
     Q_OBJECT
-    public:
-        explicit WineSettings(core::wine::Shell * shell, QWidget* parent = nullptr);
+public:
+    explicit WineSettings(core::wine::Shell* shell, QWidget* parent = nullptr);
 
-    private:
-        void setup_dxvk_option();
-        void setup_prefix_option();
-        void setup_wine_binary_option();
-        void setup_tricks_option();
-        void setup_wine_args_option();
+private:
+    void setup_dxvk_option();
+    void setup_prefix_option();
+    void setup_wine_binary_option();
+    void setup_tricks_option();
+    void setup_macos_components_option();
+    void setup_wine_args_option();
 
-        core::wine::Shell * shell{};
+    core::wine::Shell* shell {};
 };
