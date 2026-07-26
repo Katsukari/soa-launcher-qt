@@ -7,7 +7,7 @@
 #include "util/Config.hpp"
 #include "core/game/GameVersion.hpp"
 #include "util/ProgressBar.hpp"
-#include <QMessageBox>
+#include "widgets/LauncherDialog.hpp"
 #include <QPainter>
 #include <QPushButton>
 #include <QTimer>
@@ -53,6 +53,7 @@ DownloadProgress::DownloadProgress(const Mode mode_, QWidget* parent)
 
             const bool retryable_failure = status.base.state == State::Failed && !cancelled;
             retry_button->setVisible(retryable_failure);
+            details_button->setVisible(retryable_failure);
             update();
 
             if (finished)
@@ -113,21 +114,45 @@ void DownloadProgress::setup_buttons()
     const QSize window_size = window()->size();
 
     close_button = util::simple_utils::make_flat_button(this);
-    close_button->setAccessibleName("Cancel or close download");
+    close_button->setAccessibleName(mode == Mode::Repair
+        ? QStringLiteral("Cancel or close repair")
+        : QStringLiteral("Cancel or close download"));
     close_button->setIcon(QIcon(util::assets::images[util::assets::Image::CloseNormal]));
     close_button->setIconSize(dl::close_icon(window_size));
     close_button->setGeometry(dl::close(window_size));
     connect(close_button, &QPushButton::clicked, this, &DownloadProgress::cancel_download);
     close_button->raise();
 
-    const QRect action_rect = dl::retry_button(window_size);
-    retry_button = new QPushButton("RETRY", this);
+    retry_button = new QPushButton(QStringLiteral("RETRY"), this);
     retry_button->setCursor(Qt::PointingHandCursor);
-    retry_button->setStyleSheet(util::styles::k_link_blue);
-    retry_button->setGeometry(action_rect);
+    retry_button->setStyleSheet(util::styles::k_primary_button);
+    retry_button->setGeometry(dl::retry_button(window_size));
+    retry_button->setAccessibleName(mode == Mode::Repair
+        ? QStringLiteral("Retry repair")
+        : QStringLiteral("Retry download"));
     retry_button->setVisible(false);
     connect(retry_button, &QPushButton::clicked, this, &DownloadProgress::start_download);
     retry_button->raise();
+
+    details_button = new QPushButton(QStringLiteral("SHOW ERROR"), this);
+    details_button->setCursor(Qt::PointingHandCursor);
+    details_button->setStyleSheet(util::styles::k_neutral_button);
+    details_button->setGeometry(dl::details_button(window_size));
+    details_button->setAccessibleName(QStringLiteral("Show full error"));
+    details_button->setVisible(false);
+    connect(details_button, &QPushButton::clicked, this, [this]()
+    {
+        if (current.base.message.isEmpty())
+            return;
+        LauncherDialog::error(
+            this,
+            mode == Mode::Repair
+                ? QStringLiteral("Repair Error Details")
+                : QStringLiteral("Download Error Details"),
+            current.base.message,
+            QStringLiteral("Retry continues from the files that were already verified or downloaded."));
+    });
+    details_button->raise();
 }
 
 void DownloadProgress::showEvent(QShowEvent* event)
@@ -141,17 +166,21 @@ void DownloadProgress::cancel_download()
 {
     if (current.base.state == State::Working && current.base.progress > 0.0)
     {
-        const auto answer = QMessageBox::question(
+        const bool confirmed = LauncherDialog::confirm(
             this,
+            LauncherDialog::Tone::Warning,
             mode == Mode::Repair
-                ? util::i18n::translate("Cancel Repair")
-                : util::i18n::translate("Cancel Download"),
+                ? QStringLiteral("Cancel Repair")
+                : QStringLiteral("Cancel Download"),
             mode == Mode::Repair
-                ? util::i18n::translate("Cancel the current repair? Verified and partial files will be kept so a later retry can continue.")
-                : util::i18n::translate("Cancel the current game download? Verified and partial files will be kept so a later retry can continue."),
-            QMessageBox::Yes | QMessageBox::No,
-            QMessageBox::No);
-        if (answer != QMessageBox::Yes)
+                ? QStringLiteral("Cancel the current repair? Verified and partial files will be kept so a later retry can continue.")
+                : QStringLiteral("Cancel the current game download? Verified and partial files will be kept so a later retry can continue."),
+            mode == Mode::Repair
+                ? QStringLiteral("Cancel Repair")
+                : QStringLiteral("Cancel Download"),
+            QStringLiteral("Keep Running"),
+            true);
+        if (!confirmed)
             return;
     }
 
@@ -202,6 +231,7 @@ void DownloadProgress::set_terminal_error(const QString& message)
     current.base.message = message;
     current.base.progress = -1.0;
     retry_button->show();
+    details_button->show();
     update();
     emit download_finished(false);
 }
@@ -227,6 +257,7 @@ void DownloadProgress::start_download()
     }
 
     retry_button->hide();
+    details_button->hide();
     current = DownloadStatus{};
     current.base.state = State::Working;
     current.base.message = mode == Mode::Repair

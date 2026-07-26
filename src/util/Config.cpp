@@ -78,12 +78,19 @@ namespace util::config
 
         QString normalized_launcher_size(const QString& value)
         {
-            static const QRegularExpression pattern(QStringLiteral(R"(^(\d{3,4})x(\d{3,4})$)"));
-            const auto match = pattern.match(value.trimmed());
-            if (!match.hasMatch()) return QStringLiteral("1400x846");
-            const int width = qBound(900, match.captured(1).toInt(), 3840);
-            const int height = qBound(544, match.captured(2).toInt(), 2160);
-            return QStringLiteral("%1x%2").arg(width).arg(height);
+            const QString candidate = value.trimmed().toLower();
+            if (candidate == QStringLiteral("900x544"))
+                return QStringLiteral("1120x677");
+
+            static const QStringList supported {
+                QStringLiteral("1120x677"),
+                QStringLiteral("1400x846"),
+                QStringLiteral("1600x967"),
+                QStringLiteral("1920x1160")
+            };
+            return supported.contains(candidate)
+                ? candidate
+                : QStringLiteral("1400x846");
         }
 
 

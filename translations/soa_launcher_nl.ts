@@ -514,8 +514,8 @@ DXVK blijft optioneel en kan later in Instellingen worden ingeschakeld. Er wordt
         </message>
         <message>
             <location filename="../src/widgets/LauncherSettings.cpp" line="526" />
-            <source>&lt;td width="50%" style="padding:1px 10px 2px 0; white-space:nowrap;"&gt;&lt;b&gt;%1:&lt;/b&gt; &lt;span style="color:%2"&gt;%3&lt;/span&gt;&lt;/td&gt;</source>
-            <translation>&lt;td width="50%" style="padding:1px 10px 2px 0; white-space:nowrap;"&gt;&lt;b&gt;%1:&lt;/b&gt; &lt;span style="color:%2"&gt;%3&lt;/span&gt;&lt;/td&gt;</translation>
+            <source>&lt;td width="50%" style="padding:1px 10px 2px 0;"&gt;&lt;b&gt;%1:&lt;/b&gt; &lt;span style="color:%2"&gt;%3&lt;/span&gt;&lt;/td&gt;</source>
+            <translation>&lt;td width="50%" style="padding:1px 10px 2px 0;"&gt;&lt;b&gt;%1:&lt;/b&gt; &lt;span style="color:%2"&gt;%3&lt;/span&gt;&lt;/td&gt;</translation>
         </message>
         <message>
             <location filename="../src/widgets/LauncherSettings.cpp" line="535" />
@@ -1059,11 +1059,6 @@ Met Aanmeldlink kopiëren kun je de exacte link in elke browser plakken.</transl
         <message>
             <source>cmd_force_simpleShadow</source>
             <translation>cmd_force_simpleShadow</translation>
-        </message>
-        <message>
-            <location filename="../src/widgets/LauncherSettings.cpp" line="589" />
-            <source>Compact (900x544)</source>
-            <translation>Compact (900x544)</translation>
         </message>
         <message>
             <location filename="../src/widgets/AdvancedSettings.cpp" line="150" />
@@ -3876,6 +3871,290 @@ Ontbreekt: %1.</translation>
             <location filename="../src/widgets/GameInstall.cpp" line="248" />
             <source>~ 2 GB of free disk space required.</source>
             <translation>~ 2 GB vrije schijfruimte vereist.</translation>
+        </message>
+        <message>
+            <source>Credits</source>
+            <translation>Credits</translation>
+        </message>
+        <message>
+            <source>Close window</source>
+            <translation>Venster sluiten</translation>
+        </message>
+        <message>
+            <source>Official Website</source>
+            <translation>Officiële website</translation>
+        </message>
+        <message>
+            <source>Source Code</source>
+            <translation>Broncode</translation>
+        </message>
+        <message>
+            <source>Contact</source>
+            <translation>Contact</translation>
+        </message>
+        <message>
+            <source>ABOUT</source>
+            <translation>OVER</translation>
+        </message>
+        <message>
+            <source>The official launcher for Linux and macOS.</source>
+            <translation>De officiële launcher voor Linux en macOS.</translation>
+        </message>
+        <message>
+            <source>VERSION %1 · QT %2</source>
+            <translation>VERSIE %1 · QT %2</translation>
+        </message>
+        <message>
+            <source>Everything in one place</source>
+            <translation>Alles op één plek</translation>
+        </message>
+        <message>
+            <source>Install, update, verify, repair, and launch both supported Story of Alicia game profiles.</source>
+            <translation>Installeer, update, controleer, repareer en start beide ondersteunde Story of Alicia-spelprofielen.</translation>
+        </message>
+        <message>
+            <source>Linux and macOS</source>
+            <translation>Linux en macOS</translation>
+        </message>
+        <message>
+            <source>Linux uses Wine or Proton. macOS uses the bundled Story of Alicia runtime.</source>
+            <translation>Linux gebruikt Wine of Proton. macOS gebruikt de meegeleverde Story of Alicia-runtime.</translation>
+        </message>
+        <message>
+            <source>Game and artwork remain owned by their respective copyright holders.</source>
+            <translation>Het spel en het artwork blijven eigendom van hun respectieve rechthebbenden.</translation>
+        </message>
+        <message>
+            <source>CREDITS</source>
+            <translation>CREDITS</translation>
+        </message>
+        <message>
+            <source>Built with help from the Story of Alicia community.</source>
+            <translation>Gebouwd met hulp van de Story of Alicia-community.</translation>
+        </message>
+        <message>
+            <source>THANK YOU</source>
+            <translation>BEDANKT</translation>
+        </message>
+        <message>
+            <source>Launcher development</source>
+            <translation>Launcherontwikkeling</translation>
+        </message>
+        <message>
+            <source>Story of Alicia team and contributors</source>
+            <translation>Het Story of Alicia-team en bijdragers</translation>
+        </message>
+        <message>
+            <source>Artwork and branding</source>
+            <translation>Artwork en vormgeving</translation>
+        </message>
+        <message>
+            <source>Respective Story of Alicia artists and copyright holders</source>
+            <translation>De respectieve Story of Alicia-artiesten en rechthebbenden</translation>
+        </message>
+        <message>
+            <source>Translations and testing</source>
+            <translation>Vertalingen en testen</translation>
+        </message>
+        <message>
+            <source>Community translators, testers, and players</source>
+            <translation>Vertalers, testers en spelers uit de community</translation>
+        </message>
+        <message>
+            <source>Open-source technology</source>
+            <translation>Opensourcetechnologie</translation>
+        </message>
+        <message>
+            <source>Qt, Wine, spdlog, fmt, and their contributors</source>
+            <translation>Qt, Wine, spdlog, fmt en hun bijdragers</translation>
+        </message>
+        <message>
+            <source>Thank you to everyone who helps players enjoy Story of Alicia.</source>
+            <translation>Bedankt aan iedereen die spelers helpt van Story of Alicia te genieten.</translation>
+        </message>
+        <message>
+            <source>INFORMATION</source>
+            <translation>INFORMATIE</translation>
+        </message>
+        <message>
+            <source>WARNING</source>
+            <translation>WAARSCHUWING</translation>
+        </message>
+        <message>
+            <source>CONFIRMATION</source>
+            <translation>BEVESTIGING</translation>
+        </message>
+        <message>
+            <source>Reset Launcher</source>
+            <translation>Launcher resetten</translation>
+        </message>
+        <message>
+            <source>Keep Running</source>
+            <translation>Doorgaan</translation>
+        </message>
+        <message>
+            <source>Continue Sign In</source>
+            <translation>Doorgaan met aanmelden</translation>
+        </message>
+        <message>
+            <source>Choose game installation folder</source>
+            <translation>Kies de installatiemap van het spel</translation>
+        </message>
+        <message>
+            <source>Game launch arguments</source>
+            <translation>Startargumenten van het spel</translation>
+        </message>
+        <message>
+            <source>Cancel or close repair</source>
+            <translation>Reparatie annuleren of sluiten</translation>
+        </message>
+        <message>
+            <source>Retry repair</source>
+            <translation>Reparatie opnieuw proberen</translation>
+        </message>
+        <message>
+            <source>Retry download</source>
+            <translation>Download opnieuw proberen</translation>
+        </message>
+        <message>
+            <source>SHOW ERROR</source>
+            <translation>FOUT TONEN</translation>
+        </message>
+        <message>
+            <source>Show full error</source>
+            <translation>Volledige fout tonen</translation>
+        </message>
+        <message>
+            <source>Repair Error Details</source>
+            <translation>Details van reparatiefout</translation>
+        </message>
+        <message>
+            <source>Download Error Details</source>
+            <translation>Details van downloadfout</translation>
+        </message>
+        <message>
+            <source>Retry continues from the files that were already verified or downloaded.</source>
+            <translation>Een nieuwe poging gaat verder vanaf de bestanden die al zijn gecontroleerd of gedownload.</translation>
+        </message>
+        <message>
+            <source>Close game installation</source>
+            <translation>Spelinstallatie sluiten</translation>
+        </message>
+        <message>
+            <source>Cancel game installation</source>
+            <translation>Spelinstallatie annuleren</translation>
+        </message>
+        <message>
+            <source>Install game</source>
+            <translation>Spel installeren</translation>
+        </message>
+        <message>
+            <source>Change game installation path</source>
+            <translation>Installatiepad van het spel wijzigen</translation>
+        </message>
+        <message>
+            <source>Copy connectivity report</source>
+            <translation>Verbindingsrapport kopiëren</translation>
+        </message>
+        <message>
+            <source>COPIED</source>
+            <translation>GEKOPIEERD</translation>
+        </message>
+        <message>
+            <source>Cancel prefix setup</source>
+            <translation>Prefixinstallatie annuleren</translation>
+        </message>
+        <message>
+            <source>Cancel Prefix Setup</source>
+            <translation>Prefixinstallatie annuleren</translation>
+        </message>
+        <message>
+            <source>Cancel the current prefix setup? An incomplete prefix may need to be repaired the next time setup runs.</source>
+            <translation>De huidige prefixinstallatie annuleren? Een onvolledige prefix moet mogelijk worden gerepareerd wanneer de installatie de volgende keer wordt uitgevoerd.</translation>
+        </message>
+        <message>
+            <source>Cancel Setup</source>
+            <translation>Installatie annuleren</translation>
+        </message>
+        <message>
+            <source>Use recommended setup</source>
+            <translation>Aanbevolen installatie gebruiken</translation>
+        </message>
+        <message>
+            <source>Choose a runtime manually</source>
+            <translation>Handmatig een runtime kiezen</translation>
+        </message>
+        <message>
+            <source>Close prefix installation</source>
+            <translation>Prefixinstallatie sluiten</translation>
+        </message>
+        <message>
+            <source>Cancel prefix installation</source>
+            <translation>Prefixinstallatie annuleren</translation>
+        </message>
+        <message>
+            <source>Install prefix</source>
+            <translation>Prefix installeren</translation>
+        </message>
+        <message>
+            <source>Change prefix installation path</source>
+            <translation>Installatiepad van prefix wijzigen</translation>
+        </message>
+        <message>
+            <source>Close runtime selection</source>
+            <translation>Runtimeselectie sluiten</translation>
+        </message>
+        <message>
+            <source>Rescan runtimes</source>
+            <translation>Runtimes opnieuw scannen</translation>
+        </message>
+        <message>
+            <source>Add runtime</source>
+            <translation>Runtime toevoegen</translation>
+        </message>
+        <message>
+            <source>Continue with selected runtime</source>
+            <translation>Doorgaan met geselecteerde runtime</translation>
+        </message>
+        <message>
+            <source>Request Rosetta installation</source>
+            <translation>Rosetta-installatie aanvragen</translation>
+        </message>
+        <message>
+            <source>Select runtime: %1</source>
+            <translation>Runtime selecteren: %1</translation>
+        </message>
+        <message>
+            <source>Runtime prefix path</source>
+            <translation>Pad naar runtime-prefix</translation>
+        </message>
+        <message>
+            <source>Choose Wine prefix folder</source>
+            <translation>Map voor Wine-prefix kiezen</translation>
+        </message>
+        <message>
+            <source>Custom runtime path</source>
+            <translation>Pad naar aangepaste runtime</translation>
+        </message>
+        <message>
+            <source>Choose Wine binary or Proton script</source>
+            <translation>Wine-programma of Proton-script kiezen</translation>
+        </message>
+        <message>
+            <source>Winetricks path</source>
+            <translation>Pad naar Winetricks</translation>
+        </message>
+        <message>
+            <source>Choose Winetricks executable</source>
+            <translation>Winetricks-programma kiezen</translation>
+        </message>
+        <message>
+            <source>Runtime environment variables</source>
+            <translation>Omgevingsvariabelen voor runtime</translation>
+        </message>
+        <message>
+            <source>Connectivity check results</source>
+            <translation>Resultaten van verbindingscontrole</translation>
         </message>
     </context>
     <context>

@@ -152,6 +152,8 @@ set(LAUNCHER_SOURCES
         src/core/state/InstallState.cpp
         src/core/state/ViewRouter.cpp
         src/widgets/WineSelectMenu.cpp
+        src/widgets/LauncherInfoDialog.cpp
+        src/widgets/LauncherDialog.cpp
 )
 
 set(LAUNCHER_HEADERS
@@ -208,6 +210,8 @@ set(LAUNCHER_HEADERS
         include/core/network/DownloadStatus.hpp
         include/core/game/GameVersion.hpp
         include/widgets/WineSelectMenu.hpp
+        include/widgets/LauncherInfoDialog.hpp
+        include/widgets/LauncherDialog.hpp
 )
 
 set(SOA_PLATFORM_RESOURCES)

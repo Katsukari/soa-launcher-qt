@@ -1,4 +1,5 @@
 #include "widgets/PrefixProgress.hpp"
+#include "widgets/LauncherDialog.hpp"
 #include "util/Assets.hpp"
 #include "util/Layout.hpp"
 #include "util/SimpleUtils.hpp"
@@ -103,13 +104,27 @@ void PrefixProgress::setup_buttons()
     const QSize w = window()->size();
 
     close_button = util::simple_utils::make_flat_button(this);
+    close_button->setAccessibleName(QStringLiteral("Cancel prefix setup"));
     close_button->setIcon(QIcon(util::assets::images[util::assets::Image::CloseSettings]));
     close_button->setIconSize(dl::close_icon(w));
     close_button->setGeometry(dl::close(w));
     connect(close_button, &QPushButton::clicked, this, [this]()
     {
         if (shell && shell->is_busy())
+        {
+            const bool confirmed = LauncherDialog::confirm(
+                this,
+                LauncherDialog::Tone::Warning,
+                QStringLiteral("Cancel Prefix Setup"),
+                QStringLiteral(
+                    "Cancel the current prefix setup? An incomplete prefix may need to be repaired the next time setup runs."),
+                QStringLiteral("Cancel Setup"),
+                QStringLiteral("Keep Running"),
+                true);
+            if (!confirmed)
+                return;
             shell->cancel_current();
+        }
         hide();
         emit closed();
     });
@@ -162,9 +177,18 @@ void PrefixProgress::paint_content(QPainter& painter)
     painter.setPen(util::colors::k_text_label);
 
     const QRect info = dl::info_row(w);
-    painter.drawText(info, Qt::AlignLeft | Qt::AlignVCenter, util::i18n::translate(status));
-    if (step > 0)
-        painter.drawText(info, Qt::AlignRight | Qt::AlignVCenter, util::i18n::translate("Step %1 of 3").arg(step));
+    const QString step_text = step > 0
+        ? util::i18n::translate("Step %1 of 3").arg(step)
+        : QString();
+    const int step_width = step_text.isEmpty()
+        ? 0
+        : painter.fontMetrics().horizontalAdvance(step_text) + util::layout::scaled(12, w);
+    const QRect status_rect = info.adjusted(0, 0, -step_width, 0);
+    const QString status_text = painter.fontMetrics().elidedText(
+        util::i18n::translate(status), Qt::ElideRight, qMax(1, status_rect.width()));
+    painter.drawText(status_rect, Qt::AlignLeft | Qt::AlignVCenter, status_text);
+    if (!step_text.isEmpty())
+        painter.drawText(info, Qt::AlignRight | Qt::AlignVCenter, step_text);
 
     util::progress_bar::draw(painter, dl::bar_rect(w), current_pct / 100.0);
 

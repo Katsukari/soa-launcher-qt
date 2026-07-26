@@ -35,6 +35,51 @@ namespace util::simple_utils
         description_label->setStyleSheet(QStringLiteral("color: #4F1717; background: transparent;"));
         description_label->setGeometry(layout::settings::row_desc(window_size, y));
         description_label->setProperty("soa_i18n_text_source", description);
+
+        const int title_base_size = title_font.pixelSize();
+        const int description_base_size = description_font.pixelSize();
+        const auto refit = [title_label, description_label,
+                            title_base_size, description_base_size]()
+        {
+            QFont fitted_title = title_label->font();
+            int title_size = qMax(12, title_base_size);
+            while (title_size > 12)
+            {
+                fitted_title.setPixelSize(title_size);
+                if (QFontMetrics(fitted_title).horizontalAdvance(title_label->text())
+                    <= qMax(1, title_label->width() - 4))
+                {
+                    break;
+                }
+                --title_size;
+            }
+            fitted_title.setPixelSize(title_size);
+            title_label->setFont(fitted_title);
+            title_label->setToolTip(title_label->text());
+
+            QFont fitted_description = description_label->font();
+            int description_size = qMax(11, description_base_size);
+            const QRect available(0, 0, qMax(1, description_label->width()),
+                                  qMax(1, description_label->height()));
+            while (description_size > 11)
+            {
+                fitted_description.setPixelSize(description_size);
+                const QRect bounds = QFontMetrics(fitted_description).boundingRect(
+                    available, Qt::TextWordWrap | Qt::AlignLeft | Qt::AlignTop,
+                    description_label->text());
+                if (bounds.height() <= available.height())
+                    break;
+                --description_size;
+            }
+            fitted_description.setPixelSize(description_size);
+            description_label->setFont(fitted_description);
+            description_label->setToolTip(description_label->text());
+        };
+
+        refit();
+        QObject::connect(&i18n::LanguageManager::instance(),
+                         &i18n::LanguageManager::language_changed,
+                         title_label, [refit]() { refit(); });
     }
 
     QPushButton* make_flat_button(QWidget* parent)
@@ -54,6 +99,7 @@ namespace util::simple_utils
         constexpr auto k_asset_property = "soa_button_asset";
         constexpr auto k_loading_property = "soa_button_loading";
         constexpr auto k_connected_property = "soa_button_language_connected";
+        constexpr auto k_stretch_asset_property = "soa_button_stretch_asset";
 
         QLabel* button_text_label(QPushButton* button)
         {
@@ -89,8 +135,9 @@ namespace util::simple_utils
             QFont font = label->font();
             const int base_size = label->property(k_base_pixel_size_property).toInt();
             const int maximum_width = qMax(1, label->width() - 12);
-            int pixel_size = qMax(8, base_size);
-            while (pixel_size > 8)
+            constexpr int minimum_pixel_size = 10;
+            int pixel_size = qMax(minimum_pixel_size, base_size);
+            while (pixel_size > minimum_pixel_size)
             {
                 font.setPixelSize(pixel_size);
                 if (QFontMetrics(font).horizontalAdvance(label->text()) <= maximum_width)
@@ -105,6 +152,29 @@ namespace util::simple_utils
         {
             return static_cast<assets::Button>(button->property(k_asset_property).toInt());
         }
+
+        QPixmap displayed_button_pixmap(QPushButton* button, const QPixmap& source)
+        {
+            if (!button || source.isNull()
+                || !button->property(k_stretch_asset_property).toBool())
+            {
+                return source;
+            }
+
+            const QSize target = button->iconSize().isValid()
+                ? button->iconSize()
+                : button->size();
+            return source.scaled(target, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+        }
+
+        void set_button_icon(QPushButton* button, const QPixmap& source)
+        {
+            const QPixmap displayed = displayed_button_pixmap(button, source);
+            QIcon icon;
+            icon.addPixmap(displayed, QIcon::Normal);
+            icon.addPixmap(displayed, QIcon::Disabled);
+            button->setIcon(icon);
+        }
     }
 
     void refresh_button(QPushButton* button)
@@ -116,10 +186,7 @@ namespace util::simple_utils
         const assets::ButtonAsset& asset = assets::button(key);
         const bool loading = button->property(k_loading_property).toBool();
         const QPixmap& pixmap = loading && !asset.loading.isNull() ? asset.loading : asset.normal;
-        QIcon icon;
-        icon.addPixmap(pixmap, QIcon::Normal);
-        icon.addPixmap(pixmap, QIcon::Disabled);
-        button->setIcon(icon);
+        set_button_icon(button, pixmap);
 
         if (QLabel* label = button_text_label(button))
         {
@@ -204,16 +271,16 @@ namespace util::simple_utils
         switch (event->type())
         {
             case QEvent::Enter:
-                button->setIcon(QIcon(hover));
+                set_button_icon(button, hover);
                 return true;
             case QEvent::Leave:
-                button->setIcon(QIcon(normal));
+                set_button_icon(button, normal);
                 return true;
             case QEvent::MouseButtonPress:
-                button->setIcon(QIcon(clicked));
+                set_button_icon(button, clicked);
                 return true;
             case QEvent::MouseButtonRelease:
-                button->setIcon(QIcon(button->underMouse() ? hover : normal));
+                set_button_icon(button, button->underMouse() ? hover : normal);
                 return true;
             default:
                 return false;

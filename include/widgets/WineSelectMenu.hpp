@@ -7,6 +7,7 @@
 class QScrollArea;
 class QLabel;
 class QPushButton;
+class QAbstractButton;
 
 class WineSelectMenu : public util::modal_overlay::ModalOverlay
 {
@@ -36,10 +37,10 @@ private:
     int selected {-1};
     QLabel* runtime_status {};
     QScrollArea* list {};
-    QVector<QPushButton*> rows;
+    QVector<QAbstractButton*> rows;
     QPushButton* close_button {};
-    QPushButton* rescan_button {};
-    QPushButton* browse_button {};
-    QPushButton* rosetta_button {};
-    QPushButton* continue_button {};
+    QAbstractButton* rescan_button {};
+    QAbstractButton* browse_button {};
+    QAbstractButton* rosetta_button {};
+    QAbstractButton* continue_button {};
 };

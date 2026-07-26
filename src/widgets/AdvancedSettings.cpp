@@ -6,11 +6,11 @@
 #include "util/Styles.hpp"
 #include "util/Config.hpp"
 #include "util/LaunchArguments.hpp"
+#include "widgets/LauncherDialog.hpp"
 #include <QIcon>
 #include <QLineEdit>
 #include <QPushButton>
 #include <QFileDialog>
-#include <QMessageBox>
 
 #include "util/LanguageManager.hpp"
 using util::config::Config;
@@ -52,6 +52,7 @@ void AdvancedSettings::setup_game_path_option()
     browse->setCursor(Qt::PointingHandCursor);
     browse->setStyleSheet(util::styles::k_neutral_button);
     browse->setGeometry(ls::browse_rect(w, y));
+    browse->setAccessibleName(QStringLiteral("Choose game installation folder"));
     connect(browse, &QPushButton::clicked, this, [this]()
     {
         const QString dir = QFileDialog::getExistingDirectory(
@@ -69,7 +70,7 @@ void AdvancedSettings::setup_game_path_option()
                 const QString message = QStringLiteral(
                     "The game folder must remain inside the selected Wine prefix.");
 #endif
-                QMessageBox::warning(
+                LauncherDialog::warning(
                     this,
                     QStringLiteral("Invalid Game Folder"),
                     message);
@@ -97,7 +98,7 @@ void AdvancedSettings::setup_game_path_option()
             const QString message = QStringLiteral(
                 "The game folder must remain inside the selected Wine prefix.");
 #endif
-            QMessageBox::warning(
+            LauncherDialog::warning(
                 this,
                 QStringLiteral("Invalid Game Folder"),
                 message);
@@ -122,6 +123,7 @@ void AdvancedSettings::setup_game_args_option()
                             "Passed to Alicia.exe. Optional for most players.");
     auto* field = new QLineEdit(this);
     field->setPlaceholderText("Alicia.exe (default)");
+    field->setAccessibleName(QStringLiteral("Game launch arguments"));
     field->setStyleSheet(util::styles::k_field);
     field->setGeometry(ls::ctrl_pos(w, y).x(), ls::ctrl_pos(w, y).y(),
                        ls::ctrl_w(w), util::layout::scaled(34, w));
@@ -131,7 +133,7 @@ void AdvancedSettings::setup_game_args_option()
         const auto validation = util::launch_arguments::validate(field->text());
         if (!validation.valid)
         {
-            QMessageBox::warning(
+            LauncherDialog::warning(
                 this,
                 QStringLiteral("Invalid Launch Arguments"),
                 validation.error);

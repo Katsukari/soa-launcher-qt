@@ -25,6 +25,8 @@ signals:
 protected:
     void paintEvent(QPaintEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
+    void mouseMoveEvent(QMouseEvent* event) override;
+    void leaveEvent(QEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;
     void focusOutEvent(QFocusEvent* event) override;
 
@@ -39,4 +41,5 @@ private:
     int current {};
     bool open {};
     bool opens_upward {};
+    int hovered_slot {-1};
 };

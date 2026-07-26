@@ -36,6 +36,7 @@ namespace util::assets
         VersionFrameInactive,
         VersionIconPlaytest,
         VersionIconAlicia2,
+        SoaLogo,
         SettingsButton,
         Count
     };

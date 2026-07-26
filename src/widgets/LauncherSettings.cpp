@@ -1,4 +1,5 @@
 #include "widgets/LauncherSettings.hpp"
+#include "widgets/LauncherDialog.hpp"
 
 #include "widgets/ImageDropdown.hpp"
 #include "util/Assets.hpp"
@@ -23,7 +24,6 @@
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkRequest>
-#include <QMessageBox>
 #include <QProcess>
 #include <QPushButton>
 #include <QSaveFile>
@@ -242,8 +242,7 @@ void LauncherSettings::setup_launch_on_startup_option()
         QString error;
         if (!configure_startup(enabled, error))
         {
-            QMessageBox::critical(this, util::i18n::translate("Startup Setting Failed"),
-                                  util::i18n::translate(error));
+            LauncherDialog::error(this, QStringLiteral("Startup Setting Failed"), error);
             set_startup_button_state(previous);
             return;
         }
@@ -316,20 +315,29 @@ void LauncherSettings::setup_run_connectivity_test_option()
     connectivity_label->setGeometry(lset::connectivity_text(w));
     connectivity_label->setTextFormat(Qt::RichText);
     connectivity_label->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+    connectivity_label->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    connectivity_label->setAccessibleName(QStringLiteral("Connectivity check results"));
     connectivity_label->setStyleSheet(
-        "QLabel { background: transparent; border: none; color: #5A4636; font-family: 'Inter'; font-size: 11px; }");
+        "QLabel { background: transparent; border: none; color: #5A4636; font-family: 'Inter'; font-size: 12px; }");
 
     copy_report_button = new QPushButton(QStringLiteral("COPY REPORT"), connectivity_panel);
     copy_report_button->setGeometry(lset::copy_report(w));
     copy_report_button->setCursor(Qt::PointingHandCursor);
+    copy_report_button->setAccessibleName(QStringLiteral("Copy connectivity report"));
     copy_report_button->setStyleSheet(
-        "QPushButton { background: transparent; border: none; color: #9E8E7E; font-family: 'Inter'; font-size: 10px; font-weight: 700; }"
+        "QPushButton { background: transparent; border: none; color: #9E8E7E; font-family: 'Inter'; font-size: 11px; font-weight: 700; }"
         "QPushButton:hover { color: #6F5F50; }"
         "QPushButton:focus { border: 1px solid #2FB4E0; border-radius: 3px; }");
     connect(copy_report_button, &QPushButton::clicked, this, [this]()
     {
-        if (QApplication::clipboard())
-            QApplication::clipboard()->setText(connectivity_plain_report);
+        if (!QApplication::clipboard())
+            return;
+        QApplication::clipboard()->setText(connectivity_plain_report);
+        copy_report_button->setText(util::i18n::translate("COPIED"));
+        QTimer::singleShot(1200, copy_report_button, [this]()
+        {
+            copy_report_button->setText(util::i18n::translate("COPY REPORT"));
+        });
     });
 
     network_manager = new QNetworkAccessManager(this);
@@ -523,7 +531,7 @@ void LauncherSettings::refresh_connectivity_report()
             ? QStringLiteral("#9E8E7E")
             : ok ? QStringLiteral("#15936E") : QStringLiteral("#C34A3C");
         return QStringLiteral(
-            "<td width=\"50%\" style=\"padding:1px 10px 2px 0; white-space:nowrap;\">"
+            "<td width=\"50%\" style=\"padding:1px 10px 2px 0;\">"
             "<b>%1:</b> <span style=\"color:%2\">%3</span></td>")
             .arg(escaped_html(util::i18n::translate(label)))
             .arg(color)
@@ -579,22 +587,20 @@ void LauncherSettings::setup_launcher_size_option()
         QStringLiteral("color: #4F1717; background: transparent;"));
 
     const QStringList sizes {
-        QStringLiteral("900x544"),
         QStringLiteral("1120x677"),
         QStringLiteral("1400x846"),
         QStringLiteral("1600x967"),
         QStringLiteral("1920x1160")
     };
     launcher_size_dropdown = new ImageDropdown(
-        {QStringLiteral("Compact (900x544)"),
-         QStringLiteral("Small (1120x677)"),
+        {QStringLiteral("Small (1120x677)"),
          QStringLiteral("Default (1400x846)"),
          QStringLiteral("Large (1600x967)"),
          QStringLiteral("Extra Large (1920x1160)")}, this);
 
     int index = sizes.indexOf(Config::instance().launcher_size());
     if (index < 0)
-        index = 2;
+        index = 1;
     launcher_size_dropdown->set_index(index);
 
     connect(launcher_size_dropdown, &ImageDropdown::changed, this, [this, sizes](const int selected)
@@ -604,10 +610,10 @@ void LauncherSettings::setup_launcher_size_option()
         if (Config::instance().launcher_size() == sizes[selected])
             return;
         Config::instance().set_launcher_size(sizes[selected]);
-        QMessageBox::information(
+        LauncherDialog::information(
             this,
-            util::i18n::translate("Launcher Size Saved"),
-            util::i18n::translate("The new launcher size will be used after you restart the launcher."));
+            QStringLiteral("Launcher Size Saved"),
+            QStringLiteral("The new launcher size will be used after you restart the launcher."));
     });
 
     apply_dynamic_layout();

@@ -1,12 +1,20 @@
 #include "widgets/WineSelectMenu.hpp"
+#include "widgets/LauncherDialog.hpp"
 #include "util/LanguageManager.hpp"
 
 #include <QFileDialog>
+#include <QAbstractButton>
+#include <QEnterEvent>
 #include <QFileInfo>
+#include <QFontMetrics>
 #include <QFrame>
+#include <QIcon>
 #include <QLabel>
-#include <QMessageBox>
+#include <QMouseEvent>
+#include <QLinearGradient>
 #include <QPainter>
+#include <QPainterPath>
+#include <QPalette>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QVBoxLayout>
@@ -25,27 +33,290 @@
 
 using util::config::Config;
 namespace cw = core::wine;
-namespace im = util::layout::install_modal;
-
 namespace
 {
-    const char* k_row =
-        "QPushButton { text-align: left; padding: 10px 14px; border: 1px solid #C9BBAA;"
-        "    border-radius: 8px; background: #FFFFFF; color: #392518;"
-        "    font-family: 'Inter'; font-size: 14px; }"
-        "QPushButton:hover { border-color: #2FB4E0; }"
-        "QPushButton:checked { border: 2px solid #2FB4E0; background: #EAF7FC; }"
-        "QPushButton:disabled { color: #8A7A6B; background: #F5F1ED; }";
+    constexpr QSize k_runtime_box_size {700, 520};
+
+    QRect runtime_box_rect(const QSize window_size)
+    {
+        return util::layout::centered(k_runtime_box_size, window_size, 0, 12);
+    }
+
+    QRect runtime_local_rect(const QSize window_size, const QRect source)
+    {
+        return util::layout::scaled(source, window_size)
+            .translated(runtime_box_rect(window_size).topLeft());
+    }
+
     const char* k_scroll =
-        "QScrollArea { background: transparent; border: none; }"
-        "QScrollBar:vertical { width: 8px; background: transparent; margin: 0; }"
-        "QScrollBar::handle:vertical { background: #C9BBAA; border-radius: 4px; min-height: 24px; }"
-        "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }";
+        "QScrollArea { background:rgba(255,255,255,0.34); border:1px solid #D8C8B6;"
+        " border-radius:10px; }"
+        "QScrollArea > QWidget > QWidget { background:transparent; }"
+        "QScrollBar:vertical { width:12px; background:rgba(236,226,215,0.72);"
+        " border-radius:6px; margin:4px 3px 4px 1px; }"
+        "QScrollBar::handle:vertical { background:#BFAE9B; border-radius:5px; min-height:34px; }"
+        "QScrollBar::handle:vertical:hover { background:#2FB4E0; }"
+        "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0; }"
+        "QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background:transparent; }";
     const char* k_status =
-        "QLabel { color: #6B5B4D; font-family: 'Inter'; font-size: 12px; background: transparent; }";
+        "QLabel { color:#6B5B4D; background:rgba(244,236,227,0.66);"
+        " border:1px solid rgba(201,187,170,0.74); border-radius:8px; padding:5px 10px; }";
     const char* k_empty =
-        "QLabel { color: #8A7A6B; font-family: 'Inter'; font-size: 13px; padding: 24px;"
-        "    background: transparent; }";
+        "QLabel { color:#8A7A6B; padding:28px; background:transparent; }";
+
+    class RuntimeRow final : public QAbstractButton
+    {
+    public:
+        RuntimeRow(QString name, QString type, QString architecture, QString path,
+                   QString details, QWidget* parent)
+            : QAbstractButton(parent), runtime_name(std::move(name)), runtime_type(std::move(type)),
+              runtime_architecture(std::move(architecture)), runtime_path(std::move(path)),
+              runtime_details(std::move(details))
+        {
+            setCheckable(true);
+            setCursor(Qt::PointingHandCursor);
+            setFocusPolicy(Qt::StrongFocus);
+            setMouseTracking(true);
+            setAttribute(Qt::WA_Hover, true);
+            setAttribute(Qt::WA_NoSystemBackground, true);
+            setAutoFillBackground(false);
+            setToolTip(QStringLiteral("%1\n%2 · %3 · %4\n%5")
+                .arg(runtime_name, runtime_type, runtime_architecture, runtime_details, runtime_path));
+        }
+
+    protected:
+        void paintEvent(QPaintEvent*) override
+        {
+            const QSize host = window()->size();
+            QPainter painter(this);
+            painter.setRenderHint(QPainter::Antialiasing);
+            painter.setRenderHint(QPainter::TextAntialiasing);
+
+            const QRectF card = QRectF(rect()).adjusted(1.0, 1.0, -1.0, -1.0);
+            const qreal radius = util::layout::scaled(9, host);
+
+            QColor top;
+            QColor bottom;
+            QColor border;
+            if (!isEnabled())
+            {
+                top = QColor(239, 233, 226);
+                bottom = QColor(226, 218, 209);
+                border = QColor(205, 192, 178);
+            }
+            else if (isChecked())
+            {
+                top = QColor(236, 250, 255);
+                bottom = QColor(205, 237, 247);
+                border = QColor(47, 180, 224);
+            }
+            else if (underMouse())
+            {
+                top = QColor(255, 255, 255);
+                bottom = QColor(245, 235, 225);
+                border = QColor(181, 154, 130);
+            }
+            else
+            {
+                top = QColor(253, 249, 245);
+                bottom = QColor(239, 229, 219);
+                border = QColor(201, 181, 160);
+            }
+
+            QPainterPath shape;
+            shape.addRoundedRect(card, radius, radius);
+            QLinearGradient gradient(card.topLeft(), card.bottomLeft());
+            gradient.setColorAt(0.0, top);
+            gradient.setColorAt(1.0, bottom);
+            painter.fillPath(shape, gradient);
+
+            QPen edge(border, qMax(1, util::layout::scaled(isChecked() ? 2 : 1, host)));
+            painter.setPen(edge);
+            painter.setBrush(Qt::NoBrush);
+            painter.drawPath(shape);
+
+            painter.save();
+            painter.setClipPath(shape);
+            painter.fillRect(QRectF(card.left(), card.top(), card.width(),
+                                    util::layout::scaled(2, host)),
+                             QColor(255, 255, 255, 160));
+            painter.restore();
+
+            const int left = util::layout::scaled(16, host);
+            const int right = util::layout::scaled(48, host);
+            const QRect text_area = card.toAlignedRect().adjusted(
+                left, util::layout::scaled(7, host),
+                -right, -util::layout::scaled(7, host));
+
+            QFont title_font = util::assets::fonts[util::assets::Font::EurostileBold];
+            title_font.setPixelSize(util::layout::scaled(14, host));
+            title_font.setWeight(QFont::Bold);
+            painter.setFont(title_font);
+            painter.setPen(isEnabled() ? util::colors::k_text_maroon : QColor(138, 122, 107));
+            const QRect title_rect(text_area.left(), text_area.top(), text_area.width(),
+                                   util::layout::scaled(23, host));
+            painter.drawText(title_rect, Qt::AlignLeft | Qt::AlignVCenter,
+                             painter.fontMetrics().elidedText(runtime_name, Qt::ElideRight,
+                                                              title_rect.width()));
+
+            QFont detail_font = util::assets::fonts[util::assets::Font::Inter];
+            detail_font.setPixelSize(util::layout::scaled(12, host));
+            detail_font.setWeight(QFont::DemiBold);
+            painter.setFont(detail_font);
+            painter.setPen(isEnabled() ? QColor(84, 65, 51) : QColor(145, 132, 120));
+            const QString summary = QStringLiteral("%1  ·  %2  ·  %3")
+                .arg(runtime_type, runtime_architecture, runtime_details);
+            const QRect summary_rect(text_area.left(), title_rect.bottom(), text_area.width(),
+                                     util::layout::scaled(22, host));
+            painter.drawText(summary_rect, Qt::AlignLeft | Qt::AlignVCenter,
+                             painter.fontMetrics().elidedText(summary, Qt::ElideRight,
+                                                              summary_rect.width()));
+
+            detail_font.setPixelSize(util::layout::scaled(11, host));
+            detail_font.setWeight(QFont::Normal);
+            painter.setFont(detail_font);
+            painter.setPen(QColor(126, 110, 94));
+            const QRect path_rect(text_area.left(), summary_rect.bottom(), text_area.width(),
+                                  util::layout::scaled(21, host));
+            painter.drawText(path_rect, Qt::AlignLeft | Qt::AlignVCenter,
+                             painter.fontMetrics().elidedText(runtime_path, Qt::ElideMiddle,
+                                                              path_rect.width()));
+
+            const QPoint indicator(
+                qRound(card.right()) - util::layout::scaled(22, host),
+                qRound(card.center().y()));
+            const int indicator_radius = util::layout::scaled(9, host);
+            painter.setPen(QPen(isChecked() ? QColor(47, 180, 224) : QColor(169, 147, 126),
+                                qMax(1, util::layout::scaled(2, host))));
+            painter.setBrush(isEnabled() ? QColor(255, 252, 248) : QColor(229, 222, 214));
+            painter.drawEllipse(indicator, indicator_radius, indicator_radius);
+            if (isChecked())
+            {
+                painter.setPen(Qt::NoPen);
+                painter.setBrush(QColor(47, 180, 224));
+                painter.drawEllipse(indicator, indicator_radius - util::layout::scaled(3, host),
+                                    indicator_radius - util::layout::scaled(3, host));
+                QPen check_pen(Qt::white, qMax(1, util::layout::scaled(2, host)));
+                check_pen.setCapStyle(Qt::RoundCap);
+                check_pen.setJoinStyle(Qt::RoundJoin);
+                painter.setPen(check_pen);
+                const int x = indicator.x();
+                const int y = indicator.y();
+                painter.drawLine(x - util::layout::scaled(4, host), y,
+                                 x - util::layout::scaled(1, host), y + util::layout::scaled(3, host));
+                painter.drawLine(x - util::layout::scaled(1, host), y + util::layout::scaled(3, host),
+                                 x + util::layout::scaled(5, host), y - util::layout::scaled(4, host));
+            }
+
+            if (hasFocus())
+            {
+                painter.setPen(QPen(QColor(79, 23, 23),
+                                    qMax(1, util::layout::scaled(2, host)), Qt::DashLine));
+                painter.setBrush(Qt::NoBrush);
+                painter.drawRoundedRect(card.adjusted(4, 4, -4, -4),
+                                        util::layout::scaled(6, host),
+                                        util::layout::scaled(6, host));
+            }
+        }
+
+        void enterEvent(QEnterEvent* event) override
+        {
+            update();
+            QAbstractButton::enterEvent(event);
+        }
+
+        void leaveEvent(QEvent* event) override
+        {
+            update();
+            QAbstractButton::leaveEvent(event);
+        }
+    
+    private:
+        QString runtime_name;
+        QString runtime_type;
+        QString runtime_architecture;
+        QString runtime_path;
+        QString runtime_details;
+    };
+
+    class AssetTextButton final : public QAbstractButton
+    {
+    public:
+        AssetTextButton(const util::assets::Button asset, QString source, QWidget* parent)
+            : QAbstractButton(parent), asset_key(asset), text_source(std::move(source))
+        {
+            setCursor(Qt::PointingHandCursor);
+            setFocusPolicy(Qt::StrongFocus);
+            setAutoFillBackground(false);
+            setAttribute(Qt::WA_NoSystemBackground, true);
+            connect(&util::i18n::LanguageManager::instance(),
+                    &util::i18n::LanguageManager::language_changed,
+                    this, [this]() { update(); });
+        }
+
+    protected:
+        void paintEvent(QPaintEvent*) override
+        {
+            const auto& states = util::assets::translated_buttons[asset_key];
+            const QPixmap* pixmap = &states.normal;
+            if (!isEnabled())
+                pixmap = &states.normal;
+            else if (isDown() && !states.clicked.isNull())
+                pixmap = &states.clicked;
+            else if (underMouse() && !states.hover.isNull())
+                pixmap = &states.hover;
+
+            QPainter painter(this);
+            painter.setRenderHint(QPainter::Antialiasing);
+            painter.setRenderHint(QPainter::SmoothPixmapTransform);
+            painter.setRenderHint(QPainter::TextAntialiasing);
+            if (!pixmap->isNull())
+            {
+                painter.setOpacity(isEnabled() ? 1.0 : 0.58);
+                painter.drawPixmap(rect(), *pixmap);
+                painter.setOpacity(1.0);
+            }
+
+            QFont font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
+            font.setPixelSize(util::layout::scaled(11, window()->size()));
+            font.setWeight(QFont::Black);
+            painter.setFont(font);
+            painter.setPen(QColor(255, 255, 255, isEnabled() ? 255 : 220));
+            const QString text = util::i18n::translate(text_source).toUpper();
+            painter.drawText(rect().adjusted(util::layout::scaled(8, window()->size()), 0,
+                                             -util::layout::scaled(8, window()->size()), 0),
+                             Qt::AlignCenter,
+                             painter.fontMetrics().elidedText(text, Qt::ElideRight,
+                                                              width() - util::layout::scaled(16, window()->size())));
+
+            if (hasFocus())
+            {
+                painter.setPen(QPen(QColor(47, 180, 224),
+                                    qMax(1, util::layout::scaled(2, window()->size()))));
+                painter.setBrush(Qt::NoBrush);
+                painter.drawRoundedRect(rect().adjusted(1, 1, -2, -2),
+                                        util::layout::scaled(5, window()->size()),
+                                        util::layout::scaled(5, window()->size()));
+            }
+        }
+
+        void enterEvent(QEnterEvent* event) override
+        {
+            update();
+            QAbstractButton::enterEvent(event);
+        }
+
+        void leaveEvent(QEvent* event) override
+        {
+            update();
+            QAbstractButton::leaveEvent(event);
+        }
+
+    private:
+        util::assets::Button asset_key;
+        QString text_source;
+    };
+
 }
 
 WineSelectMenu::WineSelectMenu(QWidget* parent) : ModalOverlay(parent)
@@ -64,6 +335,7 @@ WineSelectMenu::WineSelectMenu(QWidget* parent) : ModalOverlay(parent)
 void WineSelectMenu::build_ui()
 {
     close_button = util::simple_utils::make_flat_button(this);
+    close_button->setAccessibleName(QStringLiteral("Close runtime selection"));
     close_button->setIcon(QIcon(util::assets::images[util::assets::Image::CloseSettings]));
     connect(close_button, &QPushButton::clicked, this, [this]() { hide(); emit closed(); });
 
@@ -76,27 +348,34 @@ void WineSelectMenu::build_ui()
     list->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     list->setFrameShape(QFrame::NoFrame);
     list->setStyleSheet(k_scroll);
+    list->viewport()->setAutoFillBackground(false);
+    list->viewport()->setAttribute(Qt::WA_StyledBackground, false);
 
-    rescan_button = new QPushButton(QStringLiteral("Rescan"), this);
-    browse_button = new QPushButton(QStringLiteral("Add Runtime…"), this);
-    continue_button = new QPushButton(QStringLiteral("Continue"), this);
-    for (QPushButton* button : {rescan_button, browse_button, continue_button})
+    const auto make_asset_button = [this](const util::assets::Button asset,
+                                          const QString& source)
     {
-        button->setFlat(true);
-        button->setCursor(Qt::PointingHandCursor);
-        button->setStyleSheet(util::styles::k_link_blue_lg);
-    }
-    connect(rescan_button, &QPushButton::clicked, this, &WineSelectMenu::rescan);
-    connect(browse_button, &QPushButton::clicked, this, &WineSelectMenu::browse_runtime);
+        return new AssetTextButton(asset, source, this);
+    };
+
+    rescan_button = make_asset_button(
+        util::assets::Button::Cancel, QStringLiteral("Rescan"));
+    browse_button = make_asset_button(
+        util::assets::Button::Cancel, QStringLiteral("Add Runtime…"));
+    continue_button = make_asset_button(
+        util::assets::Button::Install, QStringLiteral("Continue"));
+    rescan_button->setAccessibleName(QStringLiteral("Rescan runtimes"));
+    browse_button->setAccessibleName(QStringLiteral("Add runtime"));
+    continue_button->setAccessibleName(QStringLiteral("Continue with selected runtime"));
+    connect(rescan_button, &QAbstractButton::clicked, this, &WineSelectMenu::rescan);
+    connect(browse_button, &QAbstractButton::clicked, this, &WineSelectMenu::browse_runtime);
     continue_button->setEnabled(false);
-    connect(continue_button, &QPushButton::clicked, this, &WineSelectMenu::confirm);
+    connect(continue_button, &QAbstractButton::clicked, this, &WineSelectMenu::confirm);
 
 #if defined(Q_OS_MACOS)
-    rosetta_button = new QPushButton(QStringLiteral("Request Rosetta…"), this);
-    rosetta_button->setFlat(true);
-    rosetta_button->setCursor(Qt::PointingHandCursor);
-    rosetta_button->setStyleSheet(util::styles::k_link_blue_lg);
-    connect(rosetta_button, &QPushButton::clicked, this, &WineSelectMenu::request_rosetta);
+    rosetta_button = make_asset_button(
+        util::assets::Button::Cancel, QStringLiteral("Request Rosetta…"));
+    rosetta_button->setAccessibleName(QStringLiteral("Request Rosetta installation"));
+    connect(rosetta_button, &QAbstractButton::clicked, this, &WineSelectMenu::request_rosetta);
 #endif
 
     close_button->raise();
@@ -109,9 +388,11 @@ void WineSelectMenu::build_ui()
 void WineSelectMenu::populate()
 {
     auto* content = new QWidget;
+    content->setStyleSheet(QStringLiteral("background:transparent;"));
     auto* lay = new QVBoxLayout(content);
-    lay->setContentsMargins(0, 0, 0, 0);
-    lay->setSpacing(8);
+    const int margin = util::layout::scaled(8, window()->size());
+    lay->setContentsMargins(margin, margin, margin, margin);
+    lay->setSpacing(util::layout::scaled(8, window()->size()));
 
     rows.clear();
     selected = -1;
@@ -136,14 +417,13 @@ void WineSelectMenu::populate()
         }
         const QString architecture = wi.architectures.isEmpty()
             ? util::i18n::translate("unknown architecture") : wi.architectures;
-        auto* row = new QPushButton(
-            QStringLiteral("%1   ·   %2   ·   %3\n%4\n%5")
-                .arg(wi.name, type, architecture, wi.path, details), content);
-        row->setCheckable(true);
+        auto* row = new RuntimeRow(wi.name, type, architecture, wi.path, details, content);
         row->setEnabled(wi.usable);
-        row->setCursor(Qt::PointingHandCursor);
-        row->setStyleSheet(k_row);
-        connect(row, &QPushButton::clicked, this, [this, i]() { select_row(i); });
+        row->setMinimumHeight(qMax(76, util::layout::scaled(94, window()->size())));
+        row->setAccessibleName(util::i18n::translate("Select runtime: %1").arg(wi.name));
+        row->setAccessibleDescription(QStringLiteral("%1 · %2 · %3")
+            .arg(type, architecture, details));
+        connect(row, &QAbstractButton::clicked, this, [this, i]() { select_row(i); });
         lay->addWidget(row);
         rows.push_back(row);
     }
@@ -168,6 +448,11 @@ void WineSelectMenu::populate()
 #endif
         auto* empty = new QLabel(emptyText, content);
         empty->setStyleSheet(k_empty);
+        QFont empty_font = util::assets::fonts[util::assets::Font::Inter];
+        empty_font.setPixelSize(util::layout::scaled(13, window()->size()));
+        empty_font.setWeight(QFont::Medium);
+        empty->setFont(empty_font);
+        empty->setAlignment(Qt::AlignCenter);
         empty->setWordWrap(true);
         lay->addWidget(empty);
     }
@@ -221,19 +506,25 @@ void WineSelectMenu::rescan()
 void WineSelectMenu::browse_runtime()
 {
 #if defined(Q_OS_MACOS)
-    QMessageBox choice(QMessageBox::Question, QStringLiteral("Add macOS Runtime"),
+    const int selection = LauncherDialog::choose(
+        this,
+        LauncherDialog::Tone::Question,
+        QStringLiteral("Add macOS Runtime"),
         QStringLiteral("Select a compatible runtime application, executable, or folder."),
-        QMessageBox::NoButton, this);
-    QPushButton* folderButton = choice.addButton(QStringLiteral("Select Runtime Folder"), QMessageBox::AcceptRole);
-    QPushButton* fileButton = choice.addButton(QStringLiteral("Select Runtime App or Executable"), QMessageBox::ActionRole);
-    choice.addButton(QMessageBox::Cancel);
-    choice.exec();
+        {
+            {QStringLiteral("Cancel"), LauncherDialog::Cancelled,
+             LauncherDialog::ActionStyle::Neutral, true},
+            {QStringLiteral("Select Runtime Folder"), LauncherDialog::Primary,
+             LauncherDialog::ActionStyle::Primary, false},
+            {QStringLiteral("Select Runtime App or Executable"), LauncherDialog::Secondary,
+             LauncherDialog::ActionStyle::Primary, false}
+        });
 
     QString path;
-    if (choice.clickedButton() == folderButton)
+    if (selection == LauncherDialog::Primary)
         path = QFileDialog::getExistingDirectory(
             this, util::i18n::translate("Select Runtime Folder"));
-    else if (choice.clickedButton() == fileButton)
+    else if (selection == LauncherDialog::Secondary)
         path = QFileDialog::getOpenFileName(
             this,
             util::i18n::translate("Select Runtime App or Executable"),
@@ -251,8 +542,8 @@ void WineSelectMenu::browse_runtime()
     QString error;
     if (!cw::WineRegistry::inspect_path(path, install, &error))
     {
-        QMessageBox::warning(this, QStringLiteral("Runtime Not Usable"),
-                             error.isEmpty() ? QStringLiteral("The selected runtime could not be used.") : error);
+        LauncherDialog::warning(this, QStringLiteral("Runtime Not Usable"),
+                                error.isEmpty() ? QStringLiteral("The selected runtime could not be used.") : error);
         return;
     }
     runtimes.append(install);
@@ -263,17 +554,22 @@ void WineSelectMenu::browse_runtime()
 void WineSelectMenu::request_rosetta()
 {
 #if defined(Q_OS_MACOS)
-    const auto answer = QMessageBox::question(this, QStringLiteral("Install Rosetta"),
-        QStringLiteral("Some macOS runtimes are Intel applications. macOS may now show its system Rosetta installation prompt. Continue?"));
-    if (answer != QMessageBox::Yes) return;
+    const bool confirmed = LauncherDialog::confirm(
+        this,
+        LauncherDialog::Tone::Question,
+        QStringLiteral("Install Rosetta"),
+        QStringLiteral("Some macOS runtimes are Intel applications. macOS may now show its system Rosetta installation prompt. Continue?"),
+        QStringLiteral("Continue"),
+        QStringLiteral("Cancel"));
+    if (!confirmed) return;
     if (!cw::macos::request_rosetta_install_prompt())
     {
-        QMessageBox::warning(this, QStringLiteral("Rosetta Request Failed"),
-                             QStringLiteral("macOS could not start the Rosetta installation request."));
+        LauncherDialog::warning(this, QStringLiteral("Rosetta Request Failed"),
+                                QStringLiteral("macOS could not start the Rosetta installation request."));
         return;
     }
-    QMessageBox::information(this, QStringLiteral("Rosetta"),
-        QStringLiteral("Complete the macOS prompt, then press Rescan."));
+    LauncherDialog::information(this, QStringLiteral("Rosetta"),
+                                QStringLiteral("Complete the macOS prompt, then press Rescan."));
 #endif
 }
 
@@ -311,18 +607,19 @@ void WineSelectMenu::confirm()
 void WineSelectMenu::paint_content(QPainter& painter)
 {
     const QSize w = window()->size();
-    const QRect box = im::box_rect(w);
-    painter.drawPixmap(box, util::assets::images[util::assets::Image::BoxGameInstall]);
+    const QRect box = runtime_box_rect(w);
+    painter.drawPixmap(box, util::assets::images[util::assets::Image::BoxSettings]);
 
     QFont title_font = util::assets::fonts[util::assets::Font::EurostileBlack];
-    title_font.setPixelSize(util::layout::scaled(util::layout::text::k_modal_header, w));
+    title_font.setPixelSize(util::layout::scaled(27, w));
     title_font.setWeight(QFont::Black);
     painter.setFont(title_font);
     painter.setPen(util::colors::k_text_maroon);
-    painter.drawText(im::title(w), Qt::AlignCenter, util::i18n::translate("SELECT RUNTIME"));
+    painter.drawText(runtime_local_rect(w, {30, 34, 640, 38}), Qt::AlignCenter,
+                     util::i18n::translate("SELECT RUNTIME"));
 
     QFont body_font = util::assets::fonts[util::assets::Font::Inter];
-    body_font.setPixelSize(util::layout::scaled(util::layout::text::k_body, w));
+    body_font.setPixelSize(util::layout::scaled(14, w));
     body_font.setWeight(QFont::Medium);
     painter.setFont(body_font);
     painter.setPen(util::colors::k_text_body);
@@ -331,34 +628,51 @@ void WineSelectMenu::paint_content(QPainter& painter)
 #else
     const QString text = QStringLiteral("Choose the Wine or Proton version used to run the game.");
 #endif
-    painter.drawText(im::body(w), Qt::AlignHCenter | Qt::AlignTop | Qt::TextWordWrap,
+    painter.drawText(runtime_local_rect(w, {68, 88, 564, 46}),
+                     Qt::AlignHCenter | Qt::AlignVCenter | Qt::TextWordWrap,
                      util::i18n::translate(text));
 }
 
 void WineSelectMenu::relayout()
 {
     const QSize w = window()->size();
-    const QRect box = im::box_rect(w);
-    close_button->setIconSize(im::close_icon(w));
-    close_button->setGeometry(im::close(w));
+    const QRect box = runtime_box_rect(w);
+    close_button->setIconSize(util::layout::scaled(QSize(16, 16), w));
+    close_button->setGeometry(runtime_local_rect(w, {642, 18, 40, 40}));
 
-    const int inset = util::layout::scaled(34, w);
-    const QRect body = im::body(w);
-    const int top = body.bottom() + util::layout::scaled(16, w);
-    const int btn_h = util::layout::scaled(30, w);
-    const int btn_y = box.bottom() - util::layout::scaled(30, w) - btn_h;
-    const int status_h = util::layout::scaled(34, w);
-    const int status_y = btn_y - util::layout::scaled(8, w) - status_h;
+    list->setGeometry(runtime_local_rect(w, {46, 145, 608, 244}));
 
-    list->setGeometry(box.left() + inset, top, box.width() - 2 * inset,
-                      qMax(0, status_y - top - util::layout::scaled(8, w)));
-    runtime_status->setGeometry(box.left() + inset, status_y, box.width() - 2 * inset, status_h);
+    QFont status_font = util::assets::fonts[util::assets::Font::Inter];
+    status_font.setPixelSize(util::layout::scaled(12, w));
+    status_font.setWeight(QFont::Medium);
+    runtime_status->setFont(status_font);
 
-    const int btn_w = util::layout::scaled(132, w);
-    continue_button->setGeometry(box.right() - inset - btn_w, btn_y, btn_w, btn_h);
-    rescan_button->setGeometry(box.left() + inset, btn_y, btn_w, btn_h);
-    browse_button->setGeometry(box.left() + inset + btn_w, btn_y, btn_w, btn_h);
-    if (rosetta_button)
-        rosetta_button->setGeometry(box.left() + inset + btn_w * 2, btn_y,
-                                    util::layout::scaled(160, w), btn_h);
+    const int gap = util::layout::scaled(10, w);
+    const QRect status_row = runtime_local_rect(w, {46, 398, 608, 42});
+    if (rosetta_button && !rosetta_button->isHidden())
+    {
+        const int rosetta_width = util::layout::scaled(190, w);
+        runtime_status->setGeometry(status_row.adjusted(0, 0, -rosetta_width - gap, 0));
+        rosetta_button->setGeometry(status_row.right() - rosetta_width + 1,
+                                    status_row.top(), rosetta_width, status_row.height());
+    }
+    else
+    {
+        runtime_status->setGeometry(status_row);
+        if (rosetta_button)
+            rosetta_button->setGeometry(QRect{});
+    }
+
+    const QRect buttons = runtime_local_rect(w, {46, 454, 608, 44});
+    const int button_gap = util::layout::scaled(10, w);
+    const int button_width = (buttons.width() - 2 * button_gap) / 3;
+    rescan_button->setGeometry(buttons.left(), buttons.top(), button_width, buttons.height());
+    browse_button->setGeometry(buttons.left() + button_width + button_gap,
+                               buttons.top(), button_width, buttons.height());
+    continue_button->setGeometry(buttons.left() + 2 * (button_width + button_gap),
+                                 buttons.top(), buttons.width() - 2 * (button_width + button_gap),
+                                 buttons.height());
+
 }
+
+

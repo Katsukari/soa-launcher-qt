@@ -62,12 +62,12 @@ void RulesAgreement::setup_controls()
     rules_text->setStyleSheet(
         "QTextBrowser { background:rgba(255,255,255,0.22); color:#392518; padding:18px; "
         "font-family:'Inter'; font-size:13px; border-radius:8px; }"
-        "QScrollBar:vertical { width:7px; background:#E4DED9; margin:2px; }"
+        "QScrollBar:vertical { width:10px; background:#E4DED9; margin:2px; }"
         "QScrollBar::handle:vertical { background:#B0A297; border-radius:3px; min-height:24px; }"
         "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0px; }");
     accepted_box = new QCheckBox(this);
     accepted_box->setStyleSheet(k_checkbox_style);
-    accepted_box->setGeometry(local_rect(w, {66, 500, 535, 34}));
+    accepted_box->setGeometry(local_rect(w, {66, 492, 535, 48}));
     accepted_box->setAccessibleName(QStringLiteral("Accept Story of Alicia rules"));
     connect(accepted_box, &QCheckBox::toggled, this, [this]() { update_agree_button(); });
 
@@ -80,7 +80,7 @@ void RulesAgreement::setup_controls()
                               agree_size.width(), agree_size.height());
     agree_button->setIconSize(agree_size);
     QFont agree_font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
-    agree_font.setPixelSize(util::layout::scaled(10, w));
+    agree_font.setPixelSize(util::layout::scaled(12, w));
     agree_font.setWeight(QFont::Black);
     util::simple_utils::add_button_text(agree_button, util::assets::Button::Agree, QStringLiteral("I AGREE WITH THE RULES"), agree_font);
     agree_button->setAccessibleName(QStringLiteral("Agree with the rules"));

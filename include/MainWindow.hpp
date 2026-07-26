@@ -101,6 +101,7 @@ private:
     void set_launcher_menu_visible(bool visible);
     void raise_persistent_controls();
     void show_about();
+    void show_credits();
     void request_quit();
     void retranslate_dynamic_text();
     [[nodiscard]] bool can_run_game_directly() const;
@@ -120,8 +121,8 @@ private:
     QActionGroup* language_action_group {};
     QPushButton* language_button {};
     QPushButton* show_log_button {};
+    QPushButton* credits_button {};
     QPushButton* about_button {};
-    QPushButton* quit_launcher_button {};
     QLabel* version_label {};
     QPushButton* close_button {};
     QPushButton* minimize_button {};

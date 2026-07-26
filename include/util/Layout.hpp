@@ -131,26 +131,29 @@ namespace util::layout
 
         inline constexpr QRect k_title {0, 38, k_box.width(), 30};
         inline constexpr QRect k_settings_button =
-            anchor_top_right({0, 0, k_box.width(), k_box.height()}, 25, 23, {37, 37});
-        inline constexpr QRect k_reset {0, 305, k_box.width(), 34};
+            anchor_top_right({0, 0, k_box.width(), k_box.height()}, 25, 23, {40, 40});
+        inline constexpr QRect k_reset {0, 303, k_box.width(), 40};
 
         inline constexpr QRect k_message {95, 92, 430, 70};
-        inline constexpr int   k_dl_button_x = 104;
+        inline constexpr int   k_dl_button_x = k_message.x();
         inline constexpr int   k_dl_button_y = 187;
-        inline constexpr int   k_dl_button_w = 432;
+        inline constexpr int   k_dl_button_w = k_message.width();
 
         inline constexpr QSize k_discord_icon   {24, 24};
-        inline constexpr QRect k_discord_button  {104, 100, 432, 56};
-        inline constexpr QRect k_keep_signed_in  {104, 173, 230, 22};
-        inline constexpr QRect k_disclaimer      {105, 202, 430, 94};
+        inline constexpr QRect k_discord_button  {105, 100, 430, 56};
+        inline constexpr QRect k_keep_signed_in  {104, 157, 260, 40};
+        inline constexpr QRect k_disclaimer      {105, 198, 430, 102};
 
         inline constexpr QRect k_waiting_title {0, 100, k_box.width(), 28};
-        inline constexpr QRect k_steps         {85, 148, 470, 121};
-        inline constexpr QRect k_try_again     {0, 270, k_box.width(), 22};
+        inline constexpr QRect k_steps         {85, 148, 470, 108};
+        inline constexpr QRect k_try_again     {0, 258, k_box.width(), 40};
 
-        inline constexpr QRect k_signed_in_banner {105, 104, 430, 48};
-        inline constexpr QRect k_enter_button     {104, 174, 432, 67};
-        inline constexpr QRect k_warning          {70, 286, 500, 62};
+        inline constexpr QRect k_signed_bug_checkbox {104, 88, 24, 28};
+        inline constexpr QRect k_signed_bug_text     {134, 88, 402, 28};
+        inline constexpr QRect k_signed_rules_checkbox {104, 116, 24, 28};
+        inline constexpr QRect k_signed_rules_text     {134, 116, 402, 28};
+        inline constexpr QRect k_signed_in_banner {105, 150, 430, 48};
+        inline constexpr QRect k_enter_button     {105, 211, 430, 67};
 
         QRect  rect(QSize win);
         QPoint pos(QSize win);
@@ -173,17 +176,20 @@ namespace util::layout
         QRect  steps(QSize win);
         QRect  try_again(QSize win);
 
+        QRect  signed_bug_checkbox(QSize win);
+        QRect  signed_bug_text(QSize win);
+        QRect  signed_rules_checkbox(QSize win);
+        QRect  signed_rules_text(QSize win);
         QRect  signed_in_banner(QSize win);
         QRect  enter_button(QSize win);
-        QRect  warning(QSize win);
     }
 
     namespace settings
     {
         inline constexpr QSize k_box {630, 570};
         inline constexpr QSize k_box_expanded {630, 620};
-        inline constexpr QSize k_close_icon {13, 13};
-        inline constexpr QSize k_close_hit {22, 22};
+        inline constexpr QSize k_close_icon {16, 16};
+        inline constexpr QSize k_close_hit {40, 40};
         inline constexpr int   k_margin_top = 45;
         inline constexpr int   k_margin_top_expanded = 25;
         inline constexpr int   k_header_gap = 60;
@@ -198,7 +204,7 @@ namespace util::layout
 
         inline constexpr QRect k_page_title {0, 34, k_box.width(), 30};
         inline constexpr int   k_control_col = 227;
-        inline constexpr QSize k_slider      {69, 34};
+        inline constexpr QSize k_slider      {76, 40};
         inline constexpr int   k_slider_gap  = 10;
         inline constexpr int   k_desc_max_w  = 270;
 
@@ -207,8 +213,8 @@ namespace util::layout
         inline constexpr int   k_ctrl_x    = 366;
         inline constexpr int   k_ctrl_w    = 227;
         inline constexpr int   k_desc_dy   = 30;
-        inline constexpr int   k_desc_h    = 40;
-        inline constexpr int   k_title_h   = 26;
+        inline constexpr int   k_desc_h    = 46;
+        inline constexpr int   k_title_h   = 28;
 
 
 
@@ -216,8 +222,8 @@ namespace util::layout
         inline constexpr int   k_row_bottom      = 455;
         inline constexpr int   k_row_bottom_foot = 410;
 
-        inline constexpr int   k_input_h    = 34;
-        inline constexpr int   k_browse_w   = 34;
+        inline constexpr int   k_input_h    = 40;
+        inline constexpr int   k_browse_w   = 40;
         inline constexpr int   k_input_gap  = 6;
 
         QRect box_rect(QSize win, bool expanded = false);
@@ -306,7 +312,7 @@ namespace util::layout
         inline constexpr int   k_path_inset   = 33;
         inline constexpr int   k_path_h       = 69;
         inline constexpr int   k_path_y       = 150;
-        inline constexpr int   k_changepath_y = 248;
+        inline constexpr int   k_changepath_y = 252;
         inline constexpr int   k_changepath_h = 20;
         inline constexpr int   k_warn_y       = 224;
         inline constexpr int   k_warn_h       = 18;
@@ -317,8 +323,8 @@ namespace util::layout
         inline constexpr int   k_button_gap   = 35;
 
         inline constexpr QRect k_rect  = center_in_region(k_box, 0, k_margin_top);
-        inline constexpr QSize k_close_icon {13, 13};
-        inline constexpr QSize k_close_hit  {22, 22};
+        inline constexpr QSize k_close_icon {16, 16};
+        inline constexpr QSize k_close_hit  {40, 40};
         inline constexpr QRect k_close = anchor_top_right({0, 0, k_box.width(), k_box.height()}, 19, 17, k_close_hit);
 
         inline constexpr QRect k_title {0, k_title_y, k_box.width(), k_title_h};
@@ -349,7 +355,7 @@ namespace util::layout
 
     namespace progress_modal
     {
-        inline constexpr QSize k_box        {490, 190};
+        inline constexpr QSize k_box        {490, 210};
         inline constexpr int   k_margin_top = 40;
 
         inline constexpr int   k_pad_x       = 30;
@@ -363,11 +369,11 @@ namespace util::layout
         inline constexpr int   k_under_h     = 20;
 
         inline constexpr QRect k_rect = center_in_region(k_box, 0, k_margin_top);
-        inline constexpr QSize k_close_icon {18, 18};
-        inline constexpr QSize k_close_hit  {18, 18};
-        inline constexpr QRect k_close = anchor_top_right({0, 0, k_box.width(), k_box.height()}, 22, 17, k_close_hit);
-        inline constexpr QSize k_pause_hit  {16, 16};
-        inline constexpr QRect k_pause = anchor_top_right({0, 0, k_box.width(), k_box.height()}, 48, 18, k_pause_hit);
+        inline constexpr QSize k_close_icon {16, 16};
+        inline constexpr QSize k_close_hit  {40, 40};
+        inline constexpr QRect k_close = anchor_top_right({0, 0, k_box.width(), k_box.height()}, 16, 11, k_close_hit);
+        inline constexpr QSize k_pause_hit  {40, 40};
+        inline constexpr QRect k_pause = anchor_top_right({0, 0, k_box.width(), k_box.height()}, 56, 11, k_pause_hit);
 
         inline constexpr QRect k_title {0, k_title_y, k_box.width(), k_title_h};
         inline constexpr QRect k_info  {k_pad_x, k_info_y,  k_box.width() - 2 * k_pad_x, k_info_h};
@@ -386,5 +392,6 @@ namespace util::layout
         QRect bar_rect(QSize win);
         QRect under_row(QSize win);
         QRect retry_button(QSize win);
+        QRect details_button(QSize win);
     }
 }

@@ -49,6 +49,7 @@ void WineInstall::setup_close_button()
     const QSize w = window()->size();
     close_button = util::simple_utils::make_flat_button(this);
 
+    close_button->setAccessibleName(QStringLiteral("Close prefix installation"));
     close_button->setIcon(QIcon(util::assets::images[util::assets::Image::CloseSettings]));
     close_button->setIconSize(util::layout::install_modal::close_icon(w));
     close_button->setGeometry(util::layout::install_modal::close(w));
@@ -75,6 +76,7 @@ void WineInstall::setup_buttons()
     cancel_font.setPixelSize(util::layout::scaled(12, w));
     cancel_font.setWeight(QFont::Black);
     util::simple_utils::add_button_text(cancel_button, util::assets::Button::Cancel, QStringLiteral("CANCEL"), cancel_font);
+    cancel_button->setAccessibleName(QStringLiteral("Cancel prefix installation"));
 
     connect(cancel_button, &QPushButton::clicked, this, [this]()
     {
@@ -91,6 +93,7 @@ void WineInstall::setup_buttons()
     install_font.setPixelSize(util::layout::scaled(12, w));
     install_font.setWeight(QFont::Black);
     util::simple_utils::add_button_text(install_button, util::assets::Button::Install, QStringLiteral("INSTALL"), install_font);
+    install_button->setAccessibleName(QStringLiteral("Install prefix"));
 
     connect(install_button, &QPushButton::clicked, this, [this]()
     {
@@ -105,6 +108,7 @@ void WineInstall::setup_buttons()
     change_path_button->setCursor(Qt::PointingHandCursor);
     change_path_button->setStyleSheet(util::styles::k_link_blue_lg);
     change_path_button->setGeometry(util::layout::install_modal::change_path_button(w));
+    change_path_button->setAccessibleName(QStringLiteral("Change prefix installation path"));
 
     connect(change_path_button, &QPushButton::clicked, this, [this]
     {
@@ -235,7 +239,10 @@ void WineInstall::paint_content(QPainter& painter)
     path_font.setWeight(QFont::ExtraBold);
     painter.setFont(path_font);
     painter.setPen(util::colors::k_text_maroon);
-    painter.drawText(path_rect.adjusted(14, 34, -14, 0), Qt::AlignTop | Qt::AlignLeft, game_path);
+    const QRect path_text_rect = path_rect.adjusted(14, 34, -14, 0);
+    const QString elided_path = painter.fontMetrics().elidedText(
+        game_path, Qt::ElideMiddle, qMax(1, path_text_rect.width()));
+    painter.drawText(path_text_rect, Qt::AlignTop | Qt::AlignLeft, elided_path);
 
     if (!warn_message.isEmpty())
     {

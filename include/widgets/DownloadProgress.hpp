@@ -53,4 +53,5 @@ private:
 
     QPushButton* close_button {};
     QPushButton* retry_button {};
+    QPushButton* details_button {};
 };

@@ -514,8 +514,8 @@ DXVK er fortsatt valgfritt og kan aktiveres senere i Innstillinger. Ingenting in
         </message>
         <message>
             <location filename="../src/widgets/LauncherSettings.cpp" line="526" />
-            <source>&lt;td width="50%" style="padding:1px 10px 2px 0; white-space:nowrap;"&gt;&lt;b&gt;%1:&lt;/b&gt; &lt;span style="color:%2"&gt;%3&lt;/span&gt;&lt;/td&gt;</source>
-            <translation>&lt;td width="50%" style="padding:1px 10px 2px 0; white-space:nowrap;"&gt;&lt;b&gt;%1:&lt;/b&gt; &lt;span style="color:%2"&gt;%3&lt;/span&gt;&lt;/td&gt;</translation>
+            <source>&lt;td width="50%" style="padding:1px 10px 2px 0;"&gt;&lt;b&gt;%1:&lt;/b&gt; &lt;span style="color:%2"&gt;%3&lt;/span&gt;&lt;/td&gt;</source>
+            <translation>&lt;td width="50%" style="padding:1px 10px 2px 0;"&gt;&lt;b&gt;%1:&lt;/b&gt; &lt;span style="color:%2"&gt;%3&lt;/span&gt;&lt;/td&gt;</translation>
         </message>
         <message>
             <location filename="../src/widgets/LauncherSettings.cpp" line="535" />
@@ -1059,11 +1059,6 @@ Kopier innloggingslenke lar deg lime inn den nøyaktige lenken i valgfri nettles
         <message>
             <source>cmd_force_simpleShadow</source>
             <translation>cmd_force_simpleShadow</translation>
-        </message>
-        <message>
-            <location filename="../src/widgets/LauncherSettings.cpp" line="589" />
-            <source>Compact (900x544)</source>
-            <translation>Kompakt (900x544)</translation>
         </message>
         <message>
             <location filename="../src/widgets/AdvancedSettings.cpp" line="150" />
@@ -3876,6 +3871,290 @@ Mangler: %1.</translation>
             <location filename="../src/widgets/GameInstall.cpp" line="248" />
             <source>~ 2 GB of free disk space required.</source>
             <translation>~ 2 GB ledig diskplass kreves.</translation>
+        </message>
+        <message>
+            <source>Credits</source>
+            <translation>Bidragsytere</translation>
+        </message>
+        <message>
+            <source>Close window</source>
+            <translation>Lukk vinduet</translation>
+        </message>
+        <message>
+            <source>Official Website</source>
+            <translation>Offisielt nettsted</translation>
+        </message>
+        <message>
+            <source>Source Code</source>
+            <translation>Kildekode</translation>
+        </message>
+        <message>
+            <source>Contact</source>
+            <translation>Kontakt</translation>
+        </message>
+        <message>
+            <source>ABOUT</source>
+            <translation>OM</translation>
+        </message>
+        <message>
+            <source>The official launcher for Linux and macOS.</source>
+            <translation>Den offisielle launcheren for Linux og macOS.</translation>
+        </message>
+        <message>
+            <source>VERSION %1 · QT %2</source>
+            <translation>VERSJON %1 · QT %2</translation>
+        </message>
+        <message>
+            <source>Everything in one place</source>
+            <translation>Alt på ett sted</translation>
+        </message>
+        <message>
+            <source>Install, update, verify, repair, and launch both supported Story of Alicia game profiles.</source>
+            <translation>Installer, oppdater, kontroller, reparer og start begge støttede Story of Alicia-spillprofilene.</translation>
+        </message>
+        <message>
+            <source>Linux and macOS</source>
+            <translation>Linux og macOS</translation>
+        </message>
+        <message>
+            <source>Linux uses Wine or Proton. macOS uses the bundled Story of Alicia runtime.</source>
+            <translation>Linux bruker Wine eller Proton. macOS bruker den medfølgende Story of Alicia-runtimen.</translation>
+        </message>
+        <message>
+            <source>Game and artwork remain owned by their respective copyright holders.</source>
+            <translation>Spillet og grafikken eies fortsatt av sine respektive rettighetshavere.</translation>
+        </message>
+        <message>
+            <source>CREDITS</source>
+            <translation>BIDRAGSYTERE</translation>
+        </message>
+        <message>
+            <source>Built with help from the Story of Alicia community.</source>
+            <translation>Bygget med hjelp fra Story of Alicia-fellesskapet.</translation>
+        </message>
+        <message>
+            <source>THANK YOU</source>
+            <translation>TAKK</translation>
+        </message>
+        <message>
+            <source>Launcher development</source>
+            <translation>Launcherutvikling</translation>
+        </message>
+        <message>
+            <source>Story of Alicia team and contributors</source>
+            <translation>Story of Alicia-teamet og bidragsytere</translation>
+        </message>
+        <message>
+            <source>Artwork and branding</source>
+            <translation>Grafikk og profilering</translation>
+        </message>
+        <message>
+            <source>Respective Story of Alicia artists and copyright holders</source>
+            <translation>De respektive Story of Alicia-kunstnerne og rettighetshaverne</translation>
+        </message>
+        <message>
+            <source>Translations and testing</source>
+            <translation>Oversettelser og testing</translation>
+        </message>
+        <message>
+            <source>Community translators, testers, and players</source>
+            <translation>Fellesskapets oversettere, testere og spillere</translation>
+        </message>
+        <message>
+            <source>Open-source technology</source>
+            <translation>Åpen kildekode-teknologi</translation>
+        </message>
+        <message>
+            <source>Qt, Wine, spdlog, fmt, and their contributors</source>
+            <translation>Qt, Wine, spdlog, fmt og deres bidragsytere</translation>
+        </message>
+        <message>
+            <source>Thank you to everyone who helps players enjoy Story of Alicia.</source>
+            <translation>Takk til alle som hjelper spillere med å ha glede av Story of Alicia.</translation>
+        </message>
+        <message>
+            <source>INFORMATION</source>
+            <translation>INFORMASJON</translation>
+        </message>
+        <message>
+            <source>WARNING</source>
+            <translation>ADVARSEL</translation>
+        </message>
+        <message>
+            <source>CONFIRMATION</source>
+            <translation>BEKREFTELSE</translation>
+        </message>
+        <message>
+            <source>Reset Launcher</source>
+            <translation>Tilbakestill launcheren</translation>
+        </message>
+        <message>
+            <source>Keep Running</source>
+            <translation>Fortsett</translation>
+        </message>
+        <message>
+            <source>Continue Sign In</source>
+            <translation>Fortsett innloggingen</translation>
+        </message>
+        <message>
+            <source>Choose game installation folder</source>
+            <translation>Velg spillinstallasjonsmappe</translation>
+        </message>
+        <message>
+            <source>Game launch arguments</source>
+            <translation>Spillstartargumenter</translation>
+        </message>
+        <message>
+            <source>Cancel or close repair</source>
+            <translation>Avbryt eller lukk reparasjonen</translation>
+        </message>
+        <message>
+            <source>Retry repair</source>
+            <translation>Prøv reparasjonen på nytt</translation>
+        </message>
+        <message>
+            <source>Retry download</source>
+            <translation>Prøv nedlastingen på nytt</translation>
+        </message>
+        <message>
+            <source>SHOW ERROR</source>
+            <translation>VIS FEIL</translation>
+        </message>
+        <message>
+            <source>Show full error</source>
+            <translation>Vis hele feilen</translation>
+        </message>
+        <message>
+            <source>Repair Error Details</source>
+            <translation>Detaljer om reparasjonsfeil</translation>
+        </message>
+        <message>
+            <source>Download Error Details</source>
+            <translation>Detaljer om nedlastingsfeil</translation>
+        </message>
+        <message>
+            <source>Retry continues from the files that were already verified or downloaded.</source>
+            <translation>Et nytt forsøk fortsetter fra filene som allerede er kontrollert eller lastet ned.</translation>
+        </message>
+        <message>
+            <source>Close game installation</source>
+            <translation>Lukk spillinstallasjonen</translation>
+        </message>
+        <message>
+            <source>Cancel game installation</source>
+            <translation>Avbryt spillinstallasjonen</translation>
+        </message>
+        <message>
+            <source>Install game</source>
+            <translation>Installer spillet</translation>
+        </message>
+        <message>
+            <source>Change game installation path</source>
+            <translation>Endre spillinstallasjonsbane</translation>
+        </message>
+        <message>
+            <source>Copy connectivity report</source>
+            <translation>Kopier tilkoblingsrapport</translation>
+        </message>
+        <message>
+            <source>COPIED</source>
+            <translation>KOPIERT</translation>
+        </message>
+        <message>
+            <source>Cancel prefix setup</source>
+            <translation>Avbryt prefiksoppsettet</translation>
+        </message>
+        <message>
+            <source>Cancel Prefix Setup</source>
+            <translation>Avbryt prefiksoppsett</translation>
+        </message>
+        <message>
+            <source>Cancel the current prefix setup? An incomplete prefix may need to be repaired the next time setup runs.</source>
+            <translation>Vil du avbryte det pågående prefiksoppsettet? Et ufullstendig prefiks må kanskje repareres neste gang oppsettet kjøres.</translation>
+        </message>
+        <message>
+            <source>Cancel Setup</source>
+            <translation>Avbryt oppsett</translation>
+        </message>
+        <message>
+            <source>Use recommended setup</source>
+            <translation>Bruk anbefalt oppsett</translation>
+        </message>
+        <message>
+            <source>Choose a runtime manually</source>
+            <translation>Velg en runtime manuelt</translation>
+        </message>
+        <message>
+            <source>Close prefix installation</source>
+            <translation>Lukk prefiksinstallasjonen</translation>
+        </message>
+        <message>
+            <source>Cancel prefix installation</source>
+            <translation>Avbryt prefiksinstallasjonen</translation>
+        </message>
+        <message>
+            <source>Install prefix</source>
+            <translation>Installer prefiks</translation>
+        </message>
+        <message>
+            <source>Change prefix installation path</source>
+            <translation>Endre prefiksinstallasjonsbane</translation>
+        </message>
+        <message>
+            <source>Close runtime selection</source>
+            <translation>Lukk runtimevalget</translation>
+        </message>
+        <message>
+            <source>Rescan runtimes</source>
+            <translation>Søk etter runtimer på nytt</translation>
+        </message>
+        <message>
+            <source>Add runtime</source>
+            <translation>Legg til runtime</translation>
+        </message>
+        <message>
+            <source>Continue with selected runtime</source>
+            <translation>Fortsett med valgt runtime</translation>
+        </message>
+        <message>
+            <source>Request Rosetta installation</source>
+            <translation>Be om Rosetta-installasjon</translation>
+        </message>
+        <message>
+            <source>Select runtime: %1</source>
+            <translation>Velg runtime: %1</translation>
+        </message>
+        <message>
+            <source>Runtime prefix path</source>
+            <translation>Bane til runtime-prefiks</translation>
+        </message>
+        <message>
+            <source>Choose Wine prefix folder</source>
+            <translation>Velg mappe for Wine-prefiks</translation>
+        </message>
+        <message>
+            <source>Custom runtime path</source>
+            <translation>Bane til egendefinert runtime</translation>
+        </message>
+        <message>
+            <source>Choose Wine binary or Proton script</source>
+            <translation>Velg Wine-binærfil eller Proton-skript</translation>
+        </message>
+        <message>
+            <source>Winetricks path</source>
+            <translation>Bane til Winetricks</translation>
+        </message>
+        <message>
+            <source>Choose Winetricks executable</source>
+            <translation>Velg Winetricks-program</translation>
+        </message>
+        <message>
+            <source>Runtime environment variables</source>
+            <translation>Miljøvariabler for runtime</translation>
+        </message>
+        <message>
+            <source>Connectivity check results</source>
+            <translation>Resultater fra tilkoblingskontroll</translation>
         </message>
     </context>
     <context>

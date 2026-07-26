@@ -20,7 +20,7 @@
 
 namespace
 {
-    constexpr QSize k_box_size {660, 350};
+    constexpr QSize k_box_size {680, 410};
 
     QRect box_rect(const QSize window_size)
     {
@@ -34,18 +34,15 @@ namespace
 
     const char* k_recommendation_style =
         "QLabel { background:rgba(255,255,255,0.76); border:1px solid rgba(201,187,170,205);"
-        " border-radius:10px; color:#392518; font-family:'Inter'; font-size:14px;"
-        " padding:22px 24px 14px 24px; }";
+        " border-radius:10px; color:#392518; padding:24px 26px 16px 26px; }";
 
     const char* k_error_style =
         "QLabel { background:rgba(255,245,242,0.94); border:1px solid rgba(192,111,91,205);"
-        " border-radius:10px; color:#7F2929; font-family:'Inter'; font-size:14px;"
-        " padding:22px 24px 14px 24px; }";
+        " border-radius:10px; color:#7F2929; padding:24px 26px 16px 26px; }";
 
     const char* k_primary_style =
         "QPushButton { background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #54D8FF,stop:1 #08A9D8);"
-        " border:1px solid #159FC8; border-radius:6px; color:white; font-family:'Eurostile';"
-        " font-weight:900; font-size:17px; }"
+        " border:1px solid #159FC8; border-radius:6px; color:white; }"
         "QPushButton:hover { background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #77E2FF,stop:1 #18B9E8); }"
         "QPushButton:pressed { background:#0798C5; }"
         "QPushButton:disabled { background:#D8CDC0; border-color:#C9BBAA; color:#9E8E7E; }"
@@ -53,8 +50,7 @@ namespace
 
     const char* k_secondary_style =
         "QPushButton { background:rgba(255,255,255,0.72); border:1px solid #C9BBAA;"
-        " border-radius:6px; color:#4F1717; font-family:'Eurostile'; font-weight:900;"
-        " font-size:13px; }"
+        " border-radius:6px; color:#4F1717; }"
         "QPushButton:hover { border-color:#2FB4E0; background:rgba(255,255,255,0.94); }"
         "QPushButton:pressed { background:#EAF7FC; }"
         "QPushButton:focus { border:2px solid #2FB4E0; }";
@@ -148,7 +144,11 @@ void PrerequisitesIntro::setup_controls()
     recommendation_body->setWordWrap(true);
     recommendation_body->setAlignment(Qt::AlignHCenter | Qt::AlignVCenter);
     recommendation_body->setStyleSheet(k_recommendation_style);
-    recommendation_body->setGeometry(local_rect(w, {50, 112, 560, 122}));
+    QFont recommendation_font = util::assets::fonts[util::assets::Font::Inter];
+    recommendation_font.setPixelSize(util::layout::scaled(14, w));
+    recommendation_font.setWeight(QFont::Medium);
+    recommendation_body->setFont(recommendation_font);
+    recommendation_body->setGeometry(local_rect(w, {50, 116, 580, 162}));
     auto* shadow = new QGraphicsDropShadowEffect(recommendation_body);
     shadow->setBlurRadius(util::layout::scaled(18, w));
     shadow->setOffset(0, util::layout::scaled(5, w));
@@ -160,15 +160,23 @@ void PrerequisitesIntro::setup_controls()
     recommendation_title->setAlignment(Qt::AlignCenter);
     recommendation_title->setStyleSheet(
         "color:#4F1717; background:rgba(247,239,230,0.96); border:1px solid #D8C8B6;"
-        " border-radius:12px; padding:2px 14px; font-family:'Eurostile';"
-        " font-weight:900; font-size:15px;");
-    recommendation_title->setGeometry(local_rect(w, {205, 99, 250, 28}));
+        " border-radius:12px; padding:2px 14px;");
+    QFont recommendation_title_font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
+    recommendation_title_font.setPixelSize(util::layout::scaled(15, w));
+    recommendation_title_font.setWeight(QFont::Black);
+    recommendation_title->setFont(recommendation_title_font);
+    recommendation_title->setGeometry(local_rect(w, {160, 102, 360, 34}));
     recommendation_title->raise();
 
     continue_button = new QPushButton(QStringLiteral("CHECKING..."), this);
     continue_button->setCursor(Qt::PointingHandCursor);
     continue_button->setStyleSheet(k_primary_style);
-    continue_button->setGeometry(local_rect(w, {72, 276, 360, 50}));
+    QFont primary_font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
+    primary_font.setPixelSize(util::layout::scaled(16, w));
+    primary_font.setWeight(QFont::Black);
+    continue_button->setFont(primary_font);
+    continue_button->setGeometry(local_rect(w, {60, 330, 370, 54}));
+    continue_button->setAccessibleName(QStringLiteral("Use recommended setup"));
     continue_button->setEnabled(false);
     connect(continue_button, &QPushButton::clicked,
             this, &PrerequisitesIntro::apply_recommendation);
@@ -181,7 +189,12 @@ void PrerequisitesIntro::setup_controls()
 #endif
     choose_own_button->setCursor(Qt::PointingHandCursor);
     choose_own_button->setStyleSheet(k_secondary_style);
-    choose_own_button->setGeometry(local_rect(w, {444, 276, 144, 50}));
+    QFont secondary_font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
+    secondary_font.setPixelSize(util::layout::scaled(13, w));
+    secondary_font.setWeight(QFont::Black);
+    choose_own_button->setFont(secondary_font);
+    choose_own_button->setGeometry(local_rect(w, {440, 330, 180, 54}));
+    choose_own_button->setAccessibleName(QStringLiteral("Choose a runtime manually"));
     connect(choose_own_button, &QPushButton::clicked,
             this, &PrerequisitesIntro::choose_own_requested);
 }
@@ -475,7 +488,7 @@ void PrerequisitesIntro::paint_content(QPainter& painter)
     title_font.setWeight(QFont::Black);
     painter.setFont(title_font);
     painter.setPen(util::colors::k_text_maroon);
-    painter.drawText(local_rect(w, {20, 28, 620, 40}), Qt::AlignCenter,
+    painter.drawText(local_rect(w, {20, 28, 640, 40}), Qt::AlignCenter,
                      util::i18n::translate("EASY SETUP"));
 
     QFont body_font = util::assets::fonts[util::assets::Font::Inter];
@@ -483,7 +496,7 @@ void PrerequisitesIntro::paint_content(QPainter& painter)
     body_font.setWeight(QFont::Medium);
     painter.setFont(body_font);
     painter.setPen(util::colors::k_text_body);
-    painter.drawText(local_rect(w, {55, 70, 550, 24}),
+    painter.drawText(local_rect(w, {65, 72, 550, 24}),
                      Qt::AlignHCenter | Qt::AlignTop,
                      util::i18n::translate("Recommended setup for this computer"));
 
@@ -499,6 +512,6 @@ void PrerequisitesIntro::paint_content(QPainter& painter)
     const QString note = QStringLiteral(
         "You can still choose a different runtime manually.");
 #endif
-    painter.drawText(local_rect(w, {80, 244, 500, 20}), Qt::AlignCenter,
+    painter.drawText(local_rect(w, {80, 292, 520, 24}), Qt::AlignCenter,
                      util::i18n::translate(note));
 }

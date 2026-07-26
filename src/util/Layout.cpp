@@ -85,9 +85,12 @@ namespace util::layout
         QRect  steps(const QSize win)           { return scaled(k_steps, win); }
         QRect  try_again(const QSize win)       { return scaled(k_try_again, win); }
 
+        QRect  signed_bug_checkbox(const QSize win) { return scaled(k_signed_bug_checkbox, win); }
+        QRect  signed_bug_text(const QSize win) { return scaled(k_signed_bug_text, win); }
+        QRect  signed_rules_checkbox(const QSize win) { return scaled(k_signed_rules_checkbox, win); }
+        QRect  signed_rules_text(const QSize win) { return scaled(k_signed_rules_text, win); }
         QRect  signed_in_banner(const QSize win)  { return scaled(k_signed_in_banner, win); }
         QRect  enter_button(const QSize win)      { return scaled(k_enter_button, win); }
-        QRect  warning(const QSize win)            { return scaled(k_warning, win); }
     }
 
     namespace settings
@@ -210,15 +213,18 @@ namespace util::layout
             const QRect panel = connectivity_results(win);
             const int inset = scaled(12, win);
             return QRect{inset, scaled(8, win),
-                         panel.width() - inset * 2, panel.height() - scaled(34, win)};
+                         panel.width() - inset * 2,
+                         panel.height() - scaled(42, win)};
         }
 
         QRect copy_report(QSize win)
         {
             const QRect panel = connectivity_results(win);
-            return QRect{panel.width() - scaled(116, win),
-                         panel.height() - scaled(27, win),
-                         scaled(104, win), scaled(18, win)};
+            const int width = scaled(124, win);
+            const int height = qMax(32, scaled(36, win));
+            return QRect{panel.width() - width - scaled(10, win),
+                         panel.height() - height - scaled(5, win),
+                         width, height};
         }
     }
 
@@ -293,8 +299,9 @@ namespace util::layout
         QRect  change_path_button(const QSize win)
         {
             const QRect row = changepath_line(win);
-            const int hit_w = qMin(row.width() / 3, scaled(150, win));
-            return { row.left(), row.top(), hit_w, row.height() + scaled(4, win) };
+            const int hit_w = qMin(row.width() / 3, scaled(190, win));
+            const int hit_h = qMax(32, row.height() + scaled(8, win));
+            return { row.left(), row.center().y() - hit_h / 2, hit_w, hit_h };
         }
         QRect  warning_line(const QSize win)     { return scaled(k_warn.translated(k_rect.topLeft()), win); }
         QRect  cancel_button(const QSize win)    { return scaled(k_cancel.translated(k_rect.topLeft()), win); }
@@ -320,10 +327,23 @@ namespace util::layout
         QRect retry_button(const QSize win)
         {
             const QRect under = under_row(win);
-            return { under.left() + under.width() / 2 - scaled(50, win),
-                     under.bottom() + scaled(6, win),
-                     scaled(100, win),
-                     scaled(22, win) };
+            const int width = scaled(118, win);
+            const int height = qMax(32, scaled(38, win));
+            const int gap = scaled(10, win);
+            return { under.center().x() - gap / 2 - width,
+                     under.bottom() + scaled(8, win),
+                     width, height };
+        }
+
+        QRect details_button(const QSize win)
+        {
+            const QRect under = under_row(win);
+            const int width = scaled(118, win);
+            const int height = qMax(32, scaled(38, win));
+            const int gap = scaled(10, win);
+            return { under.center().x() + gap / 2,
+                     under.bottom() + scaled(8, win),
+                     width, height };
         }
     }
 }

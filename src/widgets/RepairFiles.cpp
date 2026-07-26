@@ -81,8 +81,8 @@ void RepairFiles::setup_buttons()
 
     close_button = util::simple_utils::make_flat_button(this);
     close_button->setIcon(QIcon(util::assets::images[util::assets::Image::CloseSettings]));
-    close_button->setIconSize(util::layout::scaled(QSize(13, 13), w));
-    close_button->setGeometry(local_rect(w, {517, 18, 22, 22}));
+    close_button->setIconSize(util::layout::scaled(QSize(16, 16), w));
+    close_button->setGeometry(local_rect(w, {505, 10, 40, 40}));
     close_button->setAccessibleName(QStringLiteral("Close repair window"));
     connect(close_button, &QPushButton::clicked, this, [this]()
     {

@@ -22,20 +22,20 @@
 #include "widgets/WineInstall.hpp"
 #include "widgets/WineSelectMenu.hpp"
 #include "widgets/LauncherLog.hpp"
+#include "widgets/LauncherInfoDialog.hpp"
+#include "widgets/LauncherDialog.hpp"
 
 #include <QAction>
 #include <QActionGroup>
 #include <QApplication>
 #include <QCloseEvent>
 #include <QCoreApplication>
-#include <QDesktopServices>
 #include <QGuiApplication>
 #include <QGraphicsDropShadowEffect>
 #include <QFrame>
 #include <QLabel>
 #include <QMenu>
 #include <QMouseEvent>
-#include <QMessageBox>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPushButton>
@@ -43,7 +43,6 @@
 #include <QSystemTrayIcon>
 #include <QToolButton>
 #include <QTimer>
-#include <QUrl>
 #include <QWindow>
 
 using core::game::GameVersion;
@@ -57,24 +56,13 @@ using util::config::Config;
 
 namespace
 {
-    QMessageBox* show_modeless_message(QWidget* parent,
-                                       const QMessageBox::Icon icon,
-                                       const QString& title,
-                                       const QString& message,
-                                       const QString& informative = {})
+    LauncherDialog* show_modeless_message(QWidget* parent,
+                                           const LauncherDialog::Tone tone,
+                                           const QString& title,
+                                           const QString& message,
+                                           const QString& informative = {})
     {
-        auto* box = new QMessageBox(
-            icon,
-            util::i18n::translate(title),
-            util::i18n::translate(message),
-            QMessageBox::Ok,
-            parent);
-        box->setAttribute(Qt::WA_DeleteOnClose);
-        box->setWindowModality(Qt::NonModal);
-        if (!informative.isEmpty())
-            box->setInformativeText(util::i18n::translate(informative));
-        box->open();
-        return box;
+        return LauncherDialog::open_message(parent, tone, title, message, informative);
     }
 
     QSize configured_window_size()
@@ -162,23 +150,23 @@ MainWindow::MainWindow(QWidget* parent)
         if ((game_install && game_install->isVisible())
             || (repair_progress && repair_progress->isVisible()))
             return;
-        QMessageBox* box = show_modeless_message(
-            this, QMessageBox::Critical, QStringLiteral("Launcher Error"), message,
+        LauncherDialog* box = show_modeless_message(
+            this, LauncherDialog::Tone::Error, QStringLiteral("Launcher Error"), message,
             QStringLiteral(
                 "The launcher log has diagnostic details. Close this message, then retry the action."));
-        connect(box, &QMessageBox::finished, install_state,
+        connect(box, &QDialog::finished, install_state,
                 [this]() { install_state->dismiss_error(); });
     });
     connect(shell, &core::wine::Shell::user_notice, this, [this](const QString& message)
     {
-        show_modeless_message(this, QMessageBox::Information,
+        show_modeless_message(this, LauncherDialog::Tone::Information,
                                QStringLiteral("Story of Alicia Launcher"), message);
     });
     connect(&Config::instance(), &Config::persistence_failed, this,
             [this](const QString& path, const QString& reason)
     {
         show_modeless_message(
-            this, QMessageBox::Critical, QStringLiteral("Settings Not Saved"),
+            this, LauncherDialog::Tone::Error, QStringLiteral("Settings Not Saved"),
             util::i18n::translate(
                 "The launcher could not save config.json.\n\nPath: %1\nReason: %2\n\n"
                 "Your on-screen change is active only for this session.")
@@ -187,7 +175,7 @@ MainWindow::MainWindow(QWidget* parent)
     if (!Config::instance().persistence_error().isEmpty())
     {
         show_modeless_message(
-            this, QMessageBox::Critical, QStringLiteral("Settings Not Saved"),
+            this, LauncherDialog::Tone::Error, QStringLiteral("Settings Not Saved"),
             util::i18n::translate(
                 "The launcher could not initialize config.json.\n\nPath: %1\n"
                 "Reason: %2")
@@ -304,10 +292,10 @@ void MainWindow::run_game_directly()
     if (!can_run_game_directly())
     {
         show_launcher();
-        QMessageBox::information(
+        LauncherDialog::information(
             this,
-            util::i18n::translate("Alicia Is Not Ready"),
-            util::i18n::translate(
+            QStringLiteral("Alicia Is Not Ready"),
+            QStringLiteral(
                 "Finish setup, install the selected game, and sign in before launching Alicia directly."));
         return;
     }
@@ -386,9 +374,7 @@ void MainWindow::setup_launcher_menu()
         "QPushButton:hover { background: rgba(235,220,211,224); "
         "border-color: rgba(79,23,23,92); }"
         "QPushButton:pressed { background: rgba(219,198,186,236); "
-        "border-color: rgba(79,23,23,125); }"
-        "QPushButton#quitLauncherMenuButton { color: #7D1F1F; }"
-        "QPushButton#quitLauncherMenuButton:hover { background: rgba(238,214,207,232); }"));
+        "border-color: rgba(79,23,23,125); }"));
     auto* menu_shadow = new QGraphicsDropShadowEffect(launcher_menu_panel);
     menu_shadow->setBlurRadius(util::layout::scaled(28, window_size));
     menu_shadow->setOffset(0, util::layout::scaled(6, window_size));
@@ -415,9 +401,8 @@ void MainWindow::setup_launcher_menu()
 
     language_button = make_menu_button(QStringLiteral("Language"), 0);
     show_log_button = make_menu_button(QStringLiteral("Show Launcher Log"), 1);
-    about_button = make_menu_button(QStringLiteral("About"), 2);
-    quit_launcher_button = make_menu_button(QStringLiteral("Quit Launcher"), 3);
-    quit_launcher_button->setObjectName(QStringLiteral("quitLauncherMenuButton"));
+    credits_button = make_menu_button(QStringLiteral("Credits"), 2);
+    about_button = make_menu_button(QStringLiteral("About"), 3);
 
     language_menu = new QMenu(this);
     language_menu->setStyleSheet(QStringLiteral(
@@ -458,13 +443,16 @@ void MainWindow::setup_launcher_menu()
         log->raise();
         log->activateWindow();
     });
+    connect(credits_button, &QPushButton::clicked, this, [this]()
+    {
+        set_launcher_menu_visible(false);
+        show_credits();
+    });
     connect(about_button, &QPushButton::clicked, this, [this]()
     {
         set_launcher_menu_visible(false);
         show_about();
     });
-    connect(quit_launcher_button, &QPushButton::clicked,
-            this, &MainWindow::request_quit);
 
     launcher_menu_panel->hide();
     refresh_language_actions();
@@ -518,30 +506,14 @@ void MainWindow::raise_persistent_controls()
 
 void MainWindow::show_about()
 {
-    QMessageBox box(this);
-    box.setIconPixmap(QPixmap(QStringLiteral(":/assets/soa-logo.png")).scaled(72, 72, Qt::KeepAspectRatio, Qt::SmoothTransformation));
-    box.setWindowTitle(util::i18n::translate("About Story of Alicia Launcher"));
-    box.setTextFormat(Qt::RichText);
-    box.setText(QStringLiteral("<b>%1</b><br>%2 %3")
-        .arg(util::i18n::translate("Story of Alicia Launcher"),
-             util::i18n::translate("Version"),
-             QString::fromLatin1(SOA_LAUNCHER_VERSION)));
-    box.setInformativeText(QStringLiteral(
-        "<a href=\"https://storyofalicia.com\">%1</a><br>"
-        "<a href=\"https://github.com/Story-Of-Alicia\">%2</a><br>"
-        "<a href=\"mailto:dev@storyofalicia.com\">%3</a><br><br>%4")
-        .arg(util::i18n::translate("Official website"),
-             util::i18n::translate("Source code and issue tracker"),
-             util::i18n::translate("Contact the launcher team"),
-             util::i18n::translate("Built with Qt %1", QString::fromLatin1(qVersion()))));
-    box.setStandardButtons(QMessageBox::Ok);
-    const auto labels = box.findChildren<QLabel*>();
-    for (QLabel* label : labels)
-    {
-        label->setOpenExternalLinks(true);
-        label->setTextInteractionFlags(Qt::TextBrowserInteraction);
-    }
-    box.exec();
+    LauncherInfoDialog dialog(LauncherInfoDialog::Page::About, this);
+    dialog.exec();
+}
+
+void MainWindow::show_credits()
+{
+    LauncherInfoDialog dialog(LauncherInfoDialog::Page::Credits, this);
+    dialog.exec();
 }
 
 void MainWindow::request_quit()
@@ -565,10 +537,10 @@ void MainWindow::retranslate_dynamic_text()
         language_button->setText(util::i18n::translate("Language"));
     if (show_log_button)
         show_log_button->setText(util::i18n::translate("Show Launcher Log"));
+    if (credits_button)
+        credits_button->setText(util::i18n::translate("Credits"));
     if (about_button)
         about_button->setText(util::i18n::translate("About"));
-    if (quit_launcher_button)
-        quit_launcher_button->setText(util::i18n::translate("Quit Launcher"));
     if (open_launcher_action)
         open_launcher_action->setText(util::i18n::translate("Open Launcher"));
     if (run_alicia_action)
@@ -625,7 +597,7 @@ void MainWindow::setup_settings()
             || stage == Stage::SettingUpPrefix)
         {
             show_modeless_message(
-                this, QMessageBox::Warning, QStringLiteral("Repair Unavailable"),
+                this, LauncherDialog::Tone::Warning, QStringLiteral("Repair Unavailable"),
                 QStringLiteral(
                     "Verify and repair is disabled while Alicia or another launcher "
                     "operation is active."));
@@ -692,7 +664,7 @@ void MainWindow::setup_repair_files()
         if (shell && shell->is_busy())
         {
             show_modeless_message(
-                this, QMessageBox::Warning, QStringLiteral("Repair Unavailable"),
+                this, LauncherDialog::Tone::Warning, QStringLiteral("Repair Unavailable"),
                 QStringLiteral(
                     "Alicia or another runtime operation is active. Finish it before "
                     "changing game files."));
@@ -721,9 +693,9 @@ void MainWindow::setup_repair_files()
                 install_state->probe();
                 last_view = View::Loading;
                 on_stage_changed(install_state->stage());
-                QMessageBox::information(
-                    this, util::i18n::translate("Repair Complete"),
-                    util::i18n::translate("The selected game was verified and repaired."));
+                LauncherDialog::information(
+                    this, QStringLiteral("Repair Complete"),
+                    QStringLiteral("The selected game was verified and repaired."));
             });
             connect(repair_progress, &DownloadProgress::closed, this, [this]()
             {
@@ -798,16 +770,18 @@ void MainWindow::setup_alicia_chooser()
         const char* preservedData =
             "The Wine prefix and both game installations will not be deleted.";
 #endif
-        const auto answer = QMessageBox::question(
+        const bool confirmed = LauncherDialog::confirm(
             this,
-            util::i18n::translate("Reset Launcher Config"),
+            LauncherDialog::Tone::Warning,
+            QStringLiteral("Reset Launcher Config"),
             util::i18n::translate(
                 "This resets launcher settings, the setup/rules confirmations, and signs you out.\n\n")
-            + util::i18n::translate(preservedData),
-            QMessageBox::Yes | QMessageBox::Cancel,
-            QMessageBox::Cancel);
+                + util::i18n::translate(preservedData),
+            QStringLiteral("Reset Launcher"),
+            QStringLiteral("Cancel"),
+            true);
 
-        if (answer != QMessageBox::Yes) return;
+        if (!confirmed) return;
 
         Config::instance().reset_launcher_config();
         game_version = Config::instance().game_version();
@@ -1194,30 +1168,39 @@ void MainWindow::closeEvent(QCloseEvent* event)
         return;
     }
 
-    QMessageBox box(
-        QMessageBox::Warning,
-        gameRunning ? util::i18n::translate("Alicia Is Running")
-                    : util::i18n::translate("Operation In Progress"),
-        gameRunning
-            ? util::i18n::translate("Closing the launcher stops live diagnostics and process monitoring. Alicia may continue running and will be detected again when the launcher restarts.")
-            : util::i18n::translate("Closing now may interrupt setup, authentication, download, repair, or update work."),
-        QMessageBox::NoButton,
-        this);
-    QPushButton* minimize = nullptr;
+    QVector<LauncherDialog::Action> actions;
     if (gameRunning)
-        minimize = box.addButton(util::i18n::translate("Minimize Launcher"), QMessageBox::AcceptRole);
-    auto* close = box.addButton(util::i18n::translate("Close Anyway"), QMessageBox::DestructiveRole);
-    box.addButton(QMessageBox::Cancel);
-    if (minimize)
-        box.setDefaultButton(minimize);
-    box.exec();
+    {
+        actions.push_back({QStringLiteral("Minimize Launcher"),
+                           LauncherDialog::Primary,
+                           LauncherDialog::ActionStyle::Primary,
+                           true});
+    }
+    actions.push_back({QStringLiteral("Cancel"),
+                       LauncherDialog::Cancelled,
+                       LauncherDialog::ActionStyle::Neutral,
+                       !gameRunning});
+    actions.push_back({QStringLiteral("Close Anyway"),
+                       LauncherDialog::Secondary,
+                       LauncherDialog::ActionStyle::Destructive,
+                       false});
 
-    if (minimize && box.clickedButton() == minimize)
+    const int result = LauncherDialog::choose(
+        this,
+        LauncherDialog::Tone::Warning,
+        gameRunning ? QStringLiteral("Alicia Is Running")
+                    : QStringLiteral("Operation In Progress"),
+        gameRunning
+            ? QStringLiteral("Closing the launcher stops live diagnostics and process monitoring. Alicia may continue running and will be detected again when the launcher restarts.")
+            : QStringLiteral("Closing now may interrupt setup, authentication, download, repair, or update work."),
+        actions);
+
+    if (gameRunning && result == LauncherDialog::Primary)
     {
         showMinimized();
         event->ignore();
     }
-    else if (box.clickedButton() == close)
+    else if (result == LauncherDialog::Secondary)
     {
         event->accept();
     }

@@ -6,11 +6,13 @@
 #include "core/auth/AuthHandler.hpp"
 #include "core/wine/Shell.hpp"
 #include "core/state/InstallState.hpp"
+#include "widgets/LauncherDialog.hpp"
 
 #include <QCheckBox>
 #include <QFontMetrics>
 #include <QGraphicsDropShadowEffect>
 #include <QSignalBlocker>
+#include <QTimer>
 
 using util::config::Config;
 using core::state::Stage;
@@ -25,8 +27,8 @@ namespace
         "    border-radius: 5px;"
         "    color: #5A4636;"
         "    font-family: 'Inter';"
-        "    font-size: 13px;"
-        "    padding: 12px 16px;"
+        "    font-size: 12px;"
+        "    padding: 8px 12px;"
         "}";
 
     const char* k_banner_box =
@@ -64,6 +66,30 @@ namespace
         widget->setGraphicsEffect(effect);
     }
 
+    void fit_acknowledgement_label(QLabel* label, const QString& plain_text,
+                                   const QSize window_size)
+    {
+        if (!label)
+            return;
+
+        QFont font = util::assets::fonts[util::assets::Font::Inter];
+        int pixel_size = qMax(11, util::layout::scaled(13, window_size));
+        while (pixel_size > 10)
+        {
+            font.setPixelSize(pixel_size);
+            font.setWeight(QFont::Medium);
+            if (QFontMetrics(font).horizontalAdvance(plain_text)
+                <= qMax(1, label->width()))
+            {
+                break;
+            }
+            --pixel_size;
+        }
+        font.setPixelSize(pixel_size);
+        font.setWeight(QFont::Medium);
+        label->setFont(font);
+    }
+
     QString welcome_message(const core::game::GameVersion version, const QString& required_action)
     {
         const QString game_name = version == core::game::GameVersion::Alicia2
@@ -74,7 +100,13 @@ namespace
             .arg(game_name, required_action);
     }
 
-
+    void set_dynamic_text(QLabel* label, const QString& source)
+    {
+        if (!label)
+            return;
+        label->setProperty("soa_i18n_text_source", source);
+        label->setText(util::i18n::translate(source));
+    }
 }
 
 AliciaChooser::AliciaChooser(AuthHandler* auth_, core::wine::Shell* shell_,
@@ -96,24 +128,23 @@ AliciaChooser::AliciaChooser(AuthHandler* auth_, core::wine::Shell* shell_,
     setup_waiting_state();
     setup_signedin_state();
 
-    warning_label = new QLabel(this);
-    warning_label->setTextFormat(Qt::PlainText);
-    warning_label->setWordWrap(true);
-    warning_label->setAlignment(Qt::AlignCenter);
-    warning_label->setStyleSheet(
-        QStringLiteral("QLabel { color: #8A4D12; background: rgba(255,238,196,0.88); "
-                       "border: 1px solid rgba(176,117,43,0.48); border-radius: 5px; "
-                       "font-family: 'Inter'; font-size: 11px; padding: 3px 8px; }"));
-    warning_label->setAccessibleName(QStringLiteral("Launcher warning"));
-    set_warning(install_state->warning_message());
-
-    refresh_game_text();
+    retranslate_dynamic_text();
     refresh_keep_signed_in();
     refresh_session_banner();
     connect(&Config::instance(), &Config::changed,
             this, &AliciaChooser::refresh_keep_signed_in);
     connect(&Config::instance(), &Config::changed,
             this, &AliciaChooser::refresh_session_banner);
+    connect(auth, &AuthHandler::authenticated, this,
+            [this](const QString&, const QString&, const QString&)
+    {
+        refresh_session_banner();
+        QTimer::singleShot(0, this, [this]()
+        {
+            refresh_session_banner();
+            refresh_enter_enabled();
+        });
+    });
 
     reset_path_button = new QPushButton("RESET LAUNCHER SETTINGS", this);
     reset_path_button->setCursor(Qt::PointingHandCursor);
@@ -126,6 +157,12 @@ AliciaChooser::AliciaChooser(AuthHandler* auth_, core::wine::Shell* shell_,
         emit reset_config_requested();
     });
 
+    QTimer::singleShot(0, this, [this]()
+    {
+        set_warning(install_state->warning_message());
+    });
+
+    retranslate_dynamic_text();
     on_stage_changed(install_state->stage());
     connect(install_state, &core::state::InstallState::stage_changed,
             this, &AliciaChooser::on_stage_changed);
@@ -301,6 +338,7 @@ void AliciaChooser::setup_download_state()
     download_button->setIcon(QIcon(normal));
     download_button->setIconSize(QSize(bw, bh));
     download_button->setGeometry(bx, by, bw, bh);
+    download_button->setProperty("soa_button_stretch_asset", true);
     QFont download_font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
     download_font.setPixelSize(util::layout::scaled(20, w));
     download_font.setWeight(QFont::Black);
@@ -330,6 +368,7 @@ void AliciaChooser::setup_login_state()
     discord_button->setIcon(QIcon(discord_normal));
     discord_button->setIconSize(QSize(dw, dh));
     discord_button->setGeometry(dr.x(), dr.y(), dw, dh);
+    discord_button->setProperty("soa_button_stretch_asset", true);
     QFont discord_font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
     discord_font.setPixelSize(util::layout::scaled(18, w));
     discord_font.setWeight(QFont::Black);
@@ -345,7 +384,7 @@ void AliciaChooser::setup_login_state()
     keep_signed_button->setAccessibleName(QStringLiteral("Keep me signed in after the launcher closes"));
     keep_signed_button->setGeometry(util::layout::alicia_chooser::keep_signed_in(w));
     QFont keep_font = util::assets::fonts[util::assets::Font::Inter];
-    keep_font.setPixelSize(util::layout::scaled(13, w));
+    keep_font.setPixelSize(qMax(11, util::layout::scaled(13, w)));
     keep_font.setWeight(QFont::Medium);
     keep_signed_button->setFont(keep_font);
     keep_signed_button->setStyleSheet(
@@ -405,7 +444,7 @@ void AliciaChooser::setup_waiting_state()
     try_again_button->setAccessibleName(QStringLiteral("Cancel Discord login and try again"));
     try_again_button->setGeometry(util::layout::alicia_chooser::try_again(w));
     QFont retry_font = util::assets::fonts[util::assets::Font::Inter];
-    retry_font.setPixelSize(util::layout::scaled(11, w));
+    retry_font.setPixelSize(qMax(11, util::layout::scaled(11, w)));
     retry_font.setWeight(QFont::Medium);
     retry_font.setUnderline(true);
     try_again_button->setFont(retry_font);
@@ -419,6 +458,47 @@ void AliciaChooser::setup_waiting_state()
 void AliciaChooser::setup_signedin_state()
 {
     const QSize w = window()->size();
+
+    const QString checkbox_style = QStringLiteral(
+        "QCheckBox { background: transparent; spacing: 0px; }"
+        "QCheckBox::indicator { width: 19px; height: 18px; }"
+        "QCheckBox::indicator:unchecked { image: url(:/assets/checkbox.png); }"
+        "QCheckBox::indicator:checked { image: url(:/assets/checkbox-ticked.png); }");
+
+    const auto configure_checked_box = [&checkbox_style](QCheckBox* checkbox)
+    {
+        checkbox->setChecked(true);
+        checkbox->setFocusPolicy(Qt::NoFocus);
+        checkbox->setAttribute(Qt::WA_TransparentForMouseEvents);
+        checkbox->setStyleSheet(checkbox_style);
+    };
+
+    signed_bug_checkbox = new QCheckBox(this);
+    signed_bug_checkbox->setGeometry(util::layout::alicia_chooser::signed_bug_checkbox(w));
+    signed_bug_checkbox->setAccessibleName(QStringLiteral("Playtest status acknowledged"));
+    configure_checked_box(signed_bug_checkbox);
+
+    signed_bug_label = new QLabel(this);
+    signed_bug_label->setTextFormat(Qt::PlainText);
+    signed_bug_label->setAlignment(Qt::AlignVCenter | Qt::AlignLeft);
+    signed_bug_label->setStyleSheet(QStringLiteral(
+        "QLabel { color: #4F1717; background: transparent; }"));
+    signed_bug_label->setGeometry(util::layout::alicia_chooser::signed_bug_text(w));
+
+    signed_rules_checkbox = new QCheckBox(this);
+    signed_rules_checkbox->setGeometry(util::layout::alicia_chooser::signed_rules_checkbox(w));
+    signed_rules_checkbox->setAccessibleName(QStringLiteral("Server rules acknowledged"));
+    configure_checked_box(signed_rules_checkbox);
+
+    signed_rules_label = new QLabel(this);
+    signed_rules_label->setTextFormat(Qt::RichText);
+    signed_rules_label->setOpenExternalLinks(true);
+    signed_rules_label->setTextInteractionFlags(Qt::LinksAccessibleByMouse | Qt::LinksAccessibleByKeyboard);
+    signed_rules_label->setAlignment(Qt::AlignVCenter | Qt::AlignLeft);
+    signed_rules_label->setStyleSheet(QStringLiteral(
+        "QLabel { color: #4F1717; background: transparent; }"
+        "QLabel a { color: #2FB4E0; text-decoration: none; }"));
+    signed_rules_label->setGeometry(util::layout::alicia_chooser::signed_rules_text(w));
 
     signed_in_label = new QLabel("  SIGNED IN", this);
     signed_in_label->setTextFormat(Qt::PlainText);
@@ -438,6 +518,7 @@ void AliciaChooser::setup_signedin_state()
     enter_button->setIcon(QIcon(enter_normal));
     enter_button->setIconSize(QSize(ew, eh));
     enter_button->setGeometry(er.x(), er.y(), ew, eh);
+    enter_button->setProperty("soa_button_stretch_asset", true);
     QFont enter_font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
     enter_font.setPixelSize(util::layout::scaled(20, w));
     enter_font.setWeight(QFont::Black);
@@ -477,11 +558,14 @@ void AliciaChooser::apply_state_visibility()
     steps_label->setVisible(waiting);
     try_again_button->setVisible(waiting);
 
+    signed_bug_checkbox->setVisible(signedin);
+    signed_bug_label->setVisible(signedin);
+    signed_rules_checkbox->setVisible(signedin);
+    signed_rules_label->setVisible(signedin);
     signed_in_label->setVisible(signedin);
     enter_button->setVisible(signedin);
 
-    reset_path_button->setVisible(
-        !download && (!warning_label || !warning_label->isVisible()));
+    reset_path_button->setVisible(!download);
     reset_path_button->setEnabled(
         current_stage != Stage::Launching && current_stage != Stage::Running);
     reset_path_button->setToolTip(reset_path_button->isEnabled()
@@ -506,16 +590,17 @@ void AliciaChooser::refresh_session_banner()
     if (!signed_in_label || !enter_button)
         return;
 
+    QString source;
     if (current_stage == Stage::Launching)
     {
-        signed_in_label->setText(util::i18n::translate("  STARTING ALICIA…"));
+        source = QStringLiteral("  STARTING ALICIA…");
         signed_in_label->setAccessibleName(util::i18n::translate("Alicia is starting"));
         enter_button->setAccessibleDescription(
             util::i18n::translate("Disabled while Alicia is starting"));
     }
     else if (current_stage == Stage::Running)
     {
-        signed_in_label->setText(util::i18n::translate("  ALICIA IS RUNNING"));
+        source = QStringLiteral("  ALICIA IS RUNNING");
         signed_in_label->setAccessibleName(util::i18n::translate("Alicia is running"));
         enter_button->setAccessibleDescription(
             util::i18n::translate("Disabled while Alicia is running"));
@@ -525,48 +610,57 @@ void AliciaChooser::refresh_session_banner()
         const QString account = Config::instance().display_name().trimmed().isEmpty()
             ? Config::instance().username().trimmed()
             : Config::instance().display_name().trimmed();
-        signed_in_label->setText(account.isEmpty()
-            ? util::i18n::translate("  SIGNED IN")
-            : util::i18n::translate("  SIGNED IN AS %1").arg(account));
+        source = account.isEmpty()
+            ? QStringLiteral("  SIGNED IN")
+            : QStringLiteral("  SIGNED IN AS %1").arg(account);
         signed_in_label->setAccessibleName(
             account.isEmpty() ? util::i18n::translate("Signed in")
                               : util::i18n::translate("Signed in as %1").arg(account));
         enter_button->setAccessibleDescription(
             util::i18n::translate("Start the selected Alicia playtest"));
     }
+
+    set_dynamic_text(signed_in_label, source);
+    signed_in_label->setToolTip(signed_in_label->text().trimmed());
 }
 
 void AliciaChooser::set_warning(const QString& message)
 {
-    if (!warning_label)
-        return;
-    const QString translated_message = util::i18n::translate(message);
-    warning_label->setText(translated_message);
-    warning_label->setToolTip(translated_message);
-    warning_label->setVisible(!message.isEmpty());
-    update_warning_geometry();
-    if (reset_path_button)
+    const QString source = message.trimmed();
+    if (source.isEmpty())
     {
-        reset_path_button->setVisible(
-            state != State::Download && message.isEmpty());
-    }
-}
-
-void AliciaChooser::update_warning_geometry()
-{
-    if (!warning_label)
+        displayed_warning.clear();
+        if (warning_dialog)
+            warning_dialog->close();
+        warning_dialog.clear();
         return;
-    const QSize w = window()->size();
-    const QRect available = util::layout::alicia_chooser::warning(w);
-    const int horizontal_margin = util::layout::scaled(20, w);
-    const int vertical_margin = util::layout::scaled(10, w);
-    const QRect bounds = QFontMetrics(warning_label->font()).boundingRect(
-        QRect(0, 0, qMax(1, available.width() - horizontal_margin), 1000),
-        Qt::AlignCenter | Qt::TextWordWrap, warning_label->text());
-    const int minimum_height = util::layout::scaled(34, w);
-    const int required_height = qBound(minimum_height, bounds.height() + vertical_margin, available.height());
-    warning_label->setGeometry(available.x(), available.bottom() - required_height + 1,
-                               available.width(), required_height);
+    }
+
+    if (source == displayed_warning && warning_dialog)
+    {
+        warning_dialog->raise();
+        warning_dialog->activateWindow();
+        return;
+    }
+
+    if (warning_dialog)
+        warning_dialog->close();
+
+    displayed_warning = source;
+    auto* dialog = LauncherDialog::open_message(
+        this,
+        LauncherDialog::Tone::Warning,
+        QStringLiteral("Launcher Warning"),
+        source);
+    warning_dialog = dialog;
+    if (dialog)
+    {
+        connect(dialog, &QObject::destroyed, this, [this, dialog]()
+        {
+            if (warning_dialog == dialog)
+                warning_dialog.clear();
+        });
+    }
 }
 
 void AliciaChooser::retranslate_dynamic_text()
@@ -591,6 +685,36 @@ void AliciaChooser::retranslate_dynamic_text()
         util::simple_utils::set_button_text(discord_button, QStringLiteral("PROCEED WITH DISCORD"));
     if (enter_button)
         util::simple_utils::set_button_text(enter_button, QStringLiteral("ENTER THE PLAYTEST"));
+    if (signed_bug_label)
+    {
+        const QString text = util::i18n::translate(
+            "I understand the game has bugs and is not the final version.");
+        signed_bug_label->setText(text);
+        signed_bug_label->setToolTip(text);
+        signed_bug_checkbox->setAccessibleName(
+            util::i18n::translate("Playtest status acknowledged"));
+        signed_bug_checkbox->setAccessibleDescription(text);
+        fit_acknowledgement_label(signed_bug_label, text, window()->size());
+    }
+    if (signed_rules_label)
+    {
+        const QString link_text = util::i18n::translate("server rules").toHtmlEscaped();
+        const QString link = QStringLiteral(
+            "<a href=\"https://docs.google.com/document/d/1vry3ZuDtzdS_mX1P2udWlb8z2Q9Atr3p1THZdtZ2EHA/edit\" "
+            "style=\"color:#2FB4E0; text-decoration:none; font-weight:700;\">%1</a>")
+            .arg(link_text);
+        const QString source_text = util::i18n::translate(
+            "I have read and will obey the %1.");
+        const QString plain_link_text = util::i18n::translate("server rules");
+        const QString plain_text = source_text.arg(plain_link_text);
+        signed_rules_label->setText(source_text.arg(link));
+        signed_rules_label->setToolTip(util::i18n::translate(
+            "Open the complete Story of Alicia server rules"));
+        signed_rules_checkbox->setAccessibleName(
+            util::i18n::translate("Server rules acknowledged"));
+        signed_rules_checkbox->setAccessibleDescription(plain_text);
+        fit_acknowledgement_label(signed_rules_label, plain_text, window()->size());
+    }
     refresh_game_text();
     refresh_keep_signed_in();
     refresh_session_banner();

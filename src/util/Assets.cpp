@@ -53,6 +53,7 @@ namespace util::assets
             {Image::VersionFrameInactive, "ver-frame-inactive-aligned.png"},
             {Image::VersionIconPlaytest, "ver-icon-pt.png"},
             {Image::VersionIconAlicia2, "ver-icon-2.0.png"},
+            {Image::SoaLogo, "soa-logo.png"},
             {Image::SettingsButton, "Settings Button.png"}
         };
 

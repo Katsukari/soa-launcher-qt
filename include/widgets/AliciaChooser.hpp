@@ -4,6 +4,7 @@
 #include <QLabel>
 #include <QPainter>
 #include <QPushButton>
+#include <QPointer>
 
 #include "core/game/GameVersion.hpp"
 #include "core/state/Stage.hpp"
@@ -11,6 +12,7 @@
 
 class AuthHandler;
 class QCheckBox;
+class LauncherDialog;
 namespace core::wine
 {
     class Shell;
@@ -61,7 +63,6 @@ private:
     void refresh_game_text();
     void refresh_session_banner();
     void set_warning(const QString& message);
-    void update_warning_geometry();
     void retranslate_dynamic_text();
 
     AuthHandler* auth {};
@@ -80,8 +81,13 @@ private:
     QLabel* waiting_title {};
     QLabel* steps_label {};
     QPushButton* try_again_button {};
+    QCheckBox* signed_bug_checkbox {};
+    QLabel* signed_bug_label {};
+    QCheckBox* signed_rules_checkbox {};
+    QLabel* signed_rules_label {};
     QLabel* signed_in_label {};
     QPushButton* enter_button {};
-    QLabel* warning_label {};
     QPushButton* reset_path_button {};
+    QPointer<LauncherDialog> warning_dialog;
+    QString displayed_warning;
 };

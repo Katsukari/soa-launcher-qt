@@ -38,9 +38,32 @@ namespace
     bool is_auth_url(const QString& value)
     {
         const QUrl url(value, QUrl::StrictMode);
-        return url.isValid()
-            && url.scheme().compare(QStringLiteral("soa"), Qt::CaseInsensitive) == 0
-            && url.host().compare(QStringLiteral("launcher"), Qt::CaseInsensitive) == 0;
+        if (!url.isValid()
+            || url.scheme().compare(QStringLiteral("soa"), Qt::CaseInsensitive) != 0)
+        {
+            return false;
+        }
+
+        const QString host = url.host().trimmed().toLower();
+        QString path = url.path().trimmed().toLower();
+        while (path.startsWith(QLatin1Char('/')))
+            path.remove(0, 1);
+
+        if (host == QStringLiteral("launcher")
+            || host == QStringLiteral("auth")
+            || host == QStringLiteral("login"))
+        {
+            return path.isEmpty()
+                || path == QStringLiteral("callback")
+                || path == QStringLiteral("auth")
+                || path == QStringLiteral("login");
+        }
+
+        return host.isEmpty()
+            && (path == QStringLiteral("launcher")
+                || path == QStringLiteral("callback")
+                || path == QStringLiteral("auth")
+                || path == QStringLiteral("login"));
     }
 
     QString soa_url_from_args(const QStringList& args)

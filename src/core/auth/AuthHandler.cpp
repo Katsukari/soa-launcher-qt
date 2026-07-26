@@ -1,4 +1,5 @@
 #include "core/auth/AuthHandler.hpp"
+#include "widgets/LauncherDialog.hpp"
 #include "util/LanguageManager.hpp"
 
 #include <QCoreApplication>
@@ -8,13 +9,12 @@
 #include <QDesktopServices>
 #include <QDir>
 #include <QFile>
-#include <QMessageBox>
 #include <QProcess>
 #include <QPointer>
 #include <QPushButton>
-#include <QRandomGenerator>
 #include <QSaveFile>
 #include <QStandardPaths>
+#include <QStringList>
 #include <QTextStream>
 #include <QTimer>
 #include <QUrl>
@@ -38,14 +38,6 @@ namespace
         "&redirect_uri=https%3A%2F%2Fauthentication.storyofalicia.com%2F"
         "&scope=identify";
 
-    QString new_login_state()
-    {
-        QString state;
-        state.reserve(64);
-        for (int i = 0; i < 4; ++i)
-            state += QStringLiteral("%1").arg(QRandomGenerator::system()->generate64(), 16, 16, QLatin1Char('0'));
-        return state;
-    }
     constexpr int k_login_timeout_ms = 10 * 60 * 1000;
     constexpr int k_duplicate_callback_window_ms = 30000;
 
@@ -150,84 +142,45 @@ AuthHandler::AuthHandler(core::wine::Shell* shell_, QObject* parent)
 
 void AuthHandler::open_login()
 {
-    if (pending || awaiting_legacy_confirmation || completion_scheduled)
+    if (pending || completion_scheduled)
         return;
-    QUrl login_url(QString::fromLatin1(k_discord_oauth_url));
-    const QString login_state = new_login_state();
-    QUrlQuery login_query(login_url);
-    login_query.addQueryItem(QStringLiteral("state"), login_state);
-    login_url.setQuery(login_query);
 
-    QWidget* parent_widget = qobject_cast<QWidget*>(parent());
-    QMessageBox choice(
-        QMessageBox::Question,
-        util::i18n::translate("Discord Login"),
-        util::i18n::translate(
-            "Choose how to open the Discord sign-in page.\n\n"
-            "Copy Login Link lets you paste the exact sign-in link into any browser."),
-        QMessageBox::NoButton,
-        parent_widget);
-    QPushButton* copy_button = choice.addButton(
-        util::i18n::translate("Copy Login Link"), QMessageBox::AcceptRole);
-    QPushButton* open_button = choice.addButton(
-        util::i18n::translate("Open Default Browser"), QMessageBox::ActionRole);
-    QPushButton* cancel_button = choice.addButton(QMessageBox::Cancel);
-    choice.setDefaultButton(copy_button);
-    choice.exec();
-
-    if (choice.clickedButton() == cancel_button)
-        return;
+    const QUrl login_url(QString::fromLatin1(k_discord_oauth_url));
 
     pending = true;
     pending_since = QDateTime::currentDateTimeUtc();
-    pending_state = login_state;
     last_callback_digest.clear();
     last_callback_seen = {};
     timeout_timer->start(k_login_timeout_ms);
     working(QStringLiteral("discord-login"), -1.0, true);
 
     const QString encoded_url = login_url.toString(QUrl::FullyEncoded);
-    if (choice.clickedButton() == copy_button)
-    {
-        if (QGuiApplication::clipboard())
-        {
-            QGuiApplication::clipboard()->setText(encoded_url);
-            SPDLOG_INFO("copied Discord login link to clipboard");
-            QMessageBox::information(
-                parent_widget,
-                util::i18n::translate("Discord Login"),
-                util::i18n::translate("The sign-in link was copied. Paste it into the browser you want to use."));
-            return;
-        }
+    if (QGuiApplication::clipboard())
+        QGuiApplication::clipboard()->setText(encoded_url);
 
-        reset_pending_login();
-        fail(QStringLiteral("The Discord login link could not be copied."));
+    SPDLOG_INFO("opening Discord login in the default browser");
+    if (QDesktopServices::openUrl(login_url))
+        return;
+
+    QWidget* parent_widget = qobject_cast<QWidget*>(parent());
+    if (QGuiApplication::clipboard())
+    {
+        LauncherDialog::warning(
+            parent_widget,
+            QStringLiteral("Browser Could Not Be Opened"),
+            QStringLiteral(
+                "The default browser could not be opened. The exact sign-in link was copied "
+                "to your clipboard instead."));
         return;
     }
 
-    SPDLOG_INFO("opening Discord login in the default browser");
-    if (choice.clickedButton() == open_button && !QDesktopServices::openUrl(login_url))
-    {
-        if (QGuiApplication::clipboard())
-        {
-            QGuiApplication::clipboard()->setText(encoded_url);
-            QMessageBox::warning(
-                parent_widget,
-                util::i18n::translate("Browser Could Not Be Opened"),
-                util::i18n::translate(
-                    "The default browser could not be opened. The exact sign-in link was copied "
-                    "to your clipboard instead."));
-            return;
-        }
-
-        reset_pending_login();
-        fail(QStringLiteral("The browser could not be opened and the login link could not be copied."));
-    }
+    reset_pending_login();
+    fail(QStringLiteral("The browser could not be opened and the login link could not be copied."));
 }
 
 void AuthHandler::cancel_login()
 {
-    if (!pending && !awaiting_legacy_confirmation && !completion_scheduled
+    if (!pending && !completion_scheduled
         && status().state != core::status::State::Working)
     {
         return;
@@ -241,10 +194,32 @@ void AuthHandler::cancel_login()
 
 bool AuthHandler::callback_is_expected(const QUrl& url) const
 {
-    return url.isValid()
-        && url.scheme().compare(QStringLiteral("soa"), Qt::CaseInsensitive) == 0
-        && url.host().compare(QStringLiteral("launcher"), Qt::CaseInsensitive) == 0
-        && (url.path().isEmpty() || url.path() == QStringLiteral("/"));
+    if (!url.isValid()
+        || url.scheme().compare(QStringLiteral("soa"), Qt::CaseInsensitive) != 0)
+    {
+        return false;
+    }
+
+    const QString host = url.host().trimmed().toLower();
+    QString path = url.path().trimmed().toLower();
+    while (path.startsWith(QLatin1Char('/')))
+        path.remove(0, 1);
+
+    if (host == QStringLiteral("launcher")
+        || host == QStringLiteral("auth")
+        || host == QStringLiteral("login"))
+    {
+        return path.isEmpty()
+            || path == QStringLiteral("callback")
+            || path == QStringLiteral("auth")
+            || path == QStringLiteral("login");
+    }
+
+    return host.isEmpty()
+        && (path == QStringLiteral("launcher")
+            || path == QStringLiteral("callback")
+            || path == QStringLiteral("auth")
+            || path == QStringLiteral("login"));
 }
 
 void AuthHandler::handle_url(const QString& url)
@@ -283,15 +258,30 @@ void AuthHandler::handle_url(const QString& url)
     }
 
     const QUrlQuery query(parsed);
-    QString returned_state = query.queryItemValue(QStringLiteral("state"), QUrl::FullyDecoded).trimmed();
-    if (returned_state.isEmpty())
-        returned_state = query.queryItemValue(QStringLiteral("oauth_state"), QUrl::FullyDecoded).trimmed();
-    if (returned_state.isEmpty())
-        returned_state = query.queryItemValue(QStringLiteral("launcher_state"), QUrl::FullyDecoded).trimmed();
+    const auto first_value = [&query](const QStringList& keys)
+    {
+        for (const QString& key : keys)
+        {
+            const QString value = query.queryItemValue(key, QUrl::FullyDecoded).trimmed();
+            if (!value.isEmpty())
+                return value;
+        }
+        return QString{};
+    };
 
-    const QString user = query.queryItemValue(QStringLiteral("user"), QUrl::FullyDecoded).trimmed();
-    const QString token = query.queryItemValue(QStringLiteral("token"), QUrl::FullyDecoded).trimmed();
-    const QString username = query.queryItemValue(QStringLiteral("username"), QUrl::FullyDecoded).trimmed();
+    const QString user = first_value({
+        QStringLiteral("user"),
+        QStringLiteral("id"),
+        QStringLiteral("ID"),
+        QStringLiteral("discord_id")});
+    const QString token = first_value({
+        QStringLiteral("token"),
+        QStringLiteral("op"),
+        QStringLiteral("OP")});
+    const QString username = first_value({
+        QStringLiteral("username"),
+        QStringLiteral("display_name"),
+        QStringLiteral("name")});
 
     const auto containsUnsafeCredentialCharacter = [](const QString& value)
     {
@@ -314,89 +304,24 @@ void AuthHandler::handle_url(const QString& url)
         return;
     }
 
-    if (pending_state.isEmpty())
-    {
-        SPDLOG_WARN("ignored soa login callback because no login state is pending");
-        return;
-    }
-
-    if (completion_scheduled || awaiting_legacy_confirmation)
+    if (completion_scheduled)
         return;
 
-    if (returned_state.isEmpty())
-    {
-        begin_legacy_confirmation(user, token, username);
-        return;
-    }
-
-    if (returned_state != pending_state)
-    {
-        SPDLOG_WARN("ignored soa login callback with mismatched state");
-        return;
-    }
-
-    schedule_login_completion(user, token, username, false);
-}
-
-void AuthHandler::begin_legacy_confirmation(const QString& user, const QString& token,
-                                            const QString& username)
-{
-    if (!pending || awaiting_legacy_confirmation || completion_scheduled)
-        return;
-
-    awaiting_legacy_confirmation = true;
-    QWidget* parent_widget = qobject_cast<QWidget*>(parent());
-    const QString display_name = username.isEmpty() ? user : username;
-    auto* confirmation = new QMessageBox(
-        QMessageBox::Warning,
-        util::i18n::translate("Unverified Login Response"),
-        util::i18n::translate(
-            "The authentication service did not return the security state generated by the "
-            "launcher. This is a compatibility fallback and is less secure.\n\n"
-            "Only continue if the browser has just completed the login you started and this is the expected account.\n\n"
-            "Continue signing in as %1?").arg(display_name.toHtmlEscaped()),
-        QMessageBox::Yes | QMessageBox::Cancel,
-        parent_widget);
-    confirmation->setDefaultButton(QMessageBox::Cancel);
-    confirmation->setAttribute(Qt::WA_DeleteOnClose);
-
-    connect(confirmation, &QMessageBox::finished, this,
-            [this, user, token, username](const int result)
-    {
-        awaiting_legacy_confirmation = false;
-        if (!pending || completion_scheduled)
-            return;
-
-        if (result != QMessageBox::Yes)
-        {
-            reset_pending_login();
-            fail(QStringLiteral(
-                "Discord login was cancelled because the response could not be verified."));
-            return;
-        }
-
-        SPDLOG_WARN("accepted a legacy soa login callback without state after user confirmation");
-        schedule_login_completion(user, token, username, true);
-    });
-
-    confirmation->open();
+    schedule_login_completion(user, token, username);
 }
 
 void AuthHandler::schedule_login_completion(const QString& user, const QString& token,
-                                            const QString& username,
-                                            const bool legacy_callback)
+                                            const QString& username)
 {
     if (!pending || completion_scheduled)
         return;
 
     completion_scheduled = true;
     pending = false;
-    awaiting_legacy_confirmation = false;
     pending_since = {};
-    pending_state.clear();
     timeout_timer->stop();
 
-    QTimer::singleShot(0, this, [this, user, token, username, legacy_callback]()
+    QTimer::singleShot(0, this, [this, user, token, username]()
     {
         if (!completion_scheduled)
             return;
@@ -407,9 +332,6 @@ void AuthHandler::schedule_login_completion(const QString& user, const QString& 
             return;
 
         SPDLOG_INFO("auth ok for Discord user {}", user.toStdString());
-        if (legacy_callback)
-            SPDLOG_DEBUG("completed Discord login through legacy callback compatibility mode");
-
         self->completion_scheduled = false;
         self->done(QStringLiteral("Logged in successfully."));
         if (self)
@@ -420,8 +342,6 @@ void AuthHandler::schedule_login_completion(const QString& user, const QString& 
 void AuthHandler::reset_pending_login()
 {
     pending = false;
-    awaiting_legacy_confirmation = false;
     pending_since = {};
-    pending_state.clear();
     timeout_timer->stop();
 }

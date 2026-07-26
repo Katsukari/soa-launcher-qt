@@ -48,6 +48,7 @@ void GameInstall::setup_close_button()
     const QSize w = window()->size();
     close_button = util::simple_utils::make_flat_button(this);
 
+    close_button->setAccessibleName(QStringLiteral("Close game installation"));
     close_button->setIcon(QIcon(util::assets::images[util::assets::Image::CloseSettings]));
     close_button->setIconSize(util::layout::install_modal::close_icon(w));
     close_button->setGeometry(util::layout::install_modal::close(w));
@@ -74,6 +75,7 @@ void GameInstall::setup_buttons()
     cancel_font.setPixelSize(util::layout::scaled(12, w));
     cancel_font.setWeight(QFont::Black);
     util::simple_utils::add_button_text(cancel_button, util::assets::Button::Cancel, QStringLiteral("CANCEL"), cancel_font);
+    cancel_button->setAccessibleName(QStringLiteral("Cancel game installation"));
 
     connect(cancel_button, &QPushButton::clicked, this, [this]()
     {
@@ -90,6 +92,7 @@ void GameInstall::setup_buttons()
     install_font.setPixelSize(util::layout::scaled(12, w));
     install_font.setWeight(QFont::Black);
     util::simple_utils::add_button_text(install_button, util::assets::Button::Install, QStringLiteral("INSTALL"), install_font);
+    install_button->setAccessibleName(QStringLiteral("Install game"));
 
     connect(install_button, &QPushButton::clicked, this, [this]()
     {
@@ -104,6 +107,7 @@ void GameInstall::setup_buttons()
     change_path_button->setCursor(Qt::PointingHandCursor);
     change_path_button->setStyleSheet(util::styles::k_link_blue_lg);
     change_path_button->setGeometry(util::layout::install_modal::change_path_button(w));
+    change_path_button->setAccessibleName(QStringLiteral("Change game installation path"));
 
     connect(change_path_button, &QPushButton::clicked, this, [this]
     {
@@ -243,9 +247,15 @@ void GameInstall::paint_content(QPainter& painter)
     note_font.setWeight(QFont::Medium);
     painter.setFont(note_font);
     painter.setPen(util::colors::k_text_caption);
-    painter.drawText(util::layout::install_modal::changepath_line(w),
+    const QRect change_path_hit = util::layout::install_modal::change_path_button(w);
+    const QRect disk_space_line = util::layout::install_modal::changepath_line(w)
+        .adjusted(change_path_hit.width() + util::layout::scaled(8, w), 0, 0, 0);
+    const QString disk_space_text = painter.fontMetrics().elidedText(
+        util::i18n::translate("~ 2 GB of free disk space required."),
+        Qt::ElideLeft, qMax(1, disk_space_line.width()));
+    painter.drawText(disk_space_line,
                      Qt::AlignRight | Qt::AlignVCenter,
-                     util::i18n::translate("~ 2 GB of free disk space required."));
+                     disk_space_text);
 
     if (show_warning)
     {

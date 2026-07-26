@@ -1,6 +1,7 @@
 #include "widgets/ImageDropdown.hpp"
 
 #include <QFocusEvent>
+#include <QFontMetrics>
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPainter>
@@ -24,13 +25,17 @@ ImageDropdown::ImageDropdown(QStringList options, QWidget* parent)
     }
 
     setFocusPolicy(Qt::StrongFocus);
+    setMouseTracking(true);
+    setCursor(Qt::PointingHandCursor);
     setAccessibleName(QStringLiteral("Selection menu"));
+    setAccessibleDescription(items.value(current));
     setFixedSize(dd::box(window()->size()));
     connect(&util::i18n::LanguageManager::instance(),
             &util::i18n::LanguageManager::language_changed,
             this, [this]()
     {
         setAccessibleName(util::i18n::translate("Selection menu"));
+        setAccessibleDescription(util::i18n::translate(items.value(current)));
         update();
     });
 }
@@ -82,6 +87,7 @@ void ImageDropdown::set_open(const bool value)
     else
     {
         open = false;
+        hovered_slot = -1;
         setFixedSize(box);
         if (opens_upward)
             move(closed_position);
@@ -94,6 +100,7 @@ void ImageDropdown::set_index(const int i)
     if (i < 0 || i >= items.size() || i == current)
         return;
     current = i;
+    setAccessibleDescription(util::i18n::translate(items.value(current)));
     update();
     emit changed(current);
 }
@@ -126,6 +133,7 @@ void ImageDropdown::mousePressEvent(QMouseEvent* event)
             if (option_rect(slot).contains(event->pos()))
             {
                 current = i;
+                setAccessibleDescription(util::i18n::translate(items.value(current)));
                 set_open(false);
                 emit changed(current);
                 event->accept();
@@ -136,6 +144,44 @@ void ImageDropdown::mousePressEvent(QMouseEvent* event)
         set_open(false);
     }
     QWidget::mousePressEvent(event);
+}
+
+
+void ImageDropdown::mouseMoveEvent(QMouseEvent* event)
+{
+    int next_hovered = -1;
+    if (open)
+    {
+        int slot = 0;
+        for (int i = 0; i < items.size(); ++i)
+        {
+            if (i == current)
+                continue;
+            if (option_rect(slot).contains(event->pos()))
+            {
+                next_hovered = slot;
+                break;
+            }
+            ++slot;
+        }
+    }
+
+    if (hovered_slot != next_hovered)
+    {
+        hovered_slot = next_hovered;
+        update();
+    }
+    QWidget::mouseMoveEvent(event);
+}
+
+void ImageDropdown::leaveEvent(QEvent* event)
+{
+    if (hovered_slot != -1)
+    {
+        hovered_slot = -1;
+        update();
+    }
+    QWidget::leaveEvent(event);
 }
 
 void ImageDropdown::keyPressEvent(QKeyEvent* event)
@@ -200,19 +246,34 @@ void ImageDropdown::paintEvent(QPaintEvent*)
                 continue;
             const QRect rect = option_rect(slot++);
             painter.drawPixmap(rect, dropdown_px);
+            if (slot - 1 == hovered_slot)
+            {
+                painter.fillRect(rect.adjusted(util::layout::scaled(5, w),
+                                               util::layout::scaled(4, w),
+                                               -util::layout::scaled(5, w),
+                                               -util::layout::scaled(8, w)),
+                                 QColor(47, 180, 224, 34));
+            }
             painter.setPen(text_col);
-            painter.drawText(rect.adjusted(pad, 0, -pad, -lip),
+            const QRect text_rect = rect.adjusted(pad, 0, -pad, -lip);
+            const QString translated = util::i18n::translate(items[i]);
+            painter.drawText(text_rect,
                              Qt::AlignVCenter | Qt::AlignLeft,
-                             util::i18n::translate(items[i]));
+                             painter.fontMetrics().elidedText(
+                                 translated, Qt::ElideRight, text_rect.width()));
         }
     }
 
     const QRect closed = closed_rect();
     painter.drawPixmap(closed, dropdown_px);
     painter.setPen(text_col);
-    painter.drawText(closed.adjusted(pad, 0, -pad, -lip),
+    const QRect closed_text = closed.adjusted(
+        pad, 0, -util::layout::scaled(52, w), -lip);
+    const QString current_text = util::i18n::translate(items.value(current));
+    painter.drawText(closed_text,
                      Qt::AlignVCenter | Qt::AlignLeft,
-                     util::i18n::translate(items.value(current)));
+                     painter.fontMetrics().elidedText(
+                         current_text, Qt::ElideRight, closed_text.width()));
 
     painter.setPen(QPen(QColor(0xA8, 0x90, 0x78), util::layout::scaled(2, w)));
     const QPoint center = dd::chevron_center(w) + QPoint(0, closed.top());
@@ -226,5 +287,15 @@ void ImageDropdown::paintEvent(QPaintEvent*)
     {
         painter.drawLine(center.x() - arm, center.y() - arm / 2, center.x(), center.y() + arm / 2);
         painter.drawLine(center.x(), center.y() + arm / 2, center.x() + arm, center.y() - arm / 2);
+    }
+
+    if (hasFocus())
+    {
+        QPen focus_pen(QColor(47, 180, 224), qMax(1, util::layout::scaled(2, w)));
+        painter.setPen(focus_pen);
+        painter.setBrush(Qt::NoBrush);
+        painter.drawRoundedRect(closed.adjusted(1, 1, -2, -2),
+                                util::layout::scaled(7, w),
+                                util::layout::scaled(7, w));
     }
 }

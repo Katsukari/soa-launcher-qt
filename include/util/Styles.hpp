@@ -25,6 +25,8 @@ namespace util::styles
         "    font-size: 11px;"
         "}"
         "QPushButton:hover { background: #E6DCD0; }"
+        "QPushButton:pressed { background: #C9BBAA; }"
+        "QPushButton:disabled { background: #E7E0D8; color: #9E8E7E; }"
         "QPushButton:focus { border: 2px solid #2FB4E0; }";
 
     inline constexpr const char* k_primary_button =
@@ -39,6 +41,8 @@ namespace util::styles
         "    font-size: 11px;"
         "}"
         "QPushButton:hover { background: #4FC4EF; }"
+        "QPushButton:pressed { background: #168EB8; }"
+        "QPushButton:disabled { background: #D8CDC0; color: #9E8E7E; }"
         "QPushButton:focus { border: 2px solid #4F1717; }";
 
     inline constexpr const char* k_flat_transparent =
