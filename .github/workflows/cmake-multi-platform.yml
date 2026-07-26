@@ -59,7 +59,8 @@ jobs:
             libxkbcommon-x11-0 \
             ninja-build \
             patchelf \
-            wget
+            wget \
+            xvfb
 
       - name: Install macOS build dependencies
         if: runner.os == 'macOS'
@@ -100,9 +101,63 @@ jobs:
 
       - name: Build Linux AppImage
         if: runner.os == 'Linux' && matrix.cpp_compiler == 'g++'
+        shell: bash
         env:
           QMAKE: ${{ env.QT_ROOT_DIR }}/bin/qmake
-        run: ./packaging/build-appimage.sh
+        run: |
+          set +e
+          ./packaging/build-appimage.sh
+          build_status=$?
+          set -e
+
+          output="${GITHUB_WORKSPACE}/packaging/Story_Of_Alicia-x86_64.AppImage"
+
+          if [ ! -s "$output" ]; then
+            echo "::error::The AppImage build failed with exit code ${build_status}, and no usable AppImage was created."
+            exit "${build_status:-1}"
+          fi
+
+          chmod +x "$output"
+
+          if [ "$build_status" -ne 0 ]; then
+            echo "::warning::build-appimage.sh returned exit code ${build_status}, but appimagetool successfully created the AppImage. Running independent validation."
+          fi
+
+          outer_isa="$(readelf -nW "$output" 2>/dev/null | grep -E 'x86 ISA needed|x86 feature needed' || true)"
+          if grep -qE 'x86-64-v[234]' <<< "$outer_isa"; then
+            echo "::error::The AppImage runtime requires a nonportable x86-64 ISA level."
+            printf '%s\n' "$outer_isa"
+            exit 1
+          fi
+
+          rm -rf "${GITHUB_WORKSPACE}/packaging/squashfs-root"
+          (
+            cd "${GITHUB_WORKSPACE}/packaging"
+            APPIMAGE_EXTRACT_AND_RUN=1 "$output" --appimage-extract >/dev/null
+          )
+
+          "${GITHUB_WORKSPACE}/packaging/check-linux-portability.sh"             "${GITHUB_WORKSPACE}/packaging/squashfs-root"
+
+          smoke_root="$(mktemp -d)"
+          smoke_log="$(mktemp)"
+          mkdir -p             "$smoke_root/home"             "$smoke_root/config"             "$smoke_root/data"             "$smoke_root/cache"             "$smoke_root/runtime"
+
+          set +e
+          timeout 8 env             HOME="$smoke_root/home"             XDG_CONFIG_HOME="$smoke_root/config"             XDG_DATA_HOME="$smoke_root/data"             XDG_CACHE_HOME="$smoke_root/cache"             XDG_RUNTIME_DIR="$smoke_root/runtime"             QT_QPA_PLATFORM=xcb             xvfb-run -a -s "-screen 0 1280x800x24"             "${GITHUB_WORKSPACE}/packaging/squashfs-root/AppRun"             >"$smoke_log" 2>&1
+          smoke_status=$?
+          set -e
+
+          if [ "$smoke_status" -ne 0 ] && [ "$smoke_status" -ne 124 ]; then
+            cat "$smoke_log"
+            rm -rf "$smoke_root" "${GITHUB_WORKSPACE}/packaging/squashfs-root"
+            rm -f "$smoke_log"
+            exit "$smoke_status"
+          fi
+
+          rm -rf "$smoke_root" "${GITHUB_WORKSPACE}/packaging/squashfs-root"
+          rm -f "$smoke_log"
+
+          echo "Validated AppImage: $output"
 
       - name: Upload Linux AppImage
         if: runner.os == 'Linux' && matrix.cpp_compiler == 'g++'
