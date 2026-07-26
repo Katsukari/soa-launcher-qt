@@ -138,10 +138,13 @@ namespace util::layout
         QRect tab_rect(const QSize win, int i, const bool expanded)
         {
             const QRect box = box_rect(win, expanded);
-            const QSize t   = tab(win);
-            const int   x   = box.left() + tab_inset(win) + i * (t.width() + tab_gap(win));
-            const int   y   = box.top() - t.height() + tab_overlap(win);
-            return { x, y, t.width(), t.height() };
+            const QSize t = tab(win);
+            const int gap = tab_gap(win);
+            const int group_width = t.width() * 3 + gap * 2;
+            const int x = box.left() + (box.width() - group_width) / 2
+                + i * (t.width() + gap);
+            const int y = box.top() - t.height() + tab_overlap(win);
+            return {x, y, t.width(), t.height()};
         }
 
         QRect row_title(const QSize win, const int y)

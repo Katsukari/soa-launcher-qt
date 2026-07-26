@@ -267,24 +267,21 @@ QPushButton* LauncherDialog::add_action(const Action& action)
                 "QPushButton { background: #20ACDA; color: #FFFFFF;"
                 "border: 1px solid #1198C5; border-radius: 8px; padding: 9px 18px; }"
                 "QPushButton:hover { background: #39BCE7; border-color: #168BB0; }"
-                "QPushButton:pressed { background: #168EB8; }"
-                "QPushButton:focus { border: 2px solid #4F1717; }"));
+                "QPushButton:pressed { background: #168EB8; }"));
             break;
         case ActionStyle::Neutral:
             button->setStyleSheet(QStringLiteral(
                 "QPushButton { background: rgba(255,255,255,210); color: #4F1717;"
                 "border: 1px solid rgba(79,23,23,72); border-radius: 8px; padding: 9px 18px; }"
                 "QPushButton:hover { background: #EEE0D7; border-color: rgba(79,23,23,125); }"
-                "QPushButton:pressed { background: #DDC9BD; }"
-                "QPushButton:focus { border: 2px solid #2FB4E0; }"));
+                "QPushButton:pressed { background: #DDC9BD; }"));
             break;
         case ActionStyle::Destructive:
             button->setStyleSheet(QStringLiteral(
                 "QPushButton { background: #E84B24; color: #FFFFFF;"
                 "border: 1px solid #C83515; border-radius: 8px; padding: 9px 18px; }"
                 "QPushButton:hover { background: #F15F38; border-color: #B92D10; }"
-                "QPushButton:pressed { background: #C93616; }"
-                "QPushButton:focus { border: 2px solid #4F1717; }"));
+                "QPushButton:pressed { background: #C93616; }"));
             break;
     }
     connect(button, &QPushButton::clicked, this, [this, result = action.result]()
@@ -296,7 +293,6 @@ QPushButton* LauncherDialog::add_action(const Action& action)
     if (action.is_default)
     {
         button->setDefault(true);
-        button->setFocus();
     }
     retranslate();
     return button;

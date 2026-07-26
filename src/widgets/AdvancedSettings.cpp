@@ -2,6 +2,7 @@
 #include "widgets/ImageDropdown.hpp"
 #include "util/Assets.hpp"
 #include "util/Layout.hpp"
+#include "util/LanguageManager.hpp"
 #include "util/SimpleUtils.hpp"
 #include "util/Styles.hpp"
 #include "util/Config.hpp"
@@ -11,8 +12,8 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QFileDialog>
-
-#include "util/LanguageManager.hpp"
+#include <QFileInfo>
+#include <QDir>
 using util::config::Config;
 namespace ls = util::layout::settings;
 namespace aset = util::layout::advanced_settings;
@@ -20,7 +21,7 @@ namespace aset = util::layout::advanced_settings;
 namespace
 {
 #if defined(Q_OS_MACOS)
-    constexpr int kAdvancedRowCount = 5;
+    constexpr int kAdvancedRowCount = 4;
 #else
     constexpr int kAdvancedRowCount = 3;
 #endif
@@ -33,8 +34,9 @@ AdvancedSettings::AdvancedSettings(QWidget* parent) : QWidget(parent)
 #if defined(Q_OS_MACOS)
     setup_macos_compatibility_option();
     setup_macos_deep_diagnostics_option();
+#else
+    setup_umu_runner_option();
 #endif
-    setup_repair_option();
 }
 void AdvancedSettings::setup_game_path_option()
 {
@@ -230,47 +232,83 @@ void AdvancedSettings::setup_macos_deep_diagnostics_option()
 #endif
 }
 
-void AdvancedSettings::setup_repair_option()
+
+void AdvancedSettings::setup_umu_runner_option()
 {
+#if !defined(Q_OS_MACOS)
     const QSize w = window()->size();
-    const int y = aset::row(kAdvancedRowCount - 1, kAdvancedRowCount);
+    const int y = aset::row(2, kAdvancedRowCount);
     util::simple_utils::make_label_block(
         this, w, y,
-        "VERIFY AND REPAIR GAME",
-        "Check the selected game's manifest and redownload missing or damaged files.");
+        "UMU-RUNNER EXECUTABLE",
+        "Optional custom umu-run executable used when launching Proton.");
 
-    const auto& asset = util::assets::button(util::assets::Button::Repair);
-    const QSize button_size = util::layout::scaled(asset.normal.size(), w);
-    const QPoint control_pos = ls::ctrl_pos(w, y);
-    const int x = control_pos.x() + (ls::ctrl_w(w) - button_size.width()) / 2;
+    umu_path_field = new QLineEdit(this);
+    umu_path_field->setText(Config::instance().umu_binary());
+    umu_path_field->setPlaceholderText(util::i18n::translate("Auto-detect umu-run"));
+    umu_path_field->setProperty("soa_i18n_placeholder_source", QStringLiteral("Auto-detect umu-run"));
+    umu_path_field->setAccessibleName(QStringLiteral("Custom umu-run executable"));
+    umu_path_field->setStyleSheet(util::styles::k_field);
+    umu_path_field->setGeometry(ls::field_rect(w, y));
 
-    repair_button = util::simple_utils::make_flat_button(this);
-    repair_button->setText(QString{});
-    repair_button->setIcon(QIcon(asset.normal));
-    repair_button->setIconSize(button_size);
-    repair_button->setGeometry(x, control_pos.y(), button_size.width(), button_size.height());
-    QFont repair_font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
-    repair_font.setPixelSize(util::layout::scaled(11, w));
-    repair_font.setWeight(QFont::Black);
-    util::simple_utils::add_button_text(repair_button, util::assets::Button::Repair, QStringLiteral("REPAIR FILES"), repair_font);
-    repair_button->setEnabled(Config::instance().game_installed());
-    repair_button->setAccessibleName(QStringLiteral("Verify and repair selected game"));
-    repair_button->installEventFilter(this);
+    auto* browse = new QPushButton("...", this);
+    browse->setCursor(Qt::PointingHandCursor);
+    browse->setStyleSheet(util::styles::k_neutral_button);
+    browse->setGeometry(ls::browse_rect(w, y));
+    browse->setAccessibleName(QStringLiteral("Choose custom umu-run executable"));
 
-    connect(repair_button, &QPushButton::clicked, this, &AdvancedSettings::repair_requested);
-    connect(&Config::instance(), &Config::changed, repair_button, [this]()
+    const auto accept_path = [this](const QString& path)
     {
-        repair_button->setEnabled(Config::instance().game_installed());
+        const QString candidate = path.trimmed();
+        if (candidate.isEmpty())
+        {
+            Config::instance().set_umu_binary(QString());
+            umu_path_field->clear();
+            return true;
+        }
+
+        const QFileInfo info(candidate);
+        if (!info.isFile() || !info.isExecutable())
+        {
+            LauncherDialog::warning(
+                this,
+                QStringLiteral("Invalid UMU-Runner Executable"),
+                QStringLiteral("Select an existing executable umu-run file."));
+            umu_path_field->setText(Config::instance().umu_binary());
+            return false;
+        }
+
+        const QString absolute = info.absoluteFilePath();
+        umu_path_field->setText(absolute);
+        Config::instance().set_umu_binary(absolute);
+        return true;
+    };
+
+    connect(browse, &QPushButton::clicked, this, [this, accept_path]()
+    {
+        QString start = Config::instance().umu_binary();
+        if (start.isEmpty())
+            start = QDir::homePath();
+        else
+            start = QFileInfo(start).absolutePath();
+
+        const QString path = QFileDialog::getOpenFileName(
+            this,
+            util::i18n::translate("Select UMU-Runner Executable"),
+            start);
+        if (!path.isEmpty())
+            accept_path(path);
     });
-}
 
-bool AdvancedSettings::eventFilter(QObject* object, QEvent* event)
-{
-    if (object == repair_button && repair_button->isEnabled())
+    connect(umu_path_field, &QLineEdit::editingFinished, this, [this, accept_path]()
     {
-        const auto& asset = util::assets::button(util::assets::Button::Repair);
-        util::simple_utils::apply_button_state(
-            event, repair_button, asset.normal, asset.hover, asset.clicked);
-    }
-    return QWidget::eventFilter(object, event);
+        accept_path(umu_path_field->text());
+    });
+
+    connect(&Config::instance(), &Config::changed, umu_path_field, [this]()
+    {
+        if (!umu_path_field->hasFocus())
+            umu_path_field->setText(Config::instance().umu_binary());
+    });
+#endif
 }

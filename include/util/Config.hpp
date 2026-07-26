@@ -22,6 +22,7 @@ namespace util::config
 
         QString wine_binary() const;
         QString winetricks_binary() const;
+        QString umu_binary() const;
         QString rosetta_x87_path() const;
 
 
@@ -64,6 +65,7 @@ namespace util::config
 
         void set_wine_binary(const QString& value);
         void set_winetricks_binary(const QString& value);
+        void set_umu_binary(const QString& value);
         void set_rosetta_x87_path(const QString& value);
         void set_wine_prefix(const QString& value);
         void set_game_install_path(const QString& value);

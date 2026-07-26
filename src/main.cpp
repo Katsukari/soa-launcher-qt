@@ -14,6 +14,7 @@
 #include <QThread>
 #include <QTimer>
 #include <QUrl>
+#include <QWidget>
 
 #include <utility>
 
@@ -147,6 +148,26 @@ namespace
         void soa_url_opened(const QString& url);
 
     protected:
+        bool notify(QObject* receiver, QEvent* event) override
+        {
+            if (event && (event->type() == QEvent::Polish || event->type() == QEvent::Show))
+            {
+                if (auto* widget = qobject_cast<QWidget*>(receiver))
+                {
+#if defined(Q_OS_MACOS)
+                    widget->setAttribute(Qt::WA_MacShowFocusRect, false);
+#endif
+                    const Qt::FocusPolicy policy = widget->focusPolicy();
+                    if (policy == Qt::TabFocus || policy == Qt::StrongFocus
+                        || policy == Qt::WheelFocus)
+                    {
+                        widget->setFocusPolicy(Qt::ClickFocus);
+                    }
+                }
+            }
+            return QApplication::notify(receiver, event);
+        }
+
         bool event(QEvent* event) override
         {
             if (event->type() != QEvent::FileOpen)
@@ -175,9 +196,7 @@ int main(int argc, char* argv[])
     app.setOrganizationName(QStringLiteral("Story Of Alicia"));
     app.setOrganizationDomain(QStringLiteral("storyofalicia.com"));
     app.setStyleSheet(QStringLiteral(
-        "QPushButton:focus, QToolButton:focus, QCheckBox:focus, QLineEdit:focus, "
-        "QComboBox:focus, QListView:focus, QTreeView:focus { "
-        "border: 2px solid #2FB4E0; }"));
+        "QWidget { outline: none; }"));
 
     QString url = soa_url_from_args(app.arguments());
     if (url.isEmpty())

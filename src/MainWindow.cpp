@@ -3,6 +3,7 @@
 #include "core/auth/AuthHandler.hpp"
 #include "core/discord/DiscordRpc.hpp"
 #include "core/integrity/GameIntegrityWatcher.hpp"
+#include "core/update/LauncherUpdateManager.hpp"
 #include "core/state/InstallState.hpp"
 #include "core/state/ViewRouter.hpp"
 #include "core/wine/Shell.hpp"
@@ -24,6 +25,7 @@
 #include "widgets/LauncherLog.hpp"
 #include "widgets/LauncherInfoDialog.hpp"
 #include "widgets/LauncherDialog.hpp"
+#include "widgets/LauncherUpdate.hpp"
 
 #include <QAction>
 #include <QActionGroup>
@@ -44,6 +46,7 @@
 #include <QToolButton>
 #include <QTimer>
 #include <QWindow>
+#include <spdlog/spdlog.h>
 
 using core::game::GameVersion;
 using core::state::Stage;
@@ -135,6 +138,7 @@ MainWindow::MainWindow(QWidget* parent)
     setup_wine_install();
     setup_game_install();
     setup_wine_select();
+    setup_launcher_updates();
 
     connect(install_state, &core::state::InstallState::stage_changed,
             this, &MainWindow::on_stage_changed);
@@ -208,10 +212,10 @@ MainWindow::MainWindow(QWidget* parent)
         show_launcher();
     });
 
-    install_state->probe();
-    shell->detect_existing_game();
     refresh_tray_actions();
     raise_persistent_controls();
+    QTimer::singleShot(0, launcher_update_manager,
+                       &core::update::LauncherUpdateManager::check_for_updates);
 
     connect(&util::i18n::LanguageManager::instance(),
             &util::i18n::LanguageManager::language_changed, this,
@@ -494,9 +498,12 @@ void MainWindow::raise_persistent_controls()
         launcher_menu_panel->raise();
     if (launcher_menu_button)
     {
-        launcher_menu_button->show();
-        launcher_menu_button->raise();
+        launcher_menu_button->setVisible(!chrome_hidden);
+        if (!chrome_hidden)
+            launcher_menu_button->raise();
     }
+    if (chrome_hidden && launcher_menu_panel)
+        launcher_menu_panel->hide();
     if (!chrome_hidden)
     {
         if (close_button) close_button->raise();
@@ -588,25 +595,7 @@ void MainWindow::setup_settings()
     {
         on_overlay_closed(settings);
     });
-    connect(settings, &Settings::repair_requested, this, [this]()
-    {
-        const Stage stage = install_state->stage();
-        if (repair_active || (shell && shell->is_busy())
-            || stage == Stage::Launching || stage == Stage::Running
-            || stage == Stage::Downloading || stage == Stage::Updating
-            || stage == Stage::SettingUpPrefix)
-        {
-            show_modeless_message(
-                this, LauncherDialog::Tone::Warning, QStringLiteral("Repair Unavailable"),
-                QStringLiteral(
-                    "Verify and repair is disabled while Alicia or another launcher "
-                    "operation is active."));
-            return;
-        }
-        close_overlay(settings);
-        repair_files->refresh();
-        open_overlay(repair_files);
-    });
+
 }
 
 void MainWindow::open_launcher_settings()
@@ -645,8 +634,8 @@ void MainWindow::setup_rules()
 
     connect(rules_agreement, &RulesAgreement::accepted, this, [this]()
     {
-        close_overlay(rules_agreement);
         Config::instance().set_rules_accepted(true);
+        close_overlay(rules_agreement);
     });
 }
 
@@ -855,6 +844,81 @@ void MainWindow::setup_wine_select()
     {
         on_overlay_closed(wine_select);
     });
+}
+
+
+void MainWindow::setup_launcher_updates()
+{
+    launcher_update_manager = new core::update::LauncherUpdateManager(this);
+    launcher_update = new LauncherUpdate(this);
+    launcher_update->hide();
+
+    connect(launcher_update_manager,
+            &core::update::LauncherUpdateManager::no_update_available,
+            this, &MainWindow::continue_after_launcher_update_check);
+    connect(launcher_update_manager,
+            &core::update::LauncherUpdateManager::check_failed,
+            this, [this](const QString& reason)
+    {
+        SPDLOG_WARN("launcher update check skipped: {}", reason.toStdString());
+        continue_after_launcher_update_check();
+    });
+    connect(launcher_update_manager,
+            &core::update::LauncherUpdateManager::update_found,
+            this, [this]()
+    {
+        launcher_update->set_release(
+            launcher_update_manager->available_version(),
+            launcher_update_manager->update_required(),
+            launcher_update_manager->release_message());
+        open_overlay(launcher_update);
+    });
+    connect(launcher_update, &LauncherUpdate::postponed, this, [this]()
+    {
+        close_overlay(launcher_update);
+        continue_after_launcher_update_check();
+    });
+    connect(launcher_update, &LauncherUpdate::update_requested,
+            launcher_update_manager,
+            &core::update::LauncherUpdateManager::download_and_install);
+    connect(launcher_update_manager,
+            &core::update::LauncherUpdateManager::download_started,
+            this, [this]()
+    {
+        launcher_update->set_downloading(true);
+    });
+    connect(launcher_update_manager,
+            &core::update::LauncherUpdateManager::download_progress,
+            launcher_update, &LauncherUpdate::set_progress);
+    connect(launcher_update_manager,
+            &core::update::LauncherUpdateManager::update_failed,
+            this, [this](const QString& reason)
+    {
+        launcher_update->set_downloading(false);
+        LauncherDialog::error(
+            this,
+            QStringLiteral("Launcher Update Failed"),
+            reason,
+            QStringLiteral("The existing launcher was not removed. Check the launcher log and try again."));
+    });
+    connect(launcher_update_manager,
+            &core::update::LauncherUpdateManager::installer_started,
+            this, [this](const QString&)
+    {
+        launcher_update->set_starting_installer();
+        QTimer::singleShot(350, this, &MainWindow::request_quit);
+    });
+}
+
+void MainWindow::continue_after_launcher_update_check()
+{
+    if (launcher_update_check_complete)
+        return;
+    launcher_update_check_complete = true;
+    install_state->probe();
+    shell->detect_existing_game();
+    refresh_tray_actions();
+    raise_persistent_controls();
 }
 
 void MainWindow::set_game_version(const GameVersion version)
@@ -1154,6 +1218,7 @@ void MainWindow::closeEvent(QCloseEvent* event)
     const bool gameRunning = shell && shell->is_game_running();
     const bool operationActive = gameRunning
         || repair_active
+        || (launcher_update && launcher_update->busy())
         || (shell && shell->is_busy())
         || (install_state && (install_state->stage() == core::state::Stage::Downloading
             || install_state->stage() == core::state::Stage::Updating

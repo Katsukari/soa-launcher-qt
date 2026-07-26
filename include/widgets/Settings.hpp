@@ -23,8 +23,6 @@ class Settings : public util::modal_overlay::ModalOverlay
         explicit Settings(core::wine::Shell* shell, QWidget* parent = nullptr);
         void set_mutation_enabled(bool enabled, const QString& reason = {});
 
-    signals:
-        void repair_requested();
 
     protected:
         void paint_content(QPainter& painter) override;

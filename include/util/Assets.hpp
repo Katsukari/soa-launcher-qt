@@ -17,6 +17,7 @@ namespace util::assets
         BoxNote,
         BoxNote2,
         BoxSettings,
+        BoxUpdate,
         BoxWaitingForAuth,
         CloseIcon,
         CloseNormal,

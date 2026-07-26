@@ -45,15 +45,13 @@ namespace
         " border:1px solid #159FC8; border-radius:6px; color:white; }"
         "QPushButton:hover { background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #77E2FF,stop:1 #18B9E8); }"
         "QPushButton:pressed { background:#0798C5; }"
-        "QPushButton:disabled { background:#D8CDC0; border-color:#C9BBAA; color:#9E8E7E; }"
-        "QPushButton:focus { border:2px solid #4F1717; }";
+        "QPushButton:disabled { background:#D8CDC0; border-color:#C9BBAA; color:#9E8E7E; }";
 
     const char* k_secondary_style =
         "QPushButton { background:rgba(255,255,255,0.72); border:1px solid #C9BBAA;"
         " border-radius:6px; color:#4F1717; }"
         "QPushButton:hover { border-color:#2FB4E0; background:rgba(255,255,255,0.94); }"
-        "QPushButton:pressed { background:#EAF7FC; }"
-        "QPushButton:focus { border:2px solid #2FB4E0; }";
+        "QPushButton:pressed { background:#EAF7FC; }";
 
     int runtime_score(const core::wine::WineInstall& runtime)
     {

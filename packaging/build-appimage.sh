@@ -144,35 +144,20 @@ fi
 
 export EXCLUDE_QT_PLUGINS="imageformats/kimg_jxr.so;imageformats/kimg_heif.so;imageformats/kimg_avif.so;imageformats/kimg_jp2.so;imageformats/kimg_exr.so;imageformats/kimg_dds.so;imageformats/kimg_eps.so;imageformats/kimg_ff.so;imageformats/kimg_hdr.so;imageformats/kimg_jxl.so;imageformats/kimg_psd.so;imageformats/kimg_pcx.so;imageformats/kimg_ras.so;imageformats/kimg_rgb.so;imageformats/kimg_tga.so;imageformats/kimg_xcf.so;imageformats/kimg_pic.so;imageformats/kimg_qoi.so"
 
-OUTPUT="$SCRIPT_DIR/Story_Of_Alicia-x86_64.AppImage"
-
-rm -f "$OUTPUT"
-
-if ./linuxdeploy-x86_64.AppImage \
+./linuxdeploy-x86_64.AppImage \
   --appdir "$APPDIR" \
   --plugin qt \
   --output appimage \
   --desktop-file "$APPDIR/usr/share/applications/soa-launcher.desktop" \
   --icon-file "$APPDIR/usr/share/icons/hicolor/256x256/apps/soa-launcher.png"
-then
-  LINUXDEPLOY_STATUS=0
-else
-  LINUXDEPLOY_STATUS=$?
-fi
-
-if [ ! -s "$OUTPUT" ]; then
-  echo "linuxdeploy returned exit code $LINUXDEPLOY_STATUS and did not create a usable AppImage:" >&2
-  echo "$OUTPUT" >&2
-  exit "$LINUXDEPLOY_STATUS"
-fi
-
-if [ "$LINUXDEPLOY_STATUS" -ne 0 ]; then
-  echo "linuxdeploy returned exit code $LINUXDEPLOY_STATUS, but successfully created:" >&2
-  echo "$OUTPUT" >&2
-  echo "Continuing with portability and smoke tests." >&2
-fi
 
 run_portability_check "$APPDIR"
+
+OUTPUT="$SCRIPT_DIR/Story_Of_Alicia-x86_64.AppImage"
+if [ ! -f "$OUTPUT" ]; then
+  echo "The expected AppImage was not produced: $OUTPUT" >&2
+  exit 1
+fi
 
 if [ "${SOA_ALLOW_NONPORTABLE_LOCAL_BUILD:-0}" != "1" ]; then
   outer_isa="$(readelf -nW "$OUTPUT" 2>/dev/null | grep -E 'x86 ISA needed|x86 feature needed' || true)"

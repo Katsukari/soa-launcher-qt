@@ -62,9 +62,7 @@ void Settings::setup_pages()
         update_panel_geometry();
     });
     stack->addWidget(new WineSettings(shell, stack));
-    auto* advanced = new AdvancedSettings(stack);
-    stack->addWidget(advanced);
-    connect(advanced, &AdvancedSettings::repair_requested, this, &Settings::repair_requested);
+    stack->addWidget(new AdvancedSettings(stack));
     stack->setCurrentIndex(0);
 }
 
@@ -194,12 +192,5 @@ void Settings::paint_content(QPainter& painter)
         painter.fillPath(p, on ? active : inactive);
         painter.setPen(on ? textCol : textCol.lighter(140));
         painter.drawText(r, Qt::AlignCenter, util::i18n::translate(labels[i]));
-        if (tab_buttons[i] && tab_buttons[i]->hasFocus())
-        {
-            painter.setBrush(Qt::NoBrush);
-            painter.setPen(QPen(QColor(0x2F, 0xB4, 0xE0),
-                                qMax(1, util::layout::scaled(2, w))));
-            painter.drawRoundedRect(r.adjusted(1, 1, -2, -2), radius, radius);
-        }
     }
 }

@@ -24,6 +24,10 @@ namespace core::integrity
 {
     class GameIntegrityWatcher;
 }
+namespace core::update
+{
+    class LauncherUpdateManager;
+}
 namespace core::discord
 {
     class DiscordRpc;
@@ -46,6 +50,7 @@ class GameInstall;
 class DownloadProgress;
 class WineSelectMenu;
 class WineInstall;
+class LauncherUpdate;
 class AuthHandler;
 
 class MainWindow : public QWidget
@@ -84,6 +89,8 @@ private:
     void setup_wine_install();
     void setup_game_install();
     void setup_wine_select();
+    void setup_launcher_updates();
+    void continue_after_launcher_update_check();
     void set_game_version(core::game::GameVersion version);
     void refresh_game_selector();
     void set_game_switching_enabled(core::state::Stage stage);
@@ -110,6 +117,7 @@ private:
     bool repair_active {};
     bool minimized_for_game {};
     bool force_quit_requested {};
+    bool launcher_update_check_complete {};
     QSystemTrayIcon* tray_icon {};
     QMenu* tray_menu {};
     QAction* open_launcher_action {};
@@ -137,10 +145,12 @@ private:
     GameInstall* game_install {};
     DownloadProgress* repair_progress {};
     WineSelectMenu* wine_select {};
+    LauncherUpdate* launcher_update {};
     core::wine::Shell* shell {};
     AuthHandler* auth {};
     core::state::InstallState* install_state {};
     core::integrity::GameIntegrityWatcher* integrity_watcher {};
+    core::update::LauncherUpdateManager* launcher_update_manager {};
     core::discord::DiscordRpc* discord_rpc {};
     core::game::GameVersion game_version {core::game::GameVersion::Playtest};
     core::state::View last_view {core::state::View::Loading};

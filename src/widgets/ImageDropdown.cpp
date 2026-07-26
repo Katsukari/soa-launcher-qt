@@ -24,7 +24,7 @@ ImageDropdown::ImageDropdown(QStringList options, QWidget* parent)
         setEnabled(false);
     }
 
-    setFocusPolicy(Qt::StrongFocus);
+    setFocusPolicy(Qt::ClickFocus);
     setMouseTracking(true);
     setCursor(Qt::PointingHandCursor);
     setAccessibleName(QStringLiteral("Selection menu"));
@@ -289,13 +289,4 @@ void ImageDropdown::paintEvent(QPaintEvent*)
         painter.drawLine(center.x(), center.y() + arm / 2, center.x() + arm, center.y() - arm / 2);
     }
 
-    if (hasFocus())
-    {
-        QPen focus_pen(QColor(47, 180, 224), qMax(1, util::layout::scaled(2, w)));
-        painter.setPen(focus_pen);
-        painter.setBrush(Qt::NoBrush);
-        painter.drawRoundedRect(closed.adjusted(1, 1, -2, -2),
-                                util::layout::scaled(7, w),
-                                util::layout::scaled(7, w));
-    }
 }

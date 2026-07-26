@@ -1,23 +1,43 @@
 #include "widgets/RulesAgreement.hpp"
-#include "util/LanguageManager.hpp"
 
 #include "util/Assets.hpp"
-#include "util/Colors.hpp"
+#include "util/LanguageManager.hpp"
 #include "util/Layout.hpp"
 #include "util/SimpleUtils.hpp"
 
-#include <QCheckBox>
+#include <QDesktopServices>
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
 #include <QFrame>
+#include <QFontMetrics>
 #include <QIcon>
+#include <QLabel>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QNetworkRequest>
 #include <QPainter>
 #include <QPushButton>
+#include <QRegularExpression>
+#include <QSaveFile>
 #include <QScrollBar>
 #include <QShowEvent>
+#include <QStandardPaths>
 #include <QTextBrowser>
+#include <QTimer>
+#include <QUrl>
+#include <QUrlQuery>
+
+#include <spdlog/spdlog.h>
+
+#ifndef SOA_RULES_DOCUMENT_URL
+#define SOA_RULES_DOCUMENT_URL "https://docs.google.com/document/d/1vry3ZuDtzdS_mX1P2udWlb8z2Q9Atr3p1THZdtZ2EHA/export?format=html"
+#endif
 
 namespace
 {
     constexpr QSize k_box_size {667, 635};
+    constexpr int k_accept_cooldown_seconds = 10;
 
     QRect box_rect(const QSize window_size)
     {
@@ -26,16 +46,26 @@ namespace
 
     QRect local_rect(const QSize window_size, const QRect source)
     {
-        const QRect box = box_rect(window_size);
-        return util::layout::scaled(source, window_size).translated(box.topLeft());
+        return util::layout::scaled(source, window_size).translated(box_rect(window_size).topLeft());
     }
 
-    const char* k_checkbox_style =
-        "QCheckBox { color:#4F1717; font-family:'Inter'; font-size:14px; spacing:10px; }"
-        "QCheckBox::indicator { width:24px; height:24px; }"
-        "QCheckBox::indicator:unchecked { image:url(:/assets/checkbox.png); }"
-        "QCheckBox::indicator:checked { image:url(:/assets/checkbox-ticked.png); }"
-        "QCheckBox:focus { border:1px solid #2FB4E0; border-radius:3px; }";
+    void fit_button_label(QLabel* label, const int base_size)
+    {
+        if (!label)
+            return;
+        QFont font = label->font();
+        int size = base_size;
+        const int available = qMax(1, label->width() - 12);
+        while (size > 10)
+        {
+            font.setPixelSize(size);
+            if (QFontMetrics(font).horizontalAdvance(label->text()) <= available)
+                break;
+            --size;
+        }
+        font.setPixelSize(size);
+        label->setFont(font);
+    }
 }
 
 RulesAgreement::RulesAgreement(QWidget* parent)
@@ -55,39 +85,89 @@ void RulesAgreement::setup_controls()
 {
     const QSize w = window()->size();
 
+    network = new QNetworkAccessManager(this);
+    request_timeout = new QTimer(this);
+    request_timeout->setSingleShot(true);
+    cooldown_timer = new QTimer(this);
+    cooldown_timer->setInterval(1000);
+
     rules_text = new QTextBrowser(this);
-    rules_text->setGeometry(local_rect(w, {54, 94, 559, 390}));
+    rules_text->setGeometry(local_rect(w, {20, 35, 597, 483}));
     rules_text->setFrameShape(QFrame::NoFrame);
-    rules_text->setOpenExternalLinks(true);
-    rules_text->setStyleSheet(
-        "QTextBrowser { background:rgba(255,255,255,0.22); color:#392518; padding:18px; "
-        "font-family:'Inter'; font-size:13px; border-radius:8px; }"
-        "QScrollBar:vertical { width:10px; background:#E4DED9; margin:2px; }"
-        "QScrollBar::handle:vertical { background:#B0A297; border-radius:3px; min-height:24px; }"
-        "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0px; }");
-    accepted_box = new QCheckBox(this);
-    accepted_box->setStyleSheet(k_checkbox_style);
-    accepted_box->setGeometry(local_rect(w, {66, 492, 535, 48}));
-    accepted_box->setAccessibleName(QStringLiteral("Accept Story of Alicia rules"));
-    connect(accepted_box, &QCheckBox::toggled, this, [this]() { update_agree_button(); });
+    rules_text->setOpenLinks(false);
+    rules_text->setOpenExternalLinks(false);
+    rules_text->setStyleSheet(QStringLiteral(
+        "QTextBrowser { background:transparent; color:#392518; padding:32px 16px 16px 48px; "
+        "font-family:'Inter'; font-size:13px; border:0px; }"
+        "QScrollBar:vertical { width:6px; background:#E4DED9; margin:35px 0px 0px 0px; }"
+        "QScrollBar::handle:vertical { background:#B0A297; border-radius:3px; min-height:28px; }"
+        "QScrollBar::handle:vertical:hover { background:#9A8A7E; }"
+        "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0px; }"));
 
     agree_button = util::simple_utils::make_flat_button(this);
-    const auto& agree = util::assets::button(util::assets::Button::Agree);
-    const QSize agree_size = util::layout::scaled(agree.normal.size(), w);
+    const QSize agree_size = util::layout::scaled(
+        util::assets::translated_buttons[util::assets::Button::Agree].normal.size(), w);
     const QRect box = box_rect(w);
     agree_button->setGeometry(box.center().x() - agree_size.width() / 2,
                               box.bottom() - util::layout::scaled(64, w),
                               agree_size.width(), agree_size.height());
     agree_button->setIconSize(agree_size);
+    agree_button->installEventFilter(this);
+    agree_button->setAccessibleName(QStringLiteral("Agree with the rules"));
+
+    agree_button_label = new QLabel(agree_button);
+    agree_button_label->setGeometry(agree_button->rect());
+    agree_button_label->setAlignment(Qt::AlignCenter);
+    agree_button_label->setAttribute(Qt::WA_TransparentForMouseEvents);
     QFont agree_font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
     agree_font.setPixelSize(util::layout::scaled(12, w));
     agree_font.setWeight(QFont::Black);
-    util::simple_utils::add_button_text(agree_button, util::assets::Button::Agree, QStringLiteral("I AGREE WITH THE RULES"), agree_font);
-    agree_button->setAccessibleName(QStringLiteral("Agree with the rules"));
-    agree_button->installEventFilter(this);
+    agree_button_label->setFont(agree_font);
+    agree_button_label->setStyleSheet(QStringLiteral(
+        "QLabel { color:#FFFFFF; background:transparent; }"
+        "QLabel:disabled { color:#FFFFFF; }"));
+    agree_button_label->raise();
+
+    connect(rules_text->verticalScrollBar(), &QScrollBar::valueChanged, this, [this](const int value)
+    {
+        QScrollBar* bar = rules_text->verticalScrollBar();
+        if (!has_scrolled_to_end && value >= bar->maximum() - util::layout::scaled(60, window()->size()))
+        {
+            has_scrolled_to_end = true;
+            update_agree_button();
+            SPDLOG_INFO("rules document scrolled to end");
+        }
+    });
+    connect(rules_text, &QTextBrowser::anchorClicked, this, [this](const QUrl& url)
+    {
+        if (url.isRelative() || url.scheme().isEmpty())
+        {
+            rules_text->scrollToAnchor(url.fragment().isEmpty() ? url.toString() : url.fragment());
+            return;
+        }
+        QDesktopServices::openUrl(url);
+    });
+    connect(cooldown_timer, &QTimer::timeout, this, [this]()
+    {
+        seconds_remaining = qMax(0, seconds_remaining - 1);
+        if (seconds_remaining == 0)
+            cooldown_timer->stop();
+        update_agree_button();
+    });
+    connect(request_timeout, &QTimer::timeout, this, [this]()
+    {
+        if (reply && reply->isRunning())
+            reply->abort();
+    });
     connect(agree_button, &QPushButton::clicked, this, [this]()
     {
-        if (!accepted_box->isChecked())
+        if (!document_ready)
+        {
+            if (!loading)
+                load_rules();
+            return;
+        }
+        if (seconds_remaining > 0 && !has_scrolled_to_end)
             return;
         hide();
         emit accepted();
@@ -97,96 +177,353 @@ void RulesAgreement::setup_controls()
     update_agree_button();
 }
 
-void RulesAgreement::retranslate_content()
+QString RulesAgreement::rules_url() const
 {
-    const QString heading = util::i18n::translate("Before entering the playtest");
-    const QString authority = util::i18n::translate(
-        "The authoritative Story of Alicia server rules are maintained in the linked document and may be updated by the team.");
-    const QString link = util::i18n::translate(
-        "Open the complete Story of Alicia server rules");
-    const QString acknowledgement = util::i18n::translate(
-        "Your playtest acknowledgement");
-    const QString read_rules = util::i18n::translate(
-        "You have read the complete rules document and agree to obey it while using either game version.");
-    const QString unfinished = util::i18n::translate(
-        "You understand that the game is unfinished, contains bugs, and may change during testing.");
-    const QString access = util::i18n::translate(
-        "You understand that access can be limited or removed when the rules are not followed.");
-    const QString report = util::i18n::translate(
-        "You will report serious problems to the team instead of intentionally abusing them.");
-    const QString storage = util::i18n::translate(
-        "The launcher stores this acceptance in its local configuration so the rules step is not shown on every start. Resetting launcher settings will show it again.");
+    const QString override_url = qEnvironmentVariable("SOA_RULES_DOCUMENT_URL").trimmed();
+    return override_url.isEmpty()
+        ? QString::fromUtf8(SOA_RULES_DOCUMENT_URL).trimmed()
+        : override_url;
+}
 
+QString RulesAgreement::cache_path() const
+{
+    QString root = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    if (root.isEmpty())
+        root = QDir::homePath() + QStringLiteral("/.local/share/Story of Alicia Launcher");
+    QDir().mkpath(root);
+    return QDir(root).filePath(QStringLiteral("rules-document-cache.html"));
+}
+
+bool RulesAgreement::load_cached_document()
+{
+    QFile cache(cache_path());
+    if (!cache.open(QIODevice::ReadOnly))
+        return false;
+    const QByteArray source = cache.readAll();
+    if (source.isEmpty() || source.size() > 4 * 1024 * 1024)
+        return false;
+    document_html = QString::fromUtf8(source);
+    rules_text->setHtml(document_html);
+    document_ready = true;
+    load_error.clear();
+    start_cooldown();
+    return true;
+}
+
+void RulesAgreement::load_rules()
+{
+    if (reply)
+        return;
+
+    const QUrl url(rules_url());
+    if (!url.isValid()
+        || (url.scheme() != QStringLiteral("https")
+            && qEnvironmentVariableIntValue("SOA_ALLOW_INSECURE_RULES_URL") != 1))
+    {
+        show_load_failure(util::i18n::translate("The rules document URL is invalid or insecure."));
+        return;
+    }
+
+    loading = !document_ready;
+    load_error.clear();
+    if (!document_ready)
+    {
+        rules_text->setHtml(QStringLiteral(
+            "<div style='height:330px; display:flex; align-items:center; justify-content:center; "
+            "color:#988776; text-align:center;'>%1</div>")
+            .arg(util::i18n::translate("Loading rules...").toHtmlEscaped()));
+    }
+    update_agree_button();
+
+    QNetworkRequest request(url);
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                         QNetworkRequest::NoLessSafeRedirectPolicy);
+    request.setAttribute(QNetworkRequest::CacheLoadControlAttribute,
+                         QNetworkRequest::AlwaysNetwork);
+    request.setRawHeader("Accept", "text/html,application/xhtml+xml");
+    QNetworkReply* request_reply = network->get(request);
+    reply = request_reply;
+    request_timeout->start(15000);
+    connect(request_reply, &QNetworkReply::finished, this, [this, request_reply]()
+    {
+        finish_rules_request(request_reply);
+    });
+}
+
+void RulesAgreement::finish_rules_request(QNetworkReply* request_reply)
+{
+    request_timeout->stop();
+    reply = nullptr;
+    loading = false;
+    const int status = request_reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    const QNetworkReply::NetworkError network_error = request_reply->error();
+    const QString network_message = request_reply->errorString();
+    const QString final_host = request_reply->url().host().toLower();
+    const QByteArray source = request_reply->readAll();
+    request_reply->deleteLater();
+
+    if (network_error != QNetworkReply::NoError || status < 200 || status >= 300)
+    {
+        if (!document_ready && !load_cached_document())
+        {
+            show_load_failure(status > 0
+                ? util::i18n::translate("The rules server returned HTTP %1.").arg(status)
+                : util::i18n::translate("Failed to load rules: %1").arg(network_message));
+        }
+        else
+        {
+            SPDLOG_WARN("rules refresh failed; cached document retained: {}", network_message.toStdString());
+            update_agree_button();
+        }
+        return;
+    }
+    if (source.isEmpty() || source.size() > 4 * 1024 * 1024)
+    {
+        if (!document_ready)
+            show_load_failure(util::i18n::translate("The rules document was empty or unexpectedly large."));
+        return;
+    }
+    if (final_host.contains(QStringLiteral("accounts.google.com"))
+        || source.toLower().contains("servicelogin"))
+    {
+        if (!document_ready)
+            show_load_failure(util::i18n::translate("The rules document is not publicly accessible."));
+        return;
+    }
+    show_document(source, true);
+}
+
+void RulesAgreement::show_document(const QByteArray& source, const bool save_cache)
+{
+    const QString prepared = prepare_document(source);
+    if (prepared.isEmpty())
+    {
+        show_load_failure(util::i18n::translate("The rules document could not be rendered."));
+        return;
+    }
+
+    document_html = prepared;
+    rules_text->setHtml(document_html);
+    document_ready = true;
+    load_error.clear();
+    rules_text->verticalScrollBar()->setValue(0);
+    start_cooldown();
+
+    if (save_cache)
+    {
+        QSaveFile cache(cache_path());
+        if (cache.open(QIODevice::WriteOnly))
+        {
+            cache.write(document_html.toUtf8());
+            cache.commit();
+        }
+    }
+    update_agree_button();
+    SPDLOG_INFO("rules document rendered in launcher");
+}
+
+void RulesAgreement::show_load_failure(const QString& reason)
+{
+    loading = false;
+    document_ready = false;
+    load_error = reason;
+    const QString link = rules_url();
     rules_text->setHtml(QStringLiteral(
-        "<h2 style='color:#4F1717; margin-top:0;'>%1</h2>"
-        "<p>%2</p>"
-        "<p><a style='color:#2FB4E0; font-weight:700;' href='https://docs.google.com/document/d/1vry3ZuDtzdS_mX1P2udWlb8z2Q9Atr3p1THZdtZ2EHA/edit'>%3</a></p>"
-        "<hr>"
-        "<h3 style='color:#4F1717;'>%4</h3>"
-        "<ul>"
-        "<li>%5</li>"
-        "<li>%6</li>"
-        "<li>%7</li>"
-        "<li>%8</li>"
-        "</ul>"
-        "<p>%9</p>")
-        .arg(heading.toHtmlEscaped())
-        .arg(authority.toHtmlEscaped())
-        .arg(link.toHtmlEscaped())
-        .arg(acknowledgement.toHtmlEscaped())
-        .arg(read_rules.toHtmlEscaped())
-        .arg(unfinished.toHtmlEscaped())
-        .arg(access.toHtmlEscaped())
-        .arg(report.toHtmlEscaped())
-        .arg(storage.toHtmlEscaped()));
+        "<div style='padding:90px 28px; text-align:center; color:#8B2E2E;'>"
+        "<p><b>%1</b></p><p>%2</p><p><a href='%3'>%4</a></p></div>")
+        .arg(util::i18n::translate("Failed to load rules").toHtmlEscaped(),
+             reason.toHtmlEscaped(),
+             link.toHtmlEscaped(),
+             util::i18n::translate("Open the rules in your browser").toHtmlEscaped()));
+    update_agree_button();
+    SPDLOG_ERROR("failed to load rules document: {}", reason.toStdString());
+}
 
-    accepted_box->setText(util::i18n::translate(
-        "I have read and agree to follow the Story of Alicia server rules."));
-    accepted_box->setAccessibleName(util::i18n::translate(
-        "Accept Story of Alicia rules"));
-    agree_button->setAccessibleName(util::i18n::translate(
-        "Agree with the rules"));
-    util::simple_utils::set_button_text(
-        agree_button, QStringLiteral("I AGREE WITH THE RULES"));
+void RulesAgreement::start_cooldown()
+{
+    seconds_remaining = k_accept_cooldown_seconds;
+    has_scrolled_to_end = rules_text->verticalScrollBar()->maximum() <= 0;
+    cooldown_timer->start();
+    update_agree_button();
 }
 
 void RulesAgreement::update_agree_button()
 {
-    const bool enabled = accepted_box && accepted_box->isChecked();
-    util::simple_utils::set_button_loading(agree_button, !enabled);
-    agree_button->setEnabled(enabled);
+    const auto& assets = util::assets::translated_buttons[util::assets::Button::Agree];
+    if (loading)
+    {
+        agree_button->setEnabled(false);
+        set_button_pixmap(assets.loading.isNull() ? assets.normal : assets.loading);
+        set_button_text(QStringLiteral("LOADING RULES..."));
+    }
+    else if (!document_ready)
+    {
+        agree_button->setEnabled(true);
+        set_button_pixmap(assets.normal);
+        set_button_text(QStringLiteral("RETRY"));
+    }
+    else if (seconds_remaining > 0 && !has_scrolled_to_end)
+    {
+        agree_button->setEnabled(false);
+        set_button_pixmap(assets.loading.isNull() ? assets.normal : assets.loading);
+        agree_button_label->setText(util::i18n::translate("PLEASE READ (%1)")
+                                        .arg(seconds_remaining));
+        fit_button_label(agree_button_label, util::layout::scaled(12, window()->size()));
+    }
+    else
+    {
+        agree_button->setEnabled(true);
+        set_button_pixmap(assets.normal);
+        set_button_text(QStringLiteral("I AGREE WITH THE RULES"));
+    }
+    agree_button_label->setEnabled(true);
+    agree_button_label->raise();
 }
 
+void RulesAgreement::retranslate_content()
+{
+    agree_button->setAccessibleName(util::i18n::translate("Agree with the rules"));
+    if (loading && !document_ready)
+    {
+        rules_text->setHtml(QStringLiteral(
+            "<div style='height:330px; display:flex; align-items:center; justify-content:center; "
+            "color:#988776; text-align:center;'>%1</div>")
+            .arg(util::i18n::translate("Loading rules...").toHtmlEscaped()));
+    }
+    else if (!load_error.isEmpty() && !document_ready)
+    {
+        show_load_failure(load_error);
+    }
+    update_agree_button();
+}
+
+void RulesAgreement::set_button_pixmap(const QPixmap& pixmap)
+{
+    const QPixmap scaled = pixmap.scaled(agree_button->iconSize(), Qt::IgnoreAspectRatio,
+                                         Qt::SmoothTransformation);
+    QIcon icon;
+    icon.addPixmap(scaled, QIcon::Normal);
+    icon.addPixmap(scaled, QIcon::Disabled);
+    agree_button->setIcon(icon);
+}
+
+void RulesAgreement::set_button_text(const QString& source)
+{
+    agree_button_label->setText(util::i18n::translate(source));
+    fit_button_label(agree_button_label, util::layout::scaled(12, window()->size()));
+}
+
+QString RulesAgreement::prepare_document(const QByteArray& source)
+{
+    QString html = QString::fromUtf8(source);
+    html.remove(QRegularExpression(QStringLiteral("<script\\b[^>]*>[\\s\\S]*?</script>"),
+                                   QRegularExpression::CaseInsensitiveOption));
+    html.remove(QRegularExpression(QStringLiteral("<!--([\\s\\S]*?)-->")));
+
+    QString styles;
+    const QRegularExpression style_expression(
+        QStringLiteral("<style\\b[^>]*>([\\s\\S]*?)</style>"),
+        QRegularExpression::CaseInsensitiveOption);
+    auto style_iterator = style_expression.globalMatch(html);
+    while (style_iterator.hasNext())
+        styles += style_iterator.next().captured(1) + QLatin1Char('\n');
+
+    const QRegularExpression body_expression(
+        QStringLiteral("<body\\b[^>]*>([\\s\\S]*?)</body>"),
+        QRegularExpression::CaseInsensitiveOption);
+    const QRegularExpressionMatch body_match = body_expression.match(html);
+    QString body = body_match.hasMatch() ? body_match.captured(1) : html;
+    body.remove(QRegularExpression(QStringLiteral("font-size\\s*:[^;\"']+;?"),
+                                   QRegularExpression::CaseInsensitiveOption));
+    body = rewrite_links(body);
+
+    const QString launcher_styles = QStringLiteral(
+        "body, p, li, td, span, a { font-family:'Inter'; font-size:13px; line-height:1.5; color:#392518; }"
+        "h1, h2, h3, h4 { color:#4F1717; font-family:'Eurostile'; font-weight:800; }"
+        "h1 { font-size:22px; text-align:center; margin:0 0 8px 0; }"
+        "h2 { font-size:15px; text-align:center; margin:0 0 28px 0; }"
+        "h3 { font-size:14px; margin-top:22px; }"
+        "a { color:#20AEDD; text-decoration:none; }"
+        "hr { margin:44px 0 6px 0; color:#4F1717; }"
+        "ul, ol { margin-left:18px; }"
+        "table { border-collapse:collapse; width:100%; }"
+        "td { vertical-align:top; padding:2px 6px; }");
+    return QStringLiteral("<html><head><style>%1\n%2</style></head><body>%3</body></html>")
+        .arg(styles, launcher_styles, body);
+}
+
+QString RulesAgreement::rewrite_links(const QString& html)
+{
+    const QRegularExpression expression(
+        QStringLiteral("href\\s*=\\s*([\"'])(.*?)\\1"),
+        QRegularExpression::CaseInsensitiveOption);
+    QString result;
+    qsizetype cursor = 0;
+    auto iterator = expression.globalMatch(html);
+    while (iterator.hasNext())
+    {
+        const QRegularExpressionMatch match = iterator.next();
+        result += html.mid(cursor, match.capturedStart() - cursor);
+        QString target = match.captured(2);
+        target.replace(QStringLiteral("&amp;"), QStringLiteral("&"), Qt::CaseInsensitive);
+        QUrl url(target);
+        if (url.isValid()
+            && url.host().compare(QStringLiteral("www.google.com"), Qt::CaseInsensitive) == 0
+            && url.path() == QStringLiteral("/url"))
+        {
+            const QString unwrapped = QUrlQuery(url).queryItemValue(QStringLiteral("q"));
+            if (!unwrapped.isEmpty())
+                target = unwrapped;
+        }
+        const QChar quote = match.captured(1).isEmpty() ? QLatin1Char('\'') : match.captured(1).front();
+        result += QStringLiteral("href=") + quote + target.toHtmlEscaped() + quote;
+        cursor = match.capturedEnd();
+    }
+    result += html.mid(cursor);
+    return result;
+}
 
 void RulesAgreement::showEvent(QShowEvent* event)
 {
-    accepted_box->setChecked(false);
+    seconds_remaining = k_accept_cooldown_seconds;
+    has_scrolled_to_end = false;
     rules_text->verticalScrollBar()->setValue(0);
+    if (document_html.isEmpty())
+        load_cached_document();
+    if (!reply)
+        load_rules();
     update_agree_button();
     ModalOverlay::showEvent(event);
 }
 
 void RulesAgreement::paint_content(QPainter& painter)
 {
-    const QSize w = window()->size();
-    painter.drawPixmap(box_rect(w), util::assets::images[util::assets::Image::RulesFrame]);
-
-    QFont title_font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
-    title_font.setPixelSize(util::layout::scaled(25, w));
-    title_font.setWeight(QFont::Black);
-    painter.setFont(title_font);
-    painter.setPen(util::colors::k_text_maroon);
-    painter.drawText(local_rect(w, {25, 35, 617, 38}), Qt::AlignCenter,
-                     util::i18n::translate("STORY OF ALICIA PLAYTEST RULES"));
+    painter.drawPixmap(box_rect(window()->size()),
+                       util::assets::images[util::assets::Image::RulesFrame]);
 }
 
 bool RulesAgreement::eventFilter(QObject* object, QEvent* event)
 {
     if (object == agree_button && agree_button->isEnabled())
     {
-        const auto& agree = util::assets::button(util::assets::Button::Agree);
-        util::simple_utils::apply_button_state(
-            event, agree_button, agree.normal, agree.hover, agree.clicked);
+        const auto& assets = util::assets::translated_buttons[util::assets::Button::Agree];
+        switch (event->type())
+        {
+            case QEvent::Enter:
+                set_button_pixmap(assets.hover);
+                break;
+            case QEvent::Leave:
+                set_button_pixmap(assets.normal);
+                break;
+            case QEvent::MouseButtonPress:
+                set_button_pixmap(assets.clicked);
+                break;
+            case QEvent::MouseButtonRelease:
+                set_button_pixmap(agree_button->underMouse() ? assets.hover : assets.normal);
+                break;
+            default:
+                break;
+        }
     }
     return QWidget::eventFilter(object, event);
 }

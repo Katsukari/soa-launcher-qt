@@ -53,8 +53,7 @@ namespace
         "    font-weight: 700;"
         "    font-size: 15px;"
         "}"
-        "QPushButton:hover { color: #7E6E5E; }"
-        "QPushButton:focus { border: 1px solid #2FB4E0; border-radius: 3px; }";
+        "QPushButton:hover { color: #7E6E5E; }";
 
     void add_soft_shadow(QWidget* widget, const qreal blur = 22.0, const qreal y = 7.0,
                          const QColor& color = QColor(65, 39, 25, 72))
@@ -390,7 +389,6 @@ void AliciaChooser::setup_login_state()
     keep_signed_button->setStyleSheet(
         "QCheckBox { background: transparent; color: #4F1717; spacing: 5px; }"
         "QCheckBox:hover { color: #321010; }"
-        "QCheckBox:focus { border: 1px solid #2FB4E0; border-radius: 3px; }"
         "QCheckBox::indicator { width: 19px; height: 18px; }"
         "QCheckBox::indicator:unchecked { image: url(:/assets/checkbox.png); }"
         "QCheckBox::indicator:checked { image: url(:/assets/checkbox-ticked.png); }");
@@ -450,8 +448,7 @@ void AliciaChooser::setup_waiting_state()
     try_again_button->setFont(retry_font);
     try_again_button->setStyleSheet(
         "QPushButton { background: transparent; border: none; color: #988776; }"
-        "QPushButton:hover { color: #6F5F50; }"
-        "QPushButton:focus { border: 1px solid #2FB4E0; border-radius: 3px; }");
+        "QPushButton:hover { color: #6F5F50; }");
     connect(try_again_button, &QPushButton::clicked, auth, &AuthHandler::cancel_login);
 }
 

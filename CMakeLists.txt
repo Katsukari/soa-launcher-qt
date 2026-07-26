@@ -10,6 +10,18 @@ project(soa_launcher
         VERSION 1.0.0
 )
 
+if(DEFINED ENV{GITHUB_REPOSITORY} AND NOT "$ENV{GITHUB_REPOSITORY}" STREQUAL "")
+    set(SOA_LAUNCHER_GITHUB_REPOSITORY_DEFAULT "$ENV{GITHUB_REPOSITORY}")
+else()
+    set(SOA_LAUNCHER_GITHUB_REPOSITORY_DEFAULT "Story-Of-Alicia/soa-launcher-qt")
+endif()
+set(SOA_LAUNCHER_GITHUB_REPOSITORY
+    "${SOA_LAUNCHER_GITHUB_REPOSITORY_DEFAULT}"
+    CACHE STRING "GitHub owner/repository used for launcher releases")
+set(SOA_RULES_DOCUMENT_URL
+    "https://docs.google.com/document/d/1vry3ZuDtzdS_mX1P2udWlb8z2Q9Atr3p1THZdtZ2EHA/export?format=html"
+    CACHE STRING "HTTPS URL of the authoritative rules document")
+
 if(NOT APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
     message(FATAL_ERROR "soa_launcher currently supports Linux and macOS only")
 endif()
@@ -137,6 +149,7 @@ set(LAUNCHER_SOURCES
         src/core/runtime/RuntimeProvider.cpp
         src/core/system/SystemProfile.cpp
         src/core/integrity/GameIntegrityWatcher.cpp
+        src/core/update/LauncherUpdateManager.cpp
         src/core/wine/PrefixInspector.cpp
         src/core/network/Courier.cpp
         src/core/auth/AuthHandler.cpp
@@ -154,6 +167,7 @@ set(LAUNCHER_SOURCES
         src/widgets/WineSelectMenu.cpp
         src/widgets/LauncherInfoDialog.cpp
         src/widgets/LauncherDialog.cpp
+        src/widgets/LauncherUpdate.cpp
 )
 
 set(LAUNCHER_HEADERS
@@ -184,6 +198,7 @@ set(LAUNCHER_HEADERS
         include/core/runtime/RuntimeProvider.hpp
         include/core/system/SystemProfile.hpp
         include/core/integrity/GameIntegrityWatcher.hpp
+        include/core/update/LauncherUpdateManager.hpp
         include/core/wine/PrefixInspector.hpp
         include/core/QtLogSink.hpp
         include/core/Log.hpp
@@ -212,6 +227,7 @@ set(LAUNCHER_HEADERS
         include/widgets/WineSelectMenu.hpp
         include/widgets/LauncherInfoDialog.hpp
         include/widgets/LauncherDialog.hpp
+        include/widgets/LauncherUpdate.hpp
 )
 
 set(SOA_PLATFORM_RESOURCES)
@@ -352,6 +368,8 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 target_compile_definitions(${PROJECT_NAME} PRIVATE
         SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE
         SOA_LAUNCHER_VERSION="${PROJECT_VERSION}"
+        SOA_LAUNCHER_GITHUB_REPOSITORY="${SOA_LAUNCHER_GITHUB_REPOSITORY}"
+        SOA_RULES_DOCUMENT_URL="${SOA_RULES_DOCUMENT_URL}"
 )
 
 include(GNUInstallDirs)

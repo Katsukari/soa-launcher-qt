@@ -326,8 +326,7 @@ void LauncherSettings::setup_run_connectivity_test_option()
     copy_report_button->setAccessibleName(QStringLiteral("Copy connectivity report"));
     copy_report_button->setStyleSheet(
         "QPushButton { background: transparent; border: none; color: #9E8E7E; font-family: 'Inter'; font-size: 11px; font-weight: 700; }"
-        "QPushButton:hover { color: #6F5F50; }"
-        "QPushButton:focus { border: 1px solid #2FB4E0; border-radius: 3px; }");
+        "QPushButton:hover { color: #6F5F50; }");
     connect(copy_report_button, &QPushButton::clicked, this, [this]()
     {
         if (!QApplication::clipboard())

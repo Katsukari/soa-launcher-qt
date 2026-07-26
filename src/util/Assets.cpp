@@ -34,6 +34,7 @@ namespace util::assets
             {Image::BoxNote, "box-note.png"},
             {Image::BoxNote2, "box-note2.png"},
             {Image::BoxSettings, "box-settings.png"},
+            {Image::BoxUpdate, "box-update.png"},
             {Image::BoxWaitingForAuth, "box-waiting-for-auth.png"},
             {Image::CloseIcon, "close-icon2.png"},
             {Image::CloseNormal, "close-normal.png"},

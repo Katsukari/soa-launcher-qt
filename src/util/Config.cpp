@@ -334,6 +334,8 @@ namespace util::config
             d->values.value(QStringLiteral("wine_args")).toString());
         d->values[QStringLiteral("game_args")] = bounded_arguments(
             d->values.value(QStringLiteral("game_args")).toString());
+        d->values[QStringLiteral("umu_binary")] =
+            d->values.value(QStringLiteral("umu_binary")).toString().trimmed();
         d->values[QStringLiteral("use_dxvk")] =
             d->values.value(QStringLiteral("use_dxvk")).toBool();
         d->values[QStringLiteral("runtime_selected")] =
@@ -544,6 +546,13 @@ namespace util::config
         if (d->values.value(QStringLiteral("wine_binary")).toString().isEmpty())
             probe(QStringLiteral("wine_binary"), QStringLiteral("wine64"));
         probe(QStringLiteral("winetricks_binary"), QStringLiteral("winetricks"));
+        probe(QStringLiteral("umu_binary"), QStringLiteral("umu-run"));
+        if (d->values.value(QStringLiteral("umu_binary")).toString().isEmpty())
+        {
+            const QString local = QDir::home().filePath(QStringLiteral(".local/bin/umu-run"));
+            if (QFileInfo(local).isExecutable())
+                d->values[QStringLiteral("umu_binary")] = local;
+        }
 #else
 
 
@@ -585,6 +594,7 @@ namespace util::config
         setIfMissing(QStringLiteral("wine_arch"), QStringLiteral("win64"));
         setIfMissing(QStringLiteral("wine_binary"), QString());
         setIfMissing(QStringLiteral("winetricks_binary"), QString());
+        setIfMissing(QStringLiteral("umu_binary"), QString());
         setIfMissing(QStringLiteral("use_dxvk"), false);
         setIfMissing(QStringLiteral("runtime_selected"), false);
         setIfMissing(QStringLiteral("wine_args"), QString());
@@ -780,6 +790,7 @@ namespace util::config
 
     QString Config::wine_binary() const { return d->values.value(QStringLiteral("wine_binary")).toString(); }
     QString Config::winetricks_binary() const { return d->values.value(QStringLiteral("winetricks_binary")).toString(); }
+    QString Config::umu_binary() const { return d->values.value(QStringLiteral("umu_binary")).toString(); }
     QString Config::rosetta_x87_path() const { return d->values.value(QStringLiteral("rosetta_x87_path")).toString(); }
     QString Config::wine_arch() const
     {
@@ -999,6 +1010,12 @@ namespace util::config
     {
         if (winetricks_binary() == value) return;
         d->values[QStringLiteral("winetricks_binary")] = value; persist_change();
+    }
+    void Config::set_umu_binary(const QString& value)
+    {
+        const QString normalized = value.trimmed();
+        if (umu_binary() == normalized) return;
+        d->values[QStringLiteral("umu_binary")] = normalized; persist_change();
     }
     void Config::set_rosetta_x87_path(const QString& value)
     {

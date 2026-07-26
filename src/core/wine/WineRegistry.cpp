@@ -653,10 +653,22 @@ namespace core::wine
 
     QString umu_path()
     {
-        QString found = QStandardPaths::findExecutable("umu-run");
-        if (!found.isEmpty()) return found;
+        const QString configured = util::config::Config::instance().umu_binary();
+        if (!configured.isEmpty())
+        {
+            if (QFileInfo(configured).isAbsolute())
+                return QFileInfo(configured).isExecutable() ? configured : QString {};
 
-        const QString local = QDir::home().filePath(".local/bin/umu-run");
+            const QString found = QStandardPaths::findExecutable(configured);
+            if (!found.isEmpty())
+                return found;
+        }
+
+        QString found = QStandardPaths::findExecutable(QStringLiteral("umu-run"));
+        if (!found.isEmpty())
+            return found;
+
+        const QString local = QDir::home().filePath(QStringLiteral(".local/bin/umu-run"));
         return QFileInfo(local).isExecutable() ? local : QString {};
     }
 

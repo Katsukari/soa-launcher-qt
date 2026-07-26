@@ -75,7 +75,7 @@ namespace
         {
             setCheckable(true);
             setCursor(Qt::PointingHandCursor);
-            setFocusPolicy(Qt::StrongFocus);
+            setFocusPolicy(Qt::ClickFocus);
             setMouseTracking(true);
             setAttribute(Qt::WA_Hover, true);
             setAttribute(Qt::WA_NoSystemBackground, true);
@@ -208,15 +208,7 @@ namespace
                                  x + util::layout::scaled(5, host), y - util::layout::scaled(4, host));
             }
 
-            if (hasFocus())
-            {
-                painter.setPen(QPen(QColor(79, 23, 23),
-                                    qMax(1, util::layout::scaled(2, host)), Qt::DashLine));
-                painter.setBrush(Qt::NoBrush);
-                painter.drawRoundedRect(card.adjusted(4, 4, -4, -4),
-                                        util::layout::scaled(6, host),
-                                        util::layout::scaled(6, host));
-            }
+
         }
 
         void enterEvent(QEnterEvent* event) override
@@ -246,7 +238,7 @@ namespace
             : QAbstractButton(parent), asset_key(asset), text_source(std::move(source))
         {
             setCursor(Qt::PointingHandCursor);
-            setFocusPolicy(Qt::StrongFocus);
+            setFocusPolicy(Qt::ClickFocus);
             setAutoFillBackground(false);
             setAttribute(Qt::WA_NoSystemBackground, true);
             connect(&util::i18n::LanguageManager::instance(),
@@ -289,15 +281,7 @@ namespace
                              painter.fontMetrics().elidedText(text, Qt::ElideRight,
                                                               width() - util::layout::scaled(16, window()->size())));
 
-            if (hasFocus())
-            {
-                painter.setPen(QPen(QColor(47, 180, 224),
-                                    qMax(1, util::layout::scaled(2, window()->size()))));
-                painter.setBrush(Qt::NoBrush);
-                painter.drawRoundedRect(rect().adjusted(1, 1, -2, -2),
-                                        util::layout::scaled(5, window()->size()),
-                                        util::layout::scaled(5, window()->size()));
-            }
+
         }
 
         void enterEvent(QEnterEvent* event) override
