@@ -1,5 +1,7 @@
 # Story of Alicia Launcher
 
+[![Build macOS and Linux](https://github.com/Story-Of-Alicia/soa-launcher-qt/actions/workflows/cmake-multi-platform.yml/badge.svg)](https://github.com/Story-Of-Alicia/soa-launcher-qt/actions/workflows/cmake-multi-platform.yml)
+
 The official **Story of Alicia** launcher for Linux and macOS.
 
 The launcher can:
