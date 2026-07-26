@@ -17,6 +17,8 @@ namespace util::modal_overlay
     {
         QPixmap blur_pixmap(const QPixmap& source, const qreal radius)
         {
+            if (source.isNull()) return {};
+
             QGraphicsScene scene;
             auto* item = new QGraphicsPixmapItem(source);
             auto* blur = new QGraphicsBlurEffect;
@@ -24,11 +26,17 @@ namespace util::modal_overlay
             item->setGraphicsEffect(blur);
             scene.addItem(item);
 
+            const QRectF logical_rect = item->boundingRect();
+            scene.setSceneRect(logical_rect);
+
             QPixmap output(source.size());
+            output.setDevicePixelRatio(source.devicePixelRatio());
             output.fill(QColor(0xEA, 0xF2, 0xF7));
+
             QPainter painter(&output);
+            painter.setRenderHint(QPainter::Antialiasing);
             painter.setRenderHint(QPainter::SmoothPixmapTransform);
-            scene.render(&painter, QRectF(), QRectF(source.rect()));
+            scene.render(&painter, logical_rect, logical_rect, Qt::IgnoreAspectRatio);
             return output;
         }
 
@@ -46,15 +54,23 @@ namespace util::modal_overlay
     ModalOverlay::ModalOverlay(QWidget* parent)
         : QWidget(parent)
     {
-        setFixedSize(window()->size());
+        if (parent) setGeometry(parent->rect());
     }
 
     void ModalOverlay::show_over(QWidget* background)
     {
-        const QPixmap snapshot = background->grab();
+        if (!background) return;
+
+        if (parentWidget() == background)
+            setGeometry(background->rect());
+        else
+            resize(background->size());
+
+        const QPixmap snapshot = background->grab(background->rect());
         blurred_bg = blur_pixmap(snapshot, layout::scaled(10, size()));
         show();
         raise();
+        update();
     }
 
     void ModalOverlay::paint_frames(QPainter& painter) const
