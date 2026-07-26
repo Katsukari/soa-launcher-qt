@@ -144,6 +144,10 @@ fi
 
 export EXCLUDE_QT_PLUGINS="imageformats/kimg_jxr.so;imageformats/kimg_heif.so;imageformats/kimg_avif.so;imageformats/kimg_jp2.so;imageformats/kimg_exr.so;imageformats/kimg_dds.so;imageformats/kimg_eps.so;imageformats/kimg_ff.so;imageformats/kimg_hdr.so;imageformats/kimg_jxl.so;imageformats/kimg_psd.so;imageformats/kimg_pcx.so;imageformats/kimg_ras.so;imageformats/kimg_rgb.so;imageformats/kimg_tga.so;imageformats/kimg_xcf.so;imageformats/kimg_pic.so;imageformats/kimg_qoi.so"
 
+OUTPUT="$SCRIPT_DIR/Story_Of_Alicia-x86_64.AppImage"
+
+set +e
+
 ./linuxdeploy-x86_64.AppImage \
   --appdir "$APPDIR" \
   --plugin qt \
@@ -151,13 +155,21 @@ export EXCLUDE_QT_PLUGINS="imageformats/kimg_jxr.so;imageformats/kimg_heif.so;im
   --desktop-file "$APPDIR/usr/share/applications/soa-launcher.desktop" \
   --icon-file "$APPDIR/usr/share/icons/hicolor/256x256/apps/soa-launcher.png"
 
-run_portability_check "$APPDIR"
+LINUXDEPLOY_STATUS=$?
 
-OUTPUT="$SCRIPT_DIR/Story_Of_Alicia-x86_64.AppImage"
+set -e
+
 if [ ! -f "$OUTPUT" ]; then
-  echo "The expected AppImage was not produced: $OUTPUT" >&2
-  exit 1
+  echo "linuxdeploy failed with exit code $LINUXDEPLOY_STATUS and did not create the AppImage." >&2
+  exit "$LINUXDEPLOY_STATUS"
 fi
+
+if [ "$LINUXDEPLOY_STATUS" -ne 0 ]; then
+  echo "linuxdeploy returned exit code $LINUXDEPLOY_STATUS, but the AppImage was created." >&2
+  echo "Continuing with portability and smoke tests." >&2
+fi
+
+run_portability_check "$APPDIR"
 
 if [ "${SOA_ALLOW_NONPORTABLE_LOCAL_BUILD:-0}" != "1" ]; then
   outer_isa="$(readelf -nW "$OUTPUT" 2>/dev/null | grep -E 'x86 ISA needed|x86 feature needed' || true)"
