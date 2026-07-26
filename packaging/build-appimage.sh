@@ -146,26 +146,29 @@ export EXCLUDE_QT_PLUGINS="imageformats/kimg_jxr.so;imageformats/kimg_heif.so;im
 
 OUTPUT="$SCRIPT_DIR/Story_Of_Alicia-x86_64.AppImage"
 
-set +e
+rm -f "$OUTPUT"
 
-./linuxdeploy-x86_64.AppImage \
+if ./linuxdeploy-x86_64.AppImage \
   --appdir "$APPDIR" \
   --plugin qt \
   --output appimage \
   --desktop-file "$APPDIR/usr/share/applications/soa-launcher.desktop" \
   --icon-file "$APPDIR/usr/share/icons/hicolor/256x256/apps/soa-launcher.png"
+then
+  LINUXDEPLOY_STATUS=0
+else
+  LINUXDEPLOY_STATUS=$?
+fi
 
-LINUXDEPLOY_STATUS=$?
-
-set -e
-
-if [ ! -f "$OUTPUT" ]; then
-  echo "linuxdeploy failed with exit code $LINUXDEPLOY_STATUS and did not create the AppImage." >&2
+if [ ! -s "$OUTPUT" ]; then
+  echo "linuxdeploy returned exit code $LINUXDEPLOY_STATUS and did not create a usable AppImage:" >&2
+  echo "$OUTPUT" >&2
   exit "$LINUXDEPLOY_STATUS"
 fi
 
 if [ "$LINUXDEPLOY_STATUS" -ne 0 ]; then
-  echo "linuxdeploy returned exit code $LINUXDEPLOY_STATUS, but the AppImage was created." >&2
+  echo "linuxdeploy returned exit code $LINUXDEPLOY_STATUS, but successfully created:" >&2
+  echo "$OUTPUT" >&2
   echo "Continuing with portability and smoke tests." >&2
 fi
 
