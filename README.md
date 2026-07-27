@@ -58,30 +58,17 @@ Apple Silicon Macs use the bundled Intel game runtime through Rosetta. The launc
 
 ## Documentation
 
-- [`BUILDING.md`](docs/BUILDING.md) — building the launcher from source
-- [`CONTRIBUTING.md`](docs/CONTRIBUTING.md) — contributing code, translations, or documentation
-- [`SECURITY.md`](docs/SECURITY.md) — reporting security problems
-- [`SECURITY_INTEGRATION.md`](docs/SECURITY_INTEGRATION.md) — launcher and server security boundaries
-- [`CONFIG_REFERENCE.md`](docs/CONFIG_REFERENCE.md) — persisted launcher configuration
-- [`RUNTIME_ARCHITECTURE.md`](docs/RUNTIME_ARCHITECTURE.md) — macOS runtime package structure
-- [`PLATFORM_LINUX.md`](docs/PLATFORM_LINUX.md) — Linux behavior and packaging
-- [`PLATFORM_MACOS.md`](docs/PLATFORM_MACOS.md) — macOS behavior and packaging
-- [`TRANSLATING.md`](docs/TRANSLATING.md) — adding or updating launcher translations
-
-## Diagnostics
-
-The launcher writes diagnostic logs when setup, updating, or game launching fails.
-
-On macOS, a diagnostic archive can also be created with:
-
-```sh
-./packaging/macos/collect-diagnostics.sh
-```
-
-Diagnostic archives are automatically redacted where possible, but they should still be reviewed before sharing.
+- [`BUILDING.md`](docs/BUILDING.md) - building the launcher from source
+- [`CONTRIBUTING.md`](docs/CONTRIBUTING.md) - contributing code, translations, or documentation
+- [`SECURITY.md`](docs/SECURITY.md) - reporting security problems
+- [`SECURITY_INTEGRATION.md`](docs/SECURITY_INTEGRATION.md) - launcher and server security boundaries
+- [`CONFIG_REFERENCE.md`](docs/CONFIG_REFERENCE.md) - persisted launcher configuration
+- [`RUNTIME_ARCHITECTURE.md`](docs/RUNTIME_ARCHITECTURE.md) - macOS runtime package structure
+- [`PLATFORM_LINUX.md`](docs/PLATFORM_LINUX.md) - Linux behavior and packaging
+- [`PLATFORM_MACOS.md`](docs/PLATFORM_MACOS.md) - macOS behavior and packaging
 
 ## License and assets
 
-The launcher source code is distributed under the license in `LICENSE`.
+The launcher source code is distributed under the license in [`LICENSE`](LICENCE).
 
 Artwork, logos, fonts, game files, and modified textless versions of existing artwork remain owned by their respective copyright holders and are not automatically covered by the launcher's source-code license.
