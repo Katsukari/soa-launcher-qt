@@ -69,6 +69,6 @@ Apple Silicon Macs use the bundled Intel game runtime through Rosetta. The launc
 
 ## License and assets
 
-The launcher source code is distributed under the license in [`LICENSE`](LICENCE).
+The launcher source code is distributed under the license in [`LICENSE`](./LICENCE).
 
 Artwork, logos, fonts, game files, and modified textless versions of existing artwork remain owned by their respective copyright holders and are not automatically covered by the launcher's source-code license.
