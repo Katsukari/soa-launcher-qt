@@ -100,6 +100,11 @@ add_library(soa_network SHARED
         src/core/network/CourierTypes.swift
         src/core/network/CourierABI.swift
         src/core/network/CourierPing.swift
+        src/core/network/NetworkFoundation.swift
+        src/core/network/SwiftHttpClient.swift
+        src/core/network/LauncherUpdateService.swift
+        src/core/network/DiscordRpcService.swift
+        src/core/network/SwiftNetworkABI.swift
         src/core/network/MD5.swift
 )
 
@@ -152,6 +157,7 @@ set(LAUNCHER_SOURCES
         src/core/update/LauncherUpdateManager.cpp
         src/core/wine/PrefixInspector.cpp
         src/core/network/Courier.cpp
+        src/core/network/SwiftHttpClient.cpp
         src/core/auth/AuthHandler.cpp
         src/util/Config.cpp
         src/util/CredentialStore.cpp
@@ -205,7 +211,9 @@ set(LAUNCHER_HEADERS
         include/core/discord/DiscordRpc.hpp
         include/util/Styles.hpp
         include/core/network/Courier.h
+        include/core/network/SwiftNetwork.h
         include/core/network/CourierBridge.hpp
+        include/core/network/SwiftHttpClient.hpp
         include/core/auth/AuthHandler.hpp
         include/util/Config.hpp
         include/util/CredentialStore.hpp
@@ -533,6 +541,35 @@ if(BUILD_TESTING)
     add_test(
             NAME courier_cancel_tests
             COMMAND courier_cancel_tests
+    )
+
+
+    add_executable(swift_network_abi_tests
+            tests/swift_network_abi_tests.swift
+    )
+
+    target_compile_options(swift_network_abi_tests PRIVATE
+            "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xcc -fmodule-map-file=${CMAKE_CURRENT_SOURCE_DIR}/src/core/network/module.modulemap>"
+    )
+
+    target_include_directories(swift_network_abi_tests PRIVATE
+            include
+    )
+
+    target_link_libraries(swift_network_abi_tests PRIVATE
+            soa_network
+    )
+
+    set_target_properties(swift_network_abi_tests PROPERTIES
+            AUTOMOC OFF
+            AUTORCC OFF
+            AUTOUIC OFF
+            Swift_MODULE_NAME SoaSwiftNetworkABITests
+    )
+
+    add_test(
+            NAME swift_network_abi_tests
+            COMMAND swift_network_abi_tests
     )
 
     add_executable(courier_hash_tests
