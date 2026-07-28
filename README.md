@@ -60,7 +60,6 @@ Apple Silicon Macs use the bundled Intel game runtime through Rosetta. The launc
 
 - [`BUILDING.md`](docs/BUILDING.md) - building the launcher from source
 - [`CONTRIBUTING.md`](docs/CONTRIBUTING.md) - contributing code, translations, or documentation
-- [`SECURITY.md`](docs/SECURITY.md) - reporting security problems
 - [`SECURITY_INTEGRATION.md`](docs/SECURITY_INTEGRATION.md) - launcher and server security boundaries
 - [`CONFIG_REFERENCE.md`](docs/CONFIG_REFERENCE.md) - persisted launcher configuration
 - [`RUNTIME_ARCHITECTURE.md`](docs/RUNTIME_ARCHITECTURE.md) - macOS runtime package structure
