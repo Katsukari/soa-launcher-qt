@@ -49,24 +49,37 @@ if [ -z "$wayland_single" ] && { [ -z "$wayland_egl" ] || [ -z "$wayland_generic
   FAILED=1
 fi
 
-if [ "$FAILED" -ne 0 ]; then
-  exit 1
+if ! find "$ROOT" \( -type f -o -type l \) -name 'libswiftCore.so*' \
+    -print -quit | grep -q .; then
+  echo "Bundled Swift runtime is missing libswiftCore.so." >&2
+  FAILED=1
 fi
 
+while IFS= read -r -d '' item; do
+  if ! file -b "$item" 2>/dev/null | grep -q '^ELF '; then
+    continue
+  fi
 
+  # Never let the developer machine's Swift toolchain satisfy AppImage
+  # dependencies while validating the bundle.
+  dependencies="$(env -u LD_LIBRARY_PATH -u LD_PRELOAD ldd "$item" 2>&1 || true)"
+  while IFS= read -r dependency; do
+    [ -n "$dependency" ] || continue
+    printf 'Unresolved AppImage dependency: %s: %s\n' "$item" "$dependency" >&2
+    FAILED=1
+  done < <(grep '=> not found' <<< "$dependencies" || true)
 
+  while IFS= read -r dependency; do
+    [ -n "$dependency" ] || continue
+    if [[ "$dependency" != *"$ROOT"* ]]; then
+      printf 'Swift dependency resolved outside AppDir: %s: %s\n' \
+        "$item" "$dependency" >&2
+      FAILED=1
+    fi
+  done < <(grep -E 'libswift|libdispatch|libFoundation' <<< "$dependencies" \
+    | grep -v '=> not found' || true)
+done < <(find "$ROOT" -type f -print0)
 
-if [ -d "$ROOT" ]; then
-    while IFS= read -r binary; do
-        if file "$binary" | grep -q ELF; then
-            ldd "$binary" 2>/dev/null | grep -E 'libswift|libdispatch|libFoundation' | while IFS= read -r dep; do
-                case "$dep" in
-                    *"not found"*)
-                        echo "ERROR: unresolved Swift runtime dependency in $binary: $dep" >&2
-                        exit 1
-                        ;;
-                esac
-            done
-        fi
-    done < <(find "$ROOT" -type f -perm -0100)
+if [ "$FAILED" -ne 0 ]; then
+  exit 1
 fi

@@ -32,7 +32,7 @@ set(SOA_LAUNCHER_UPDATE_FALLBACK_MANIFEST_URL
     "https://github.com/Story-Of-Alicia/soa-launcher-qt/releases/latest/download/linux_launcher_version.json"
     CACHE STRING "HTTPS fallback URL of the signed Linux launcher update manifest")
 set(SOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX
-    "2f591419436287b9f4bbcb02d412ca9552ed835b13ec29c3481c39dbd0cbdc96"
+    ""
     CACHE STRING "Raw Ed25519 update signing public key as 64 hexadecimal characters")
 set(SOA_RULES_DOCUMENT_URL
     "https://docs.google.com/document/d/1vry3ZuDtzdS_mX1P2udWlb8z2Q9Atr3p1THZdtZ2EHA/export?format=html"
@@ -467,11 +467,11 @@ if(NOT APPLE)
             LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
 
-    install(FILES packaging/soa-launcher.desktop
+    install(FILES packaging/linux/soa-launcher.desktop
             DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
     )
 
-    install(FILES packaging/soa-launcher.png
+    install(FILES packaging/linux/soa-launcher.png
             DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps
     )
 

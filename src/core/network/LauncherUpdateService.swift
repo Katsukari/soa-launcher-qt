@@ -40,8 +40,7 @@ final class LauncherAssetDelegate: NSObject, URLSessionDataDelegate, URLSessionT
     private let expectedDigest: String
     private let progress: @Sendable (UInt64, UInt64) -> Void
     private let queue: OperationQueue
-    private var session: URLSession?
-    private var task: URLSessionDataTask?
+    private let cancellation = URLSessionTaskCancellationGate()
     private var continuation: CheckedContinuation<Void, Error>?
     private var handle: FileHandle?
     private var terminalError: LauncherServiceFailure?
@@ -69,13 +68,11 @@ final class LauncherAssetDelegate: NSObject, URLSessionDataDelegate, URLSessionT
             try await withCheckedThrowingContinuation { continuation in
                 self.continuation = continuation
                 let session = URLSession(configuration: configuration, delegate: self, delegateQueue: queue)
-                self.session = session
                 let task = session.dataTask(with: request)
-                self.task = task
-                task.resume()
+                self.cancellation.start(task)
             }
         }, onCancel: {
-            self.task?.cancel()
+            self.cancellation.cancel()
         })
     }
 
@@ -85,9 +82,11 @@ final class LauncherAssetDelegate: NSObject, URLSessionDataDelegate, URLSessionT
                     newRequest request: URLRequest,
                     completionHandler: @escaping (URLRequest?) -> Void)
     {
-        guard let url = request.url,
-              url.scheme?.lowercased() == "https",
-              LauncherUpdateService.trustedReleaseHost(url.host?.lowercased() ?? "") else {
+        guard let source = response.url, let destination = request.url,
+              source.scheme?.lowercased() == "https",
+              destination.scheme?.lowercased() == "https",
+              LauncherUpdateService.trustedReleaseHost(source.host?.lowercased() ?? ""),
+              LauncherUpdateService.trustedReleaseHost(destination.host?.lowercased() ?? "") else {
             terminalError = LauncherServiceFailure(
                 soa_launcher_error_unsafe_url,
                 "The launcher update redirected to an untrusted URL")
@@ -183,8 +182,7 @@ final class LauncherAssetDelegate: NSObject, URLSessionDataDelegate, URLSessionT
         handle = nil
 
         defer {
-            self.task = nil
-            self.session = nil
+            cancellation.clear()
             session.finishTasksAndInvalidate()
             continuation = nil
         }
@@ -522,10 +520,11 @@ final class LauncherUpdateService: @unchecked Sendable
     {
         guard let manifest = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               (manifest["schema"] as? NSNumber)?.intValue == 1,
-              manifest["platform"] as? String == "linux-x86_64" else {
+              manifest["platform"] as? String == "linux-x86_64",
+              (manifest["soa_developer_key"] as? String)?.lowercased() == publicKeyHex else {
             throw LauncherServiceFailure(
                 soa_launcher_error_invalid_release,
-                "The launcher update manifest is invalid")
+                "The launcher update is not identified as a Story of Alicia release")
         }
 
         let tag = normalizedVersion(manifest["version"] as? String ?? "")
@@ -610,6 +609,7 @@ final class LauncherUpdateService: @unchecked Sendable
         guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               (root["schema"] as? NSNumber)?.intValue == 1,
               root["platform"] as? String == "linux-x86_64",
+              (root["soa_developer_key"] as? String)?.lowercased() == publicKeyHex,
               let entries = root["releases"] as? [[String: Any]],
               !entries.isEmpty, entries.count <= 128 else {
             throw LauncherServiceFailure(

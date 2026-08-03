@@ -17,7 +17,7 @@ HISTORY_INPUT="${SOA_UPDATE_HISTORY_INPUT:-}"
 MANIFEST="$SCRIPT_DIR/linux_launcher_version.json"
 HISTORY="$SCRIPT_DIR/linux_launcher_versions.json"
 
-for command_name in jq openssl sha256sum stat base64; do
+for command_name in jq openssl sha256sum stat base64 od tail tr; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
     echo "Required command not found: $command_name" >&2
     exit 1
@@ -37,6 +37,16 @@ FILE_NAME="$(basename "$APPIMAGE")"
 SHA256="$(sha256sum "$APPIMAGE" | awk '{print $1}')"
 SIZE="$(stat -c '%s' "$APPIMAGE")"
 RELEASED_AT="${SOA_UPDATE_RELEASED_AT:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
+SOA_DEVELOPER_KEY_HEX="$(
+  openssl pkey -in "$SIGNING_KEY" -pubout -outform DER \
+    | tail -c 32 \
+    | od -An -v -tx1 \
+    | tr -d ' \n'
+)"
+if [[ ! "$SOA_DEVELOPER_KEY_HEX" =~ ^[0-9a-f]{64}$ ]]; then
+  echo "Could not derive the SOA Ed25519 developer public key." >&2
+  exit 1
+fi
 
 jq -n \
   --arg version "$VERSION" \
@@ -46,9 +56,11 @@ jq -n \
   --arg sha256 "$SHA256" \
   --argjson size "$SIZE" \
   --arg released_at "$RELEASED_AT" \
+  --arg soa_developer_key "$SOA_DEVELOPER_KEY_HEX" \
   '{schema: 1, platform: "linux-x86_64", version: $version,
     file_name: $file_name, url: $url, mirrors: [$github_url], sha256: $sha256, size: $size,
-    released_at: $released_at, required: false}' >"$MANIFEST"
+    released_at: $released_at, required: false,
+    soa_developer_key: $soa_developer_key}' >"$MANIFEST"
 
 if [ -n "$HISTORY_INPUT" ] && [ -f "$HISTORY_INPUT" ]; then
   HISTORY_SIGNATURE_INPUT="${SOA_UPDATE_HISTORY_SIGNATURE_INPUT:-$HISTORY_INPUT.sig}"
@@ -68,12 +80,15 @@ if [ -n "$HISTORY_INPUT" ] && [ -f "$HISTORY_INPUT" ]; then
   fi
   rm -f "$VERIFY_SIGNATURE" "$VERIFY_PUBLIC_KEY"
   trap - EXIT
-  jq --slurpfile current "$MANIFEST" \
-    '.releases = ([.releases[] | select(.version != $current[0].version)] + [$current[0]])
+  jq --arg soa_developer_key "$SOA_DEVELOPER_KEY_HEX" --slurpfile current "$MANIFEST" \
+    '.soa_developer_key = $soa_developer_key
+     | .releases |= map(.soa_developer_key = $soa_developer_key)
+     | .releases = ([.releases[] | select(.version != $current[0].version)] + [$current[0]])
      | .releases |= sort_by(.version)' "$HISTORY_INPUT" >"$HISTORY"
 else
-  jq -n --slurpfile current "$MANIFEST" \
-    '{schema: 1, platform: "linux-x86_64", releases: $current}' >"$HISTORY"
+  jq -n --arg soa_developer_key "$SOA_DEVELOPER_KEY_HEX" --slurpfile current "$MANIFEST" \
+    '{schema: 1, platform: "linux-x86_64", soa_developer_key: $soa_developer_key,
+      releases: $current}' >"$HISTORY"
 fi
 
 sign_file() {

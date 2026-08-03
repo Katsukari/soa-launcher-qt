@@ -378,12 +378,24 @@ final class DiscordRpcService: @unchecked Sendable
     private func socketCandidates() -> [String]
     {
         let environment = ProcessInfo.processInfo.environment
-        var directories: [String] = []
+        var baseDirectories: [String] = []
         for name in ["XDG_RUNTIME_DIR", "TMPDIR", "TMP", "TEMP"] {
             let value = environment[name]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            if !value.isEmpty { directories.append(value) }
+            if !value.isEmpty { baseDirectories.append(value) }
         }
-        directories.append("/tmp")
+        #if os(Linux)
+        baseDirectories.append("/run/user/\(getuid())")
+        #endif
+        baseDirectories.append("/tmp")
+
+        var directories = baseDirectories
+        #if os(Linux)
+        for base in baseDirectories {
+            let root = URL(fileURLWithPath: base, isDirectory: true)
+            directories.append(root.appendingPathComponent("app/com.discordapp.Discord").path)
+            directories.append(root.appendingPathComponent("snap.discord").path)
+        }
+        #endif
         var seen = Set<String>()
         var output: [String] = []
         for directory in directories {

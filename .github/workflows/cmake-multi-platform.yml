@@ -69,6 +69,12 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install cmake ninja
 
+      - name: Install pinned Linux Swift toolchain
+        if: runner.os == 'Linux'
+        uses: swift-actions/setup-swift@7ca6abe6b3b0e8b5421b88be48feee39cbf52c6a
+        with:
+          swift-version: "6.3.2"
+
       - name: Install Qt
         uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730
         with:
@@ -107,16 +113,15 @@ jobs:
 
       - name: Build Linux AppImage
         if: runner.os == 'Linux' && matrix.cpp_compiler == 'g++'
-        continue-on-error: true
         env:
           QMAKE: ${{ env.QT_ROOT_DIR }}/bin/qmake
           SOA_UPDATE_SIGNING_KEY_B64: ${{ secrets.SOA_UPDATE_SIGNING_KEY_B64 }}
-        run: ./packaging/build-appimage.sh
+        run: ./packaging/linux/build-appimage.sh
 
       - name: Verify Linux AppImage
         if: runner.os == 'Linux' && matrix.cpp_compiler == 'g++'
         run: |
-          output="$(find "${{ github.workspace }}/packaging" -maxdepth 1 -type f -name 'Story_Of_Alicia_Launcher_*_x86_64.AppImage' -print -quit)"
+          output="$(find "${{ github.workspace }}/packaging/linux" -maxdepth 1 -type f -name 'Story_Of_Alicia_Launcher_*_x86_64.AppImage' -print -quit)"
           if [ ! -s "$output" ]; then
             echo "::error::build-appimage.sh did not produce the expected AppImage."
             exit 1
@@ -125,17 +130,49 @@ jobs:
           file "$output"
           ls -lh "$output"
 
+      - name: Validate AppImage in clean Ubuntu container
+        if: runner.os == 'Linux' && matrix.cpp_compiler == 'g++'
+        run: |
+          set -euo pipefail
+          output="$(find "${{ github.workspace }}/packaging/linux" -maxdepth 1 -type f -name 'Story_Of_Alicia_Launcher_*_x86_64.AppImage' -print -quit)"
+          extract_root="$RUNNER_TEMP/soa-appimage-extract"
+          mkdir -p "$extract_root"
+          (
+            cd "$extract_root"
+            "$output" --appimage-extract >/dev/null
+          )
+          docker run --rm -i \
+            -v "$extract_root/squashfs-root:/app:ro" \
+            ubuntu:22.04 bash -s <<'CHECK_APPIMAGE'
+          set -euo pipefail
+          swift_core="$(find /app -name 'libswiftCore.so*' -print -quit)"
+          if [ -z "$swift_core" ]; then
+            echo "libswiftCore.so is not bundled in the AppImage." >&2
+            exit 1
+          fi
+          failed=0
+          while IFS= read -r -d '' item; do
+            dependencies="$(env -u LD_LIBRARY_PATH -u LD_PRELOAD ldd "$item" 2>&1 || true)"
+            if grep -q '=> not found' <<< "$dependencies"; then
+              echo "Unresolved dependencies in clean Ubuntu 22.04: $item" >&2
+              grep '=> not found' <<< "$dependencies" >&2
+              failed=1
+            fi
+          done < <(find /app -type f \( -perm /111 -o -name '*.so' -o -name '*.so.*' \) -print0)
+          exit "$failed"
+          CHECK_APPIMAGE
+
       - name: Upload Linux AppImage
         if: runner.os == 'Linux' && matrix.cpp_compiler == 'g++'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: soa-launcher-linux-appimage
           path: |
-            ${{ github.workspace }}/packaging/Story_Of_Alicia_Launcher_*_x86_64.AppImage
-            ${{ github.workspace }}/packaging/linux_launcher_version.json
-            ${{ github.workspace }}/packaging/linux_launcher_version.json.sig
-            ${{ github.workspace }}/packaging/linux_launcher_versions.json
-            ${{ github.workspace }}/packaging/linux_launcher_versions.json.sig
+            ${{ github.workspace }}/packaging/linux/Story_Of_Alicia_Launcher_*_x86_64.AppImage
+            ${{ github.workspace }}/packaging/linux/linux_launcher_version.json
+            ${{ github.workspace }}/packaging/linux/linux_launcher_version.json.sig
+            ${{ github.workspace }}/packaging/linux/linux_launcher_versions.json
+            ${{ github.workspace }}/packaging/linux/linux_launcher_versions.json.sig
           if-no-files-found: error
           compression-level: 0
 

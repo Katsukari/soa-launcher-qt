@@ -31,8 +31,7 @@ private final class StreamingDownloadDelegate: NSObject, URLSessionDataDelegate,
     private let onBytes: (Int, UInt64) -> Void
     private let queue: OperationQueue
 
-    private var session: URLSession?
-    private var task: URLSessionDataTask?
+    private let cancellation = URLSessionTaskCancellationGate()
     private var handle: FileHandle?
     private var continuation: CheckedContinuation<Void, Error>?
     private var terminalError: Error?
@@ -80,13 +79,11 @@ private final class StreamingDownloadDelegate: NSObject, URLSessionDataDelegate,
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                 self.continuation = continuation
                 let session = URLSession(configuration: configuration, delegate: self, delegateQueue: queue)
-                self.session = session
                 let task = session.dataTask(with: request)
-                self.task = task
-                task.resume()
+                self.cancellation.start(task)
             }
         }, onCancel: {
-            self.task?.cancel()
+            self.cancellation.cancel()
         })
     }
 
@@ -170,8 +167,7 @@ private final class StreamingDownloadDelegate: NSObject, URLSessionDataDelegate,
         handle = nil
 
         defer {
-            self.task = nil
-            self.session = nil
+            cancellation.clear()
             session.finishTasksAndInvalidate()
             continuation = nil
         }

@@ -43,14 +43,46 @@ final class NetworkCallbackGate: @unchecked Sendable
     }
 }
 
+final class URLSessionTaskCancellationGate: @unchecked Sendable
+{
+    private let lock = NSLock()
+    private var task: URLSessionTask?
+    private var cancellationRequested = false
+
+    func start(_ task: URLSessionTask)
+    {
+        lock.lock()
+        self.task = task
+        let shouldCancel = cancellationRequested
+        task.resume()
+        lock.unlock()
+        if shouldCancel { task.cancel() }
+    }
+
+    func cancel()
+    {
+        lock.lock()
+        cancellationRequested = true
+        let activeTask = task
+        lock.unlock()
+        activeTask?.cancel()
+    }
+
+    func clear()
+    {
+        lock.lock()
+        task = nil
+        lock.unlock()
+    }
+}
+
 final class BoundedHTTPDelegate: NSObject, URLSessionDataDelegate, URLSessionTaskDelegate, @unchecked Sendable
 {
     private let maximumBytes: Int
     private let allowInsecureHTTP: Bool
     private let redirectValidator: @Sendable (URL, URL) -> Bool
     private let queue: OperationQueue
-    private var session: URLSession?
-    private var task: URLSessionDataTask?
+    private let cancellation = URLSessionTaskCancellationGate()
     private var continuation: CheckedContinuation<HTTPResponseValue, Error>?
     private var response: HTTPURLResponse?
     private var payload = Data()
@@ -75,13 +107,11 @@ final class BoundedHTTPDelegate: NSObject, URLSessionDataDelegate, URLSessionTas
             try await withCheckedThrowingContinuation { continuation in
                 self.continuation = continuation
                 let session = URLSession(configuration: configuration, delegate: self, delegateQueue: queue)
-                self.session = session
                 let task = session.dataTask(with: request)
-                self.task = task
-                task.resume()
+                self.cancellation.start(task)
             }
         }, onCancel: {
-            self.task?.cancel()
+            self.cancellation.cancel()
         })
     }
 
@@ -147,8 +177,7 @@ final class BoundedHTTPDelegate: NSObject, URLSessionDataDelegate, URLSessionTas
         guard !completed else { return }
         completed = true
         defer {
-            self.task = nil
-            self.session = nil
+            cancellation.clear()
             session.finishTasksAndInvalidate()
             continuation = nil
         }

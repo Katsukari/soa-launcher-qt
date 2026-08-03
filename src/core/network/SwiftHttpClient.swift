@@ -283,15 +283,13 @@ final class SwiftHttpClient: @unchecked Sendable
 #else
         let streamType = SOCK_STREAM
 #endif
-        var hints = addrinfo(
-            ai_flags: AI_ADDRCONFIG,
-            ai_family: AF_UNSPEC,
-            ai_socktype: streamType,
-            ai_protocol: 0,
-            ai_addrlen: 0,
-            ai_addr: nil,
-            ai_canonname: nil,
-            ai_next: nil)
+        // Darwin and Glibc expose addrinfo fields in different declaration
+        // orders, so avoid the platform-specific memberwise initializer.
+        var hints = addrinfo()
+        hints.ai_flags = AI_ADDRCONFIG
+        hints.ai_family = AF_UNSPEC
+        hints.ai_socktype = streamType
+        hints.ai_protocol = 0
         var result: UnsafeMutablePointer<addrinfo>?
         let code = getaddrinfo(hostname, nil, &hints, &result)
         guard code == 0, let first = result else {
