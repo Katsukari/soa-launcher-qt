@@ -71,6 +71,63 @@ require_command sha256sum
 require_command swiftc
 require_command timeout
 require_command desktop-file-validate
+require_command jq
+require_command openssl
+
+TEMPORARY_UPDATE_KEY=""
+UPDATE_HISTORY_TEMP=""
+if [ -z "${SOA_UPDATE_SIGNING_KEY:-}" ]; then
+  TEMPORARY_UPDATE_KEY="$(mktemp)"
+  if [ -n "${SOA_UPDATE_SIGNING_KEY_B64:-}" ]; then
+    printf '%s' "$SOA_UPDATE_SIGNING_KEY_B64" | base64 --decode >"$TEMPORARY_UPDATE_KEY"
+  elif [ "${GITHUB_REF_TYPE:-}" = "tag" ]; then
+    echo "Tagged release builds require the SOA_UPDATE_SIGNING_KEY_B64 secret." >&2
+    rm -f "$TEMPORARY_UPDATE_KEY"
+    exit 1
+  else
+    echo "Using an ephemeral update key for this non-release build." >&2
+    openssl genpkey -algorithm Ed25519 -out "$TEMPORARY_UPDATE_KEY"
+  fi
+  chmod 600 "$TEMPORARY_UPDATE_KEY"
+  SOA_UPDATE_SIGNING_KEY="$TEMPORARY_UPDATE_KEY"
+fi
+
+cleanup_update_key() {
+  if [ -n "$TEMPORARY_UPDATE_KEY" ]; then
+    rm -f "$TEMPORARY_UPDATE_KEY"
+  fi
+  if [ -n "$UPDATE_HISTORY_TEMP" ]; then
+    rm -rf "$UPDATE_HISTORY_TEMP"
+  fi
+}
+trap cleanup_update_key EXIT
+
+if [ -z "${SOA_UPDATE_SIGNING_KEY:-}" ] || [ ! -f "$SOA_UPDATE_SIGNING_KEY" ]; then
+  echo "SOA_UPDATE_SIGNING_KEY must point to the offline Ed25519 private key." >&2
+  exit 1
+fi
+
+DERIVED_UPDATE_PUBLIC_KEY_HEX="$(
+  openssl pkey -in "$SOA_UPDATE_SIGNING_KEY" -pubout -outform DER \
+    | tail -c 32 \
+    | od -An -v -tx1 \
+    | tr -d ' \n'
+)"
+if [ -n "${SOA_UPDATE_PUBLIC_KEY_HEX:-}" ] \
+    && [ "${SOA_UPDATE_PUBLIC_KEY_HEX,,}" != "$DERIVED_UPDATE_PUBLIC_KEY_HEX" ]; then
+  echo "SOA_UPDATE_PUBLIC_KEY_HEX does not match SOA_UPDATE_SIGNING_KEY." >&2
+  exit 1
+fi
+SOA_UPDATE_PUBLIC_KEY_HEX="$DERIVED_UPDATE_PUBLIC_KEY_HEX"
+
+LAUNCHER_VERSION="${SOA_LAUNCHER_VERSION:-$(
+  sed -nE 's/^[[:space:]]*VERSION[[:space:]]+([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' \
+    "$PROJECT_ROOT/CMakeLists.txt" | head -n 1
+)}"
+if [[ ! "$LAUNCHER_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]; then
+  echo "Could not determine a valid launcher version." >&2
+  exit 1
+fi
 
 if [ -z "${QMAKE:-}" ]; then
   QMAKE="$(command -v qmake6 || true)"
@@ -98,11 +155,24 @@ cmake \
   -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
   -DBUILD_TESTING=OFF \
+  -DSOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX="$SOA_UPDATE_PUBLIC_KEY_HEX" \
   -DCMAKE_CXX_FLAGS="-march=x86-64 -mtune=generic"
 
 cmake --build "$BUILD_DIR"
 
 DESTDIR="$APPDIR" cmake --install "$BUILD_DIR" --prefix /usr
+
+mkdir -p "$APPDIR/usr/share/soa-launcher/update"
+jq -n \
+  --arg version "$LAUNCHER_VERSION" \
+  --arg manifest_url "https://r2.storyofalicia.com/launcher/linux_launcher_version.json" \
+  --arg fallback_manifest_url \
+    "https://github.com/Story-Of-Alicia/soa-launcher-qt/releases/latest/download/linux_launcher_version.json" \
+  --arg signing_public_key "$SOA_UPDATE_PUBLIC_KEY_HEX" \
+  '{schema: 1, version: $version, platform: "linux-x86_64",
+    manifest_url: $manifest_url, fallback_manifest_url: $fallback_manifest_url,
+    signing_public_key: $signing_public_key}' \
+  >"$APPDIR/usr/share/soa-launcher/update/linux_launcher_version.json"
 
 cp soa-launcher.png "$APPDIR/soa-launcher.png"
 cp soa-launcher.desktop "$APPDIR/soa-launcher.desktop"
@@ -182,7 +252,7 @@ cleanup_smoke() {
   rm -f "$SMOKE_LOG"
 }
 
-trap cleanup_smoke EXIT
+trap 'cleanup_smoke; cleanup_update_key' EXIT
 
 mkdir -p \
   "$SMOKE_ROOT/home" \
@@ -230,8 +300,29 @@ if [ "$SMOKE_STATUS" -ne 0 ] && [ "$SMOKE_STATUS" -ne 124 ]; then
 fi
 
 cleanup_smoke
-trap - EXIT
 
 rm -rf "$SCRIPT_DIR/squashfs-root"
 
-echo "Done. The .AppImage is in: $SCRIPT_DIR"
+VERSIONED_OUTPUT="$SCRIPT_DIR/Story_Of_Alicia_Launcher_${LAUNCHER_VERSION}_x86_64.AppImage"
+mv "$OUTPUT" "$VERSIONED_OUTPUT"
+OUTPUT="$VERSIONED_OUTPUT"
+
+if [ -z "${SOA_UPDATE_HISTORY_INPUT:-}" ]; then
+  UPDATE_HISTORY_TEMP="$(mktemp -d)"
+  for history_base in \
+      "https://github.com/Story-Of-Alicia/soa-launcher-qt/releases/latest/download" \
+      "https://r2.storyofalicia.com/launcher"; do
+    if wget -q "$history_base/linux_launcher_versions.json" \
+        -O "$UPDATE_HISTORY_TEMP/linux_launcher_versions.json" \
+        && wget -q "$history_base/linux_launcher_versions.json.sig" \
+        -O "$UPDATE_HISTORY_TEMP/linux_launcher_versions.json.sig"; then
+      SOA_UPDATE_HISTORY_INPUT="$UPDATE_HISTORY_TEMP/linux_launcher_versions.json"
+      export SOA_UPDATE_HISTORY_INPUT
+      break
+    fi
+  done
+fi
+
+"$SCRIPT_DIR/generate-linux-update-metadata.sh" "$LAUNCHER_VERSION" "$OUTPUT"
+
+echo "Done. The versioned AppImage and signed update metadata are in: $SCRIPT_DIR"

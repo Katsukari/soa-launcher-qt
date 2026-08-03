@@ -48,6 +48,7 @@ private func updateCheckDone(_ result: soa_launcher_check_result,
                              _ sha256: UnsafePointer<CChar>?,
                              _ expectedSize: UInt64,
                              _ required: Bool,
+                             _ releasesJSON: UnsafePointer<CChar>?,
                              _ context: UnsafeMutableRawPointer?)
 {
     lock.lock()
@@ -107,7 +108,9 @@ struct SwiftNetworkABITests
         soa_http_client_destroy(client)
 
         guard let updater = soa_launcher_updater_create(
-            "invalid repository name",
+            "file:///invalid-manifest.json",
+            "file:///invalid-fallback.json",
+            "invalid-key",
             "1.0.0",
             "linux-x86_64",
             NSTemporaryDirectory(),

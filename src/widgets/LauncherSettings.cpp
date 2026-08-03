@@ -403,47 +403,30 @@ void LauncherSettings::start_ping_check()
     }
 
     auto* process = new QProcess(this);
-    process->setProperty("soa_result_recorded", false);
-    process->setProperty("soa_timed_out", false);
+    process->setProperty("soa_finished", false);
     const auto timer = QSharedPointer<QElapsedTimer>::create();
     timer->start();
 
-    const auto record = [this, process](const bool ok, const QString& detail)
+    const auto finish = [this, process, timer](const bool ok, const QString& detail)
     {
-        if (process->property("soa_result_recorded").toBool())
+        if (process->property("soa_finished").toBool())
             return;
-        process->setProperty("soa_result_recorded", true);
+        process->setProperty("soa_finished", true);
         record_connectivity_result(QStringLiteral("Network ping"), ok, detail);
+        process->deleteLater();
     };
 
     connect(process, &QProcess::finished, this,
-            [process, record, timer](const int exit_code, QProcess::ExitStatus status)
+            [finish, timer](const int exit_code, QProcess::ExitStatus status)
     {
-        if (!process->property("soa_timed_out").toBool())
-        {
-            const bool ok = status == QProcess::NormalExit && exit_code == 0;
-            record(ok, ok ? QStringLiteral("%1 ms").arg(timer->elapsed())
-                          : QStringLiteral("blocked or unreachable"));
-        }
-        process->deleteLater();
+        const bool ok = status == QProcess::NormalExit && exit_code == 0;
+        finish(ok, ok ? QStringLiteral("%1 ms").arg(timer->elapsed())
+                      : QStringLiteral("blocked or unreachable"));
     });
     connect(process, &QProcess::errorOccurred, this,
-            [process, record](QProcess::ProcessError error)
+            [finish](QProcess::ProcessError)
     {
-        if (process->property("soa_timed_out").toBool())
-            return;
-        record(false, error == QProcess::FailedToStart
-            ? QStringLiteral("could not start ping")
-            : QStringLiteral("ping process failed"));
-        if (process->state() == QProcess::NotRunning)
-            process->deleteLater();
-    });
-    connect(this, &QObject::destroyed, process, [process]()
-    {
-        if (process->state() == QProcess::NotRunning)
-            return;
-        process->kill();
-        process->waitForFinished(1000);
+        finish(false, QStringLiteral("could not start ping"));
     });
 
 #ifdef Q_OS_MACOS
@@ -456,16 +439,12 @@ void LauncherSettings::start_ping_check()
                           QStringLiteral("r2.storyofalicia.com")});
 #endif
 
-    QTimer::singleShot(5000, process, [process, record]()
+    QTimer::singleShot(5000, process, [process, finish]()
     {
-        if (process->property("soa_result_recorded").toBool())
+        if (process->property("soa_finished").toBool())
             return;
-        process->setProperty("soa_timed_out", true);
-        record(false, QStringLiteral("timed out"));
-        if (process->state() == QProcess::NotRunning)
-            process->deleteLater();
-        else
-            process->kill();
+        process->kill();
+        finish(false, QStringLiteral("timed out"));
     });
 }
 

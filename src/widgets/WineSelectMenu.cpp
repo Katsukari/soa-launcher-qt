@@ -17,6 +17,7 @@
 #include <QPalette>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QShowEvent>
 #include <QVBoxLayout>
 #include <QtConcurrent/QtConcurrentRun>
 
@@ -309,7 +310,6 @@ WineSelectMenu::WineSelectMenu(QWidget* parent) : ModalOverlay(parent)
     detector = new QFutureWatcher<QVector<cw::WineInstall>>(this);
     connect(detector, &QFutureWatcher<QVector<cw::WineInstall>>::finished,
             this, &WineSelectMenu::finish_scan);
-    start_scan();
     relayout();
     connect(&util::i18n::LanguageManager::instance(),
             &util::i18n::LanguageManager::language_changed, this,
@@ -477,9 +477,17 @@ void WineSelectMenu::finish_scan()
 {
     runtimes = detector->result();
     scanning = false;
+    scan_completed = true;
     rescan_button->setEnabled(true);
     browse_button->setEnabled(true);
     populate();
+}
+
+void WineSelectMenu::showEvent(QShowEvent* event)
+{
+    if (!scan_completed && !scanning)
+        start_scan();
+    ModalOverlay::showEvent(event);
 }
 
 void WineSelectMenu::rescan()
@@ -658,5 +666,3 @@ void WineSelectMenu::relayout()
                                  buttons.height());
 
 }
-
-

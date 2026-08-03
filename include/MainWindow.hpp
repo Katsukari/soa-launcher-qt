@@ -131,6 +131,7 @@ private:
     QPushButton* show_log_button {};
     QPushButton* credits_button {};
     QPushButton* about_button {};
+    QPushButton* launcher_versions_button {};
     QLabel* version_label {};
     QPushButton* close_button {};
     QPushButton* minimize_button {};

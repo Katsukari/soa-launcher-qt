@@ -11,10 +11,12 @@ struct LauncherUpdateSelection
     let message: String
     let packageKind: String
     let fileName: String
-    let packageURL: URL
+    let packageURLs: [URL]
     let sha256: String
     let expectedSize: UInt64
     let required: Bool
+
+    var packageURL: URL { packageURLs[0] }
 }
 
 struct LauncherServiceFailure: Error
@@ -220,7 +222,9 @@ final class LauncherAssetDelegate: NSObject, URLSessionDataDelegate, URLSessionT
 
 final class LauncherUpdateService: @unchecked Sendable
 {
-    private let repository: String
+    private let manifestURLText: String
+    private let fallbackManifestURLText: String
+    private let publicKeyHex: String
     private let currentVersion: String
     private let platform: String
     private let downloadDirectory: URL
@@ -234,9 +238,13 @@ final class LauncherUpdateService: @unchecked Sendable
     private let lock = NSLock()
     private var task: Task<Void, Never>?
     private var selection: LauncherUpdateSelection?
+    private var catalogue: [String: LauncherUpdateSelection] = [:]
+    private var catalogueJSON = "[]"
     private var stopped = false
 
-    init(repository: String,
+    init(manifestURL: String,
+         fallbackManifestURL: String,
+         publicKeyHex: String,
          currentVersion: String,
          platform: String,
          downloadDirectory: String,
@@ -247,7 +255,9 @@ final class LauncherUpdateService: @unchecked Sendable
          downloadDone: @escaping soa_launcher_download_cb,
          context: UnsafeMutableRawPointer?)
     {
-        self.repository = repository
+        self.manifestURLText = manifestURL
+        self.fallbackManifestURLText = fallbackManifestURL
+        self.publicKeyHex = publicKeyHex.lowercased()
         self.currentVersion = currentVersion
         self.platform = platform
         self.downloadDirectory = URL(fileURLWithPath: downloadDirectory, isDirectory: true)
@@ -266,6 +276,8 @@ final class LauncherUpdateService: @unchecked Sendable
         let active = task
         task = nil
         selection = nil
+        catalogue.removeAll()
+        catalogueJSON = "[]"
         lock.unlock()
         active?.cancel()
         gate.shutdown()
@@ -277,6 +289,17 @@ final class LauncherUpdateService: @unchecked Sendable
         let active = task
         lock.unlock()
         active?.cancel()
+    }
+
+    func selectVersion(_ version: String) -> Bool
+    {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !stopped, task == nil, let selected = catalogue[normalizedVersion(version)] else {
+            return false
+        }
+        selection = selected
+        return true
     }
 
     func check()
@@ -296,6 +319,8 @@ final class LauncherUpdateService: @unchecked Sendable
             return
         }
         selection = nil
+        catalogue.removeAll()
+        catalogueJSON = "[]"
         let operation = Task { [weak self] in
             await self?.performCheck()
             self?.clearTask()
@@ -352,13 +377,29 @@ final class LauncherUpdateService: @unchecked Sendable
         lock.unlock()
     }
 
+    private func storeCatalogue(_ values: [LauncherUpdateSelection], json: String)
+    {
+        lock.lock()
+        catalogue = Dictionary(uniqueKeysWithValues: values.map { ($0.version, $0) })
+        catalogueJSON = json
+        lock.unlock()
+    }
+
     private func performCheck() async
     {
-        guard repository.range(
-            of: #"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"#,
-            options: .regularExpression) != nil,
-              !currentVersion.isEmpty,
-              ["linux-x86_64", "macos-arm64", "macos-x86_64"].contains(platform) else {
+        if platform.hasPrefix("macos-") {
+            reportCheck(result: soa_launcher_check_no_update, failure: nil, selection: nil)
+            return
+        }
+
+        guard !currentVersion.isEmpty,
+              platform == "linux-x86_64",
+              publicKeyHex.range(of: #"^[0-9a-f]{64}$"#, options: .regularExpression) != nil,
+              let primaryURL = secureURL(manifestURLText, allowInsecureHTTP: allowInsecureHTTP),
+              let fallbackURL = secureURL(fallbackManifestURLText,
+                                          allowInsecureHTTP: allowInsecureHTTP),
+              Self.trustedReleaseHost(primaryURL.host?.lowercased() ?? ""),
+              Self.trustedReleaseHost(fallbackURL.host?.lowercased() ?? "") else {
             reportCheck(result: soa_launcher_check_failed,
                         failure: LauncherServiceFailure(
                             soa_launcher_error_invalid_configuration,
@@ -367,47 +408,29 @@ final class LauncherUpdateService: @unchecked Sendable
             return
         }
 
-        guard let url = secureURL(
-            "https://api.github.com/repos/\(repository)/releases/latest",
-            allowInsecureHTTP: allowInsecureHTTP) else {
-            reportCheck(result: soa_launcher_check_failed,
-                        failure: LauncherServiceFailure(
-                            soa_launcher_error_invalid_configuration,
-                            "The GitHub release URL is invalid"),
-                        selection: nil)
-            return
-        }
-
-        var request = URLRequest(url: url)
-        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
-        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
-        request.setValue("no-store", forHTTPHeaderField: "Cache-Control")
-
         do {
-            let response = try await fetchBounded(
-                request,
-                timeoutMilliseconds: 12_000,
-                maximumBytes: 4 * 1024 * 1024,
-                allowInsecureHTTP: allowInsecureHTTP,
-                redirectValidator: { source, destination in
-                    source.scheme?.lowercased() == destination.scheme?.lowercased()
-                    && destination.host?.lowercased() == "api.github.com"
-                })
-            guard (200...299).contains(response.status) else {
-                throw LauncherServiceFailure(
-                    soa_launcher_error_http,
-                    "HTTP \(response.status)",
-                    status: response.status)
+            var lastError: Error?
+            let endpoints = primaryURL == fallbackURL ? [primaryURL] : [primaryURL, fallbackURL]
+            for endpoint in endpoints {
+                do {
+                    let selected = try await loadCatalogue(from: endpoint)
+                    guard compareVersions(selected.version, currentVersion) > 0 else {
+                        reportCheck(result: soa_launcher_check_no_update,
+                                    failure: nil, selection: nil)
+                        return
+                    }
+                    storeSelection(selected)
+                    reportCheck(result: soa_launcher_check_update_available,
+                                failure: nil, selection: selected)
+                    return
+                } catch is CancellationError {
+                    throw CancellationError()
+                } catch {
+                    lastError = error
+                }
             }
-            guard let selected = try parseRelease(response.data) else {
-                reportCheck(result: soa_launcher_check_no_update, failure: nil, selection: nil)
-                return
-            }
-            storeSelection(selected)
-            reportCheck(result: soa_launcher_check_update_available,
-                        failure: nil,
-                        selection: selected)
+            throw lastError ?? LauncherServiceFailure(
+                soa_launcher_error_network, "No launcher update source was available")
         } catch is CancellationError {
             reportCheck(result: soa_launcher_check_cancelled,
                         failure: LauncherServiceFailure(
@@ -432,43 +455,94 @@ final class LauncherUpdateService: @unchecked Sendable
         }
     }
 
-    private func parseRelease(_ data: Data) throws -> LauncherUpdateSelection?
+    private func loadCatalogue(from manifestURL: URL) async throws -> LauncherUpdateSelection
     {
-        guard let release = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              release["draft"] as? Bool != true,
-              release["prerelease"] as? Bool != true else {
+        let manifestData = try await fetchSignedJSON(manifestURL, maximumBytes: 64 * 1024)
+        let selected = try parseManifest(manifestData)
+        let historyURL = manifestURL.deletingLastPathComponent()
+            .appendingPathComponent("linux_launcher_versions.json")
+        let historyData = try await fetchSignedJSON(historyURL, maximumBytes: 1024 * 1024)
+        let parsedCatalogue = try parseCatalogue(historyData)
+        guard parsedCatalogue.releases.contains(where: {
+            $0.version == selected.version && $0.packageURLs.contains(selected.packageURL)
+                && $0.sha256 == selected.sha256 && $0.expectedSize == selected.expectedSize
+        }) else {
             throw LauncherServiceFailure(
                 soa_launcher_error_invalid_release,
-                "GitHub returned invalid launcher release information")
+                "The latest launcher release is missing from signed release history")
+        }
+        storeCatalogue(parsedCatalogue.releases, json: parsedCatalogue.json)
+        return selected
+    }
+
+    private func fetchSignedJSON(_ url: URL, maximumBytes: Int) async throws -> Data
+    {
+        var request = URLRequest(url: url)
+        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("no-store", forHTTPHeaderField: "Cache-Control")
+        let response = try await fetchBounded(
+            request,
+            timeoutMilliseconds: 12_000,
+            maximumBytes: maximumBytes,
+            allowInsecureHTTP: allowInsecureHTTP,
+            redirectValidator: { source, destination in
+                source.scheme?.lowercased() == destination.scheme?.lowercased()
+                    && Self.trustedReleaseHost(source.host?.lowercased() ?? "")
+                    && Self.trustedReleaseHost(destination.host?.lowercased() ?? "")
+            })
+        guard (200...299).contains(response.status) else {
+            throw LauncherServiceFailure(soa_launcher_error_http,
+                                         "HTTP \(response.status)", status: response.status)
+        }
+        var signatureRequest = URLRequest(url: url.appendingPathExtension("sig"))
+        signatureRequest.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+        signatureRequest.setValue("text/plain", forHTTPHeaderField: "Accept")
+        signatureRequest.setValue("no-store", forHTTPHeaderField: "Cache-Control")
+        let signatureResponse = try await fetchBounded(
+            signatureRequest,
+            timeoutMilliseconds: 12_000,
+            maximumBytes: 256,
+            allowInsecureHTTP: allowInsecureHTTP,
+            redirectValidator: { source, destination in
+                source.scheme?.lowercased() == destination.scheme?.lowercased()
+                    && Self.trustedReleaseHost(source.host?.lowercased() ?? "")
+                    && Self.trustedReleaseHost(destination.host?.lowercased() ?? "")
+            })
+        guard (200...299).contains(signatureResponse.status) else {
+            throw LauncherServiceFailure(soa_launcher_error_http,
+                                         "HTTP \(signatureResponse.status)",
+                                         status: signatureResponse.status)
+        }
+        try verifyManifest(response.data, signature: signatureResponse.data)
+        return response.data
+    }
+
+    private func parseManifest(_ data: Data) throws -> LauncherUpdateSelection
+    {
+        guard let manifest = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              (manifest["schema"] as? NSNumber)?.intValue == 1,
+              manifest["platform"] as? String == "linux-x86_64" else {
+            throw LauncherServiceFailure(
+                soa_launcher_error_invalid_release,
+                "The launcher update manifest is invalid")
         }
 
-        let tag = normalizedVersion((release["tag_name"] as? String) ?? (release["name"] as? String) ?? "")
+        let tag = normalizedVersion(manifest["version"] as? String ?? "")
         guard validVersion(tag) else {
             throw LauncherServiceFailure(
                 soa_launcher_error_invalid_release,
                 "The latest launcher release has an invalid version tag")
         }
-        if compareVersions(tag, currentVersion) <= 0 {
-            return nil
-        }
-
-        let body = release["body"] as? String ?? ""
-        let minimum = normalizedVersion(releaseDirective(body, key: "minimum-version"))
+        let minimum = normalizedVersion(manifest["minimum_version"] as? String ?? "")
         if !minimum.isEmpty && !validVersion(minimum) {
             throw LauncherServiceFailure(
                 soa_launcher_error_invalid_release,
                 "The launcher release has an invalid minimum version")
         }
 
-        guard let assets = release["assets"] as? [[String: Any]],
-              let asset = selectAsset(assets) else {
-            throw LauncherServiceFailure(
-                soa_launcher_error_missing_asset,
-                "No compatible launcher package was attached to the release")
-        }
-
-        let name = safeFileName(asset["name"] as? String ?? "")
-        let urlText = asset["browser_download_url"] as? String ?? ""
+        let name = safeFileName(manifest["file_name"] as? String ?? "")
+        let urlText = manifest["url"] as? String ?? ""
         guard !name.isEmpty,
               let url = secureURL(urlText, allowInsecureHTTP: allowInsecureHTTP),
               Self.trustedReleaseHost(url.host?.lowercased() ?? "") else {
@@ -476,8 +550,22 @@ final class LauncherUpdateService: @unchecked Sendable
                 soa_launcher_error_unsafe_url,
                 "The launcher release contains an invalid package URL")
         }
+        var packageURLs = [url]
+        if let mirrors = manifest["mirrors"] as? [String] {
+            for mirror in mirrors {
+                guard let mirrorURL = secureURL(mirror, allowInsecureHTTP: allowInsecureHTTP),
+                      Self.trustedReleaseHost(mirrorURL.host?.lowercased() ?? "") else {
+                    throw LauncherServiceFailure(
+                        soa_launcher_error_unsafe_url,
+                        "The launcher release contains an invalid mirror URL")
+                }
+				if !packageURLs.contains(mirrorURL) {
+					packageURLs.append(mirrorURL)
+				}
+            }
+        }
 
-        var digest = (asset["digest"] as? String ?? "")
+        var digest = (manifest["sha256"] as? String ?? "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
         if digest.hasPrefix("sha256:") { digest.removeFirst(7) }
@@ -488,9 +576,9 @@ final class LauncherUpdateService: @unchecked Sendable
         }
 
         let expectedSize: UInt64
-        if let number = asset["size"] as? NSNumber, number.int64Value > 0 {
+        if let number = manifest["size"] as? NSNumber, number.int64Value > 0 {
             expectedSize = UInt64(number.int64Value)
-        } else if let value = asset["size"] as? String,
+        } else if let value = manifest["size"] as? String,
                   let parsed = UInt64(value), parsed > 0 {
             expectedSize = parsed
         } else {
@@ -507,14 +595,71 @@ final class LauncherUpdateService: @unchecked Sendable
         return LauncherUpdateSelection(
             version: tag,
             minimumVersion: minimum,
-            message: releaseSummary(body),
-            packageKind: platform.hasPrefix("linux-") ? "appimage" : "dmg",
+            message: manifest["message"] as? String ?? "",
+            packageKind: "appimage",
             fileName: name,
-            packageURL: url,
+            packageURLs: packageURLs,
             sha256: digest,
             expectedSize: expectedSize,
-            required: requiredDirective(body)
-                || (!minimum.isEmpty && compareVersions(currentVersion, minimum) < 0))
+            required: false)
+    }
+
+    private func parseCatalogue(_ data: Data) throws
+        -> (releases: [LauncherUpdateSelection], json: String)
+    {
+        guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              (root["schema"] as? NSNumber)?.intValue == 1,
+              root["platform"] as? String == "linux-x86_64",
+              let entries = root["releases"] as? [[String: Any]],
+              !entries.isEmpty, entries.count <= 128 else {
+            throw LauncherServiceFailure(
+                soa_launcher_error_invalid_release,
+                "The signed launcher release catalogue is invalid")
+        }
+
+        let now = Date()
+        let oldestAllowed = now.addingTimeInterval(-365 * 24 * 60 * 60)
+        let newestAllowed = now.addingTimeInterval(24 * 60 * 60)
+        let formatter = ISO8601DateFormatter()
+        var releases: [LauncherUpdateSelection] = []
+        var acceptedEntries: [[String: Any]] = []
+        var versions = Set<String>()
+
+        for entry in entries {
+            guard let releasedText = entry["released_at"] as? String,
+                  let releasedAt = formatter.date(from: releasedText),
+                  releasedAt >= oldestAllowed, releasedAt <= newestAllowed,
+                  JSONSerialization.isValidJSONObject(entry) else {
+                continue
+            }
+            let entryData = try JSONSerialization.data(withJSONObject: entry, options: [.sortedKeys])
+            let release = try parseManifest(entryData)
+            guard versions.insert(release.version).inserted else {
+                throw LauncherServiceFailure(
+                    soa_launcher_error_invalid_release,
+                    "The signed launcher release catalogue contains duplicate versions")
+            }
+            releases.append(release)
+            acceptedEntries.append(entry)
+        }
+
+        guard !releases.isEmpty else {
+            throw LauncherServiceFailure(
+                soa_launcher_error_invalid_release,
+                "No signed launcher release from the last year is available")
+        }
+        releases.sort { compareVersions($0.version, $1.version) > 0 }
+        acceptedEntries.sort {
+            compareVersions($0["version"] as? String ?? "", $1["version"] as? String ?? "") > 0
+        }
+        let filtered: [String: Any] = ["releases": acceptedEntries]
+        let filteredData = try JSONSerialization.data(withJSONObject: filtered, options: [.sortedKeys])
+        guard let json = String(data: filteredData, encoding: .utf8) else {
+            throw LauncherServiceFailure(
+                soa_launcher_error_invalid_release,
+                "The launcher release catalogue could not be encoded")
+        }
+        return (releases, json)
     }
 
     private func performDownload(_ selected: LauncherUpdateSelection) async
@@ -525,27 +670,43 @@ final class LauncherUpdateService: @unchecked Sendable
             try FileManager.default.createDirectory(
                 at: downloadDirectory,
                 withIntermediateDirectories: true)
-            var request = URLRequest(url: selected.packageURL)
-            request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
-            request.setValue("application/octet-stream", forHTTPHeaderField: "Accept")
-            request.setValue("identity", forHTTPHeaderField: "Accept-Encoding")
-            request.setValue("no-store", forHTTPHeaderField: "Cache-Control")
+            var lastError: Error?
+            var downloaded = false
+            for packageURL in selected.packageURLs {
+                do {
+                    try? FileManager.default.removeItem(at: partialURL)
+                    var request = URLRequest(url: packageURL)
+                    request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+                    request.setValue("application/octet-stream", forHTTPHeaderField: "Accept")
+                    request.setValue("identity", forHTTPHeaderField: "Accept-Encoding")
+                    request.setValue("no-store", forHTTPHeaderField: "Cache-Control")
 
-            let configuration = URLSessionConfiguration.ephemeral
-            configuration.timeoutIntervalForRequest = 30
-            configuration.timeoutIntervalForResource = 60 * 60
-            configuration.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
-            configuration.urlCache = nil
-
-            let delegate = LauncherAssetDelegate(
-                destination: partialURL,
-                expectedSize: selected.expectedSize,
-                expectedDigest: selected.sha256,
-                progress: { [weak self] received, total in
-                    self?.reportProgress(received: received, total: total)
-                })
-            reportProgress(received: 0, total: selected.expectedSize)
-            try await delegate.start(request: request, configuration: configuration)
+                    let configuration = URLSessionConfiguration.ephemeral
+                    configuration.timeoutIntervalForRequest = 30
+                    configuration.timeoutIntervalForResource = 60 * 60
+                    configuration.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+                    configuration.urlCache = nil
+                    let delegate = LauncherAssetDelegate(
+                        destination: partialURL,
+                        expectedSize: selected.expectedSize,
+                        expectedDigest: selected.sha256,
+                        progress: { [weak self] received, total in
+                            self?.reportProgress(received: received, total: total)
+                        })
+                    reportProgress(received: 0, total: selected.expectedSize)
+                    try await delegate.start(request: request, configuration: configuration)
+                    downloaded = true
+                    break
+                } catch is CancellationError {
+                    throw CancellationError()
+                } catch {
+                    lastError = error
+                }
+            }
+            guard downloaded else {
+                throw lastError ?? LauncherServiceFailure(
+                    soa_launcher_error_network, "No launcher package mirror was available")
+            }
             try? FileManager.default.removeItem(at: finalURL)
             do {
                 try FileManager.default.moveItem(at: partialURL, to: finalURL)
@@ -598,6 +759,9 @@ final class LauncherUpdateService: @unchecked Sendable
         let required = selection?.required ?? false
         let errorCode = failure?.code ?? soa_launcher_error_none
         let status = failure?.status ?? 0
+        lock.lock()
+        let releases = catalogueJSON
+        lock.unlock()
 
         gate.submit {
             detail.withCString { detailPointer in
@@ -608,11 +772,13 @@ final class LauncherUpdateService: @unchecked Sendable
                                 name.withCString { namePointer in
                                     url.withCString { urlPointer in
                                         digest.withCString { digestPointer in
-                                            callback(result, errorCode, Int32(status), detailPointer,
-                                                     versionPointer, minimumPointer, messagePointer,
-                                                     kindPointer, namePointer, urlPointer, digestPointer,
-                                                     expectedSize, required,
-                                                     contextAddress == 0 ? nil : UnsafeMutableRawPointer(bitPattern: contextAddress))
+                                            releases.withCString { releasesPointer in
+                                                callback(result, errorCode, Int32(status), detailPointer,
+                                                         versionPointer, minimumPointer, messagePointer,
+                                                         kindPointer, namePointer, urlPointer, digestPointer,
+                                                         expectedSize, required, releasesPointer,
+                                                         contextAddress == 0 ? nil : UnsafeMutableRawPointer(bitPattern: contextAddress))
+                                            }
                                         }
                                     }
                                 }
@@ -653,62 +819,57 @@ final class LauncherUpdateService: @unchecked Sendable
         }
     }
 
-    private func selectAsset(_ assets: [[String: Any]]) -> [String: Any]?
+    private func verifyManifest(_ manifest: Data, signature: Data) throws
     {
-        var selected: [String: Any]?
-        var best = -1
-        for asset in assets {
-            if let state = asset["state"] as? String, state != "uploaded" { continue }
-            let score = assetScore(asset["name"] as? String ?? "")
-            if score > best {
-                selected = asset
-                best = score
+        guard let signatureText = String(data: signature, encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+              let signatureBytes = Data(base64Encoded: signatureText),
+              signatureBytes.count == 64,
+              let publicKey = decodeHex(publicKeyHex), publicKey.count == 32 else {
+            throw LauncherServiceFailure(
+                soa_launcher_error_invalid_signature,
+                "The launcher update signature is malformed")
+        }
+
+        #if os(Linux)
+        let valid = publicKey.withUnsafeBytes { keyBuffer in
+            manifest.withUnsafeBytes { manifestBuffer in
+                signatureBytes.withUnsafeBytes { signatureBuffer in
+                    soa_verify_ed25519(
+                        keyBuffer.bindMemory(to: UInt8.self).baseAddress,
+                        UInt64(publicKey.count),
+                        manifestBuffer.bindMemory(to: UInt8.self).baseAddress,
+                        UInt64(manifest.count),
+                        signatureBuffer.bindMemory(to: UInt8.self).baseAddress,
+                        UInt64(signatureBytes.count))
+                }
             }
         }
-        return selected
+        guard valid else {
+            throw LauncherServiceFailure(
+                soa_launcher_error_invalid_signature,
+                "The launcher update manifest is not signed by Story of Alicia")
+        }
+        #else
+        throw LauncherServiceFailure(
+            soa_launcher_error_invalid_configuration,
+            "Launcher self-updates are disabled on this platform")
+        #endif
     }
 
-    private func assetScore(_ name: String) -> Int
+    private func decodeHex(_ value: String) -> Data?
     {
-        let lower = name.lowercased()
-        var score = 0
-        if platform == "linux-x86_64" {
-            guard lower.hasSuffix(".appimage"),
-                  !lower.contains("arm64"),
-                  !lower.contains("aarch64") else { return -1 }
-            score = 100
-            if lower.contains("x86_64") || lower.contains("amd64") { score += 100 }
-        } else if platform == "macos-arm64" {
-            guard lower.hasSuffix(".dmg"),
-                  !lower.contains("x86_64"),
-                  !lower.contains("amd64"),
-                  !lower.contains("intel") else { return -1 }
-            score = 100
-            if lower.contains("arm64") || lower.contains("aarch64") || lower.contains("apple-silicon") {
-                score += 100
-            } else if lower.contains("universal") {
-                score += 60
-            }
-        } else if platform == "macos-x86_64" {
-            guard lower.hasSuffix(".dmg"),
-                  !lower.contains("arm64"),
-                  !lower.contains("aarch64"),
-                  !lower.contains("apple-silicon") else { return -1 }
-            score = 100
-            if lower.contains("x86_64") || lower.contains("amd64") || lower.contains("intel") {
-                score += 100
-            } else if lower.contains("universal") {
-                score += 60
-            }
-        } else {
-            return -1
+        guard value.count % 2 == 0 else { return nil }
+        var output = Data()
+        output.reserveCapacity(value.count / 2)
+        var index = value.startIndex
+        while index < value.endIndex {
+            let end = value.index(index, offsetBy: 2)
+            guard let byte = UInt8(value[index..<end], radix: 16) else { return nil }
+            output.append(byte)
+            index = end
         }
-        if lower.contains("story_of_alicia")
-            || lower.contains("story-of-alicia")
-            || lower.contains("soa-launcher") {
-            score += 20
-        }
-        return score
+        return output
     }
 
     private func normalizedVersion(_ value: String) -> String
@@ -785,57 +946,6 @@ final class LauncherUpdateService: @unchecked Sendable
         return 0
     }
 
-    private func releaseDirective(_ body: String, key: String) -> String
-    {
-        let escaped = NSRegularExpression.escapedPattern(for: key)
-        guard let expression = try? NSRegularExpression(
-            pattern: "<!--\\s*soa-launcher-\(escaped)\\s*:\\s*([^>]*?)\\s*-->",
-            options: [.caseInsensitive]) else { return "" }
-        let range = NSRange(body.startIndex..<body.endIndex, in: body)
-        guard let match = expression.firstMatch(in: body, range: range),
-              let valueRange = Range(match.range(at: 1), in: body) else { return "" }
-        return String(body[valueRange]).trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private func requiredDirective(_ body: String) -> Bool
-    {
-        let value = releaseDirective(body, key: "update").lowercased()
-        return ["required", "mandatory", "true", "yes"].contains(value)
-            || body.range(of: "[launcher-update-required]", options: .caseInsensitive) != nil
-    }
-
-    private func releaseSummary(_ body: String) -> String
-    {
-        var output = body
-        output = output.replacingOccurrences(
-            of: #"<!--\s*soa-launcher-[^>]*-->"#,
-            with: "",
-            options: [.regularExpression, .caseInsensitive])
-        output = output.replacingOccurrences(
-            of: "[launcher-update-required]",
-            with: "",
-            options: .caseInsensitive)
-        output = output.replacingOccurrences(of: #"<[^>]+>"#, with: " ", options: .regularExpression)
-        output = output.replacingOccurrences(
-            of: #"\[([^\]]+)\]\([^\)]+\)"#,
-            with: "$1",
-            options: .regularExpression)
-        for raw in output.components(separatedBy: .newlines) {
-            var line = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-            line = line.replacingOccurrences(
-                of: #"^[#>*_`~\-\s]+"#,
-                with: "",
-                options: .regularExpression)
-            line = line.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
-            if line.isEmpty { continue }
-            if line.count > 220 {
-                return String(line.prefix(217)).trimmingCharacters(in: .whitespaces) + "..."
-            }
-            return line
-        }
-        return ""
-    }
-
     private func safeFileName(_ value: String) -> String
     {
         var output = URL(fileURLWithPath: value).lastPathComponent
@@ -849,14 +959,10 @@ final class LauncherUpdateService: @unchecked Sendable
 
     static func trustedReleaseHost(_ host: String) -> Bool
     {
-        let allowed = [
-            "github.com",
-            "api.github.com",
-            "objects.githubusercontent.com",
-            "github-releases.githubusercontent.com",
-            "release-assets.githubusercontent.com"
-        ]
-        return allowed.contains(host)
+        host == "r2.storyofalicia.com"
+            || host == "github.com"
+            || host == "objects.githubusercontent.com"
+            || host == "release-assets.githubusercontent.com"
             || host.hasSuffix(".githubusercontent.com")
     }
 }

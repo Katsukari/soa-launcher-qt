@@ -93,7 +93,8 @@ typedef enum
     soa_launcher_error_size_mismatch = 13,
     soa_launcher_error_digest_mismatch = 14,
     soa_launcher_error_finalize = 15,
-    soa_launcher_error_cancelled = 16
+    soa_launcher_error_cancelled = 16,
+    soa_launcher_error_invalid_signature = 17
 } soa_launcher_error;
 
 typedef void (*soa_launcher_check_cb)(soa_launcher_check_result result,
@@ -109,6 +110,7 @@ typedef void (*soa_launcher_check_cb)(soa_launcher_check_result result,
                                       const char* sha256,
                                       uint64_t expected_size,
                                       bool required,
+                                      const char* releases_json,
                                       void* ctx);
 
 typedef void (*soa_launcher_progress_cb)(uint64_t received,
@@ -122,7 +124,9 @@ typedef void (*soa_launcher_download_cb)(soa_launcher_download_result result,
                                          const char* final_path,
                                          void* ctx);
 
-soa_launcher_updater* soa_launcher_updater_create(const char* repository,
+soa_launcher_updater* soa_launcher_updater_create(const char* manifest_url,
+                                                  const char* fallback_manifest_url,
+                                                  const char* public_key_hex,
                                                   const char* current_version,
                                                   const char* platform,
                                                   const char* download_directory,
@@ -137,6 +141,14 @@ void soa_launcher_updater_destroy(soa_launcher_updater* updater);
 void soa_launcher_updater_check(soa_launcher_updater* updater);
 void soa_launcher_updater_download(soa_launcher_updater* updater);
 void soa_launcher_updater_cancel(soa_launcher_updater* updater);
+bool soa_launcher_updater_select_version(soa_launcher_updater* updater, const char* version);
+
+bool soa_verify_ed25519(const uint8_t* public_key,
+                        uint64_t public_key_size,
+                        const uint8_t* message,
+                        uint64_t message_size,
+                        const uint8_t* signature,
+                        uint64_t signature_size);
 
 typedef struct soa_discord_rpc soa_discord_rpc;
 

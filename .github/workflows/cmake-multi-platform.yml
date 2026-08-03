@@ -3,6 +3,7 @@ name: Build macOS and Linux
 on:
   push:
     branches: ["main"]
+    tags: ["v*"]
   pull_request:
     branches: ["main"]
 
@@ -59,6 +60,8 @@ jobs:
             libxkbcommon-x11-0 \
             ninja-build \
             patchelf \
+            jq \
+            libssl-dev \
             wget \
             xvfb
 
@@ -89,7 +92,7 @@ jobs:
           -G Ninja
           -DCMAKE_CXX_COMPILER="${{ matrix.cpp_compiler }}"
           -DCMAKE_BUILD_TYPE=Release
-          -DBUILD_TESTS=ON
+          -DBUILD_TESTING=ON
 
       - name: Build
         if: runner.os != 'Linux' || matrix.cpp_compiler != 'g++'
@@ -107,12 +110,13 @@ jobs:
         continue-on-error: true
         env:
           QMAKE: ${{ env.QT_ROOT_DIR }}/bin/qmake
+          SOA_UPDATE_SIGNING_KEY_B64: ${{ secrets.SOA_UPDATE_SIGNING_KEY_B64 }}
         run: ./packaging/build-appimage.sh
 
       - name: Verify Linux AppImage
         if: runner.os == 'Linux' && matrix.cpp_compiler == 'g++'
         run: |
-          output="${{ github.workspace }}/packaging/Story_Of_Alicia-x86_64.AppImage"
+          output="$(find "${{ github.workspace }}/packaging" -maxdepth 1 -type f -name 'Story_Of_Alicia_Launcher_*_x86_64.AppImage' -print -quit)"
           if [ ! -s "$output" ]; then
             echo "::error::build-appimage.sh did not produce the expected AppImage."
             exit 1
@@ -126,7 +130,12 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: soa-launcher-linux-appimage
-          path: ${{ github.workspace }}/packaging/Story_Of_Alicia-x86_64.AppImage
+          path: |
+            ${{ github.workspace }}/packaging/Story_Of_Alicia_Launcher_*_x86_64.AppImage
+            ${{ github.workspace }}/packaging/linux_launcher_version.json
+            ${{ github.workspace }}/packaging/linux_launcher_version.json.sig
+            ${{ github.workspace }}/packaging/linux_launcher_versions.json
+            ${{ github.workspace }}/packaging/linux_launcher_versions.json.sig
           if-no-files-found: error
           compression-level: 0
 
@@ -290,3 +299,65 @@ jobs:
             security delete-keychain "$SOA_SIGNING_KEYCHAIN" || true
           fi
           rm -f "$RUNNER_TEMP/developer-id.p12" "$RUNNER_TEMP/AuthKey.p8"
+
+  release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-22.04
+    permissions:
+      actions: read
+      contents: write
+
+    steps:
+      - name: Download build artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh run download "${GITHUB_RUN_ID}" --dir release-assets
+
+      - name: Verify release packages
+        run: |
+          set -euo pipefail
+          mapfile -t packages < <(find release-assets -type f \
+            \( -name '*.AppImage' -o -name '*.dmg' \) -print | sort)
+          if [ "${#packages[@]}" -ne 3 ]; then
+            printf 'Expected one AppImage and two DMGs, found %s:\n' "${#packages[@]}" >&2
+            printf '%s\n' "${packages[@]}" >&2
+            exit 1
+          fi
+          mapfile -t metadata < <(find release-assets -type f \
+            \( -name 'linux_launcher_version.json' \
+               -o -name 'linux_launcher_version.json.sig' \
+               -o -name 'linux_launcher_versions.json' \
+               -o -name 'linux_launcher_versions.json.sig' \) -print | sort)
+          if [ "${#metadata[@]}" -ne 4 ]; then
+            printf 'Expected four signed Linux metadata files, found %s:\n' "${#metadata[@]}" >&2
+            printf '%s\n' "${metadata[@]}" >&2
+            exit 1
+          fi
+          printf '%s\n' "${packages[@]}"
+          printf '%s\n' "${metadata[@]}"
+
+      - name: Publish release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mapfile -t packages < <(find release-assets -type f \
+            \( -name '*.AppImage' -o -name '*.dmg' \) -print | sort)
+          mapfile -t metadata < <(find release-assets -type f \
+            \( -name 'linux_launcher_version.json' \
+               -o -name 'linux_launcher_version.json.sig' \
+               -o -name 'linux_launcher_versions.json' \
+               -o -name 'linux_launcher_versions.json.sig' \) -print | sort)
+          assets=("${packages[@]}" "${metadata[@]}")
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            gh release upload "${GITHUB_REF_NAME}" "${assets[@]}" --clobber
+          else
+            gh release create "${GITHUB_REF_NAME}" "${assets[@]}" \
+              --title "${GITHUB_REF_NAME}" \
+              --generate-notes \
+              --verify-tag
+          fi

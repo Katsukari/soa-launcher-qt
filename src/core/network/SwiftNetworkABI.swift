@@ -78,7 +78,9 @@ public func soa_http_client_cancel_all(_ pointer: UnsafeMutableRawPointer?)
 
 @_cdecl("soa_launcher_updater_create")
 public func soa_launcher_updater_create(
-    _ repository: UnsafePointer<CChar>?,
+    _ manifestURL: UnsafePointer<CChar>?,
+    _ fallbackManifestURL: UnsafePointer<CChar>?,
+    _ publicKeyHex: UnsafePointer<CChar>?,
     _ currentVersion: UnsafePointer<CChar>?,
     _ platform: UnsafePointer<CChar>?,
     _ downloadDirectory: UnsafePointer<CChar>?,
@@ -89,7 +91,9 @@ public func soa_launcher_updater_create(
     _ downloadDone: soa_launcher_download_cb?,
     _ context: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer?
 {
-    guard let repository,
+    guard let manifestURL,
+          let fallbackManifestURL,
+          let publicKeyHex,
           let currentVersion,
           let platform,
           let downloadDirectory,
@@ -97,7 +101,9 @@ public func soa_launcher_updater_create(
           let progress,
           let downloadDone else { return nil }
     let updater = LauncherUpdateService(
-        repository: String(cString: repository),
+        manifestURL: String(cString: manifestURL),
+        fallbackManifestURL: String(cString: fallbackManifestURL),
+        publicKeyHex: String(cString: publicKeyHex),
         currentVersion: String(cString: currentVersion),
         platform: String(cString: platform),
         downloadDirectory: String(cString: downloadDirectory),
@@ -144,6 +150,15 @@ public func soa_launcher_updater_cancel(_ pointer: UnsafeMutableRawPointer?)
 {
     guard let pointer else { return }
     Unmanaged<LauncherUpdateService>.fromOpaque(pointer).takeUnretainedValue().cancel()
+}
+
+@_cdecl("soa_launcher_updater_select_version")
+public func soa_launcher_updater_select_version(_ pointer: UnsafeMutableRawPointer?,
+                                                _ version: UnsafePointer<CChar>?) -> Bool
+{
+    guard let pointer, let version else { return false }
+    return Unmanaged<LauncherUpdateService>.fromOpaque(pointer).takeUnretainedValue()
+        .selectVersion(String(cString: version))
 }
 
 @_cdecl("soa_discord_rpc_create")
