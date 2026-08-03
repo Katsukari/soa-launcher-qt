@@ -32,7 +32,7 @@ set(SOA_LAUNCHER_UPDATE_FALLBACK_MANIFEST_URL
     "https://github.com/Story-Of-Alicia/soa-launcher-qt/releases/latest/download/linux_launcher_version.json"
     CACHE STRING "HTTPS fallback URL of the signed Linux launcher update manifest")
 set(SOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX
-    ""
+    "f93de6173d28bda576e779808f54a9b618b13a6517f7df0556ca51c20a4c0178"
     CACHE STRING "Raw Ed25519 update signing public key as 64 hexadecimal characters")
 set(SOA_RULES_DOCUMENT_URL
     "https://docs.google.com/document/d/1vry3ZuDtzdS_mX1P2udWlb8z2Q9Atr3p1THZdtZ2EHA/export?format=html"
