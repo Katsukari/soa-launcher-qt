@@ -46,7 +46,6 @@
 #include <QToolButton>
 #include <QTimer>
 #include <QWindow>
-#include <spdlog/spdlog.h>
 
 using core::game::GameVersion;
 using core::state::Stage;
@@ -368,7 +367,7 @@ void MainWindow::setup_launcher_menu()
     launcher_menu_panel = new QFrame(this);
     launcher_menu_panel->setObjectName(QStringLiteral("launcherMenuPanel"));
     launcher_menu_panel->setGeometry(
-        util::layout::scaled(QRect(38, 86, 272, 238), window_size));
+        util::layout::scaled(QRect(38, 86, 272, 291), window_size));
     launcher_menu_panel->setStyleSheet(QStringLiteral(
         "QFrame#launcherMenuPanel { background: rgba(247,240,235,248); "
         "border: 1px solid rgba(79,23,23,85); border-radius: 12px; }"
@@ -405,8 +404,9 @@ void MainWindow::setup_launcher_menu()
 
     language_button = make_menu_button(QStringLiteral("Language"), 0);
     show_log_button = make_menu_button(QStringLiteral("Show Launcher Log"), 1);
-    credits_button = make_menu_button(QStringLiteral("Credits"), 2);
+    launcher_versions_button = make_menu_button(QStringLiteral("Check for Updates"), 2);
     about_button = make_menu_button(QStringLiteral("About"), 3);
+    credits_button = make_menu_button(QStringLiteral("Credits"), 4);
 
     language_menu = new QMenu(this);
     language_menu->setStyleSheet(QStringLiteral(
@@ -456,6 +456,11 @@ void MainWindow::setup_launcher_menu()
     {
         set_launcher_menu_visible(false);
         show_about();
+    });
+    connect(launcher_versions_button, &QPushButton::clicked, this, [this]()
+    {
+        set_launcher_menu_visible(false);
+        launcher_update_manager->manage_versions();
     });
 
     launcher_menu_panel->hide();
@@ -548,6 +553,8 @@ void MainWindow::retranslate_dynamic_text()
         credits_button->setText(util::i18n::translate("Credits"));
     if (about_button)
         about_button->setText(util::i18n::translate("About"));
+    if (launcher_versions_button)
+        launcher_versions_button->setText(util::i18n::translate("Check for Updates"));
     if (open_launcher_action)
         open_launcher_action->setText(util::i18n::translate("Open Launcher"));
     if (run_alicia_action)
@@ -858,10 +865,19 @@ void MainWindow::setup_launcher_updates()
             this, &MainWindow::continue_after_launcher_update_check);
     connect(launcher_update_manager,
             &core::update::LauncherUpdateManager::check_failed,
+            this, [this](const QString&)
+    {
+        continue_after_launcher_update_check();
+    });
+    connect(launcher_update_manager,
+            &core::update::LauncherUpdateManager::manual_check_failed,
             this, [this](const QString& reason)
     {
-        SPDLOG_WARN("launcher update check skipped: {}", reason.toStdString());
-        continue_after_launcher_update_check();
+        LauncherDialog::error(
+            this,
+            QStringLiteral("Launcher Update Check Failed"),
+            reason,
+            QStringLiteral("The current launcher is unchanged. You can continue using it and try again later."));
     });
     connect(launcher_update_manager,
             &core::update::LauncherUpdateManager::update_found,
@@ -871,6 +887,21 @@ void MainWindow::setup_launcher_updates()
             launcher_update_manager->available_version(),
             launcher_update_manager->update_required(),
             launcher_update_manager->release_message());
+        launcher_update->set_versions(
+            core::update::LauncherUpdateManager::current_version(),
+            launcher_update_manager->available_versions(), false);
+        open_overlay(launcher_update);
+    });
+    connect(launcher_update_manager,
+            &core::update::LauncherUpdateManager::catalogue_ready,
+            this, [this]()
+    {
+        launcher_update->set_release(
+            launcher_update_manager->available_version(), false,
+            launcher_update_manager->release_message());
+        launcher_update->set_versions(
+            core::update::LauncherUpdateManager::current_version(),
+            launcher_update_manager->available_versions(), true);
         open_overlay(launcher_update);
     });
     connect(launcher_update, &LauncherUpdate::postponed, this, [this]()
@@ -881,6 +912,8 @@ void MainWindow::setup_launcher_updates()
     connect(launcher_update, &LauncherUpdate::update_requested,
             launcher_update_manager,
             &core::update::LauncherUpdateManager::download_and_install);
+    connect(launcher_update, &LauncherUpdate::version_selected,
+            launcher_update_manager, &core::update::LauncherUpdateManager::select_version);
     connect(launcher_update_manager,
             &core::update::LauncherUpdateManager::download_started,
             this, [this]()
