@@ -70,9 +70,14 @@ Testing/
 
 
 .idea/
-/packaging/AppDir/
-/packaging/build-appimage/
-/packaging/linuxdeploy-x86_64.AppImage
-/packaging/linuxdeploy-plugin-qt-x86_64.AppImage
-/packaging/Story_Of_Alicia-*.AppImage
+/packaging/linux/AppDir/
+/packaging/linux/build-appimage/
+/packaging/linux/linuxdeploy-x86_64.AppImage
+/packaging/linux/linuxdeploy-plugin-qt-x86_64.AppImage
+/packaging/linux/Story_Of_Alicia*.AppImage
+/packaging/linux/linux_launcher_version.json
+/packaging/linux/linux_launcher_version.json.sig
+/packaging/linux/linux_launcher_versions.json
+/packaging/linux/linux_launcher_versions.json.sig
+/packaging/*.pem
 .DS_Store

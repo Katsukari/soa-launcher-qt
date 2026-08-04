@@ -7,9 +7,13 @@
 class QFrame;
 class ImageDropdown;
 class QLabel;
-class QNetworkAccessManager;
 class QPushButton;
 class QUrl;
+
+namespace core::network
+{
+    class SwiftHttpClient;
+}
 
 class LauncherSettings : public QWidget
 {
@@ -45,7 +49,7 @@ private:
     QLabel* launcher_size_title {};
     QLabel* launcher_size_description {};
     ImageDropdown* launcher_size_dropdown {};
-    QNetworkAccessManager* network_manager {};
+    core::network::SwiftHttpClient* network_manager {};
     QStringList connectivity_order;
     QHash<QString, QString> connectivity_details;
     QHash<QString, bool> connectivity_success;

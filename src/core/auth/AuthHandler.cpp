@@ -258,30 +258,44 @@ void AuthHandler::handle_url(const QString& url)
     }
 
     const QUrlQuery query(parsed);
-    const auto first_value = [&query](const QStringList& keys)
+    const auto query_value = [&query](const QString& key, const bool trim)
+    {
+        QString value = query.queryItemValue(key, QUrl::FullyDecoded);
+        if (trim)
+            value = value.trimmed();
+        return value;
+    };
+    const auto first_value = [&query_value](const QStringList& keys, const bool trim = true)
     {
         for (const QString& key : keys)
         {
-            const QString value = query.queryItemValue(key, QUrl::FullyDecoded).trimmed();
+            const QString value = query_value(key, trim);
             if (!value.isEmpty())
                 return value;
         }
         return QString{};
     };
 
-    const QString user = first_value({
-        QStringLiteral("user"),
-        QStringLiteral("id"),
+    const QString legacy_user = query_value(QStringLiteral("user"), true);
+    QString user = first_value({
         QStringLiteral("ID"),
+        QStringLiteral("id"),
         QStringLiteral("discord_id")});
-    const QString token = first_value({
-        QStringLiteral("token"),
-        QStringLiteral("op"),
-        QStringLiteral("OP")});
-    const QString username = first_value({
+    if (user.isEmpty())
+        user = legacy_user;
+
+    QString token = first_value({
+        QStringLiteral("OP"),
+        QStringLiteral("op")}, false);
+    if (token.isEmpty())
+        token = query_value(QStringLiteral("token"), false);
+
+    QString username = first_value({
         QStringLiteral("username"),
         QStringLiteral("display_name"),
         QStringLiteral("name")});
+    if (username.isEmpty() && !legacy_user.isEmpty() && legacy_user != user)
+        username = legacy_user;
 
     const auto containsUnsafeCredentialCharacter = [](const QString& value)
     {

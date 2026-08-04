@@ -15,6 +15,7 @@
 #include <QShowEvent>
 
 #include <algorithm>
+#include <utility>
 #include <QStringList>
 #include <QtConcurrent/QtConcurrentRun>
 
@@ -236,11 +237,25 @@ void PrerequisitesIntro::start_detection()
         return result;
     };
 #else
-    const auto detection = []()
+    const auto& config = util::config::Config::instance();
+    const QString savedRuntime = config.wine_binary();
+    const bool reuseSavedRuntime = config.prerequisites_confirmed()
+        && config.runtime_selected() && !savedRuntime.trimmed().isEmpty();
+    const auto detection = [savedRuntime, reuseSavedRuntime]()
     {
         DetectionResult result;
         result.profile = core::system::detect_system_profile();
-        result.runtimes = core::wine::WineRegistry::scan();
+        if (reuseSavedRuntime)
+        {
+            core::wine::WineInstall runtime;
+            if (core::wine::WineRegistry::inspect_path(savedRuntime, runtime)
+                && runtime.usable)
+            {
+                result.runtimes.append(std::move(runtime));
+            }
+        }
+        if (result.runtimes.isEmpty())
+            result.runtimes = core::wine::WineRegistry::scan();
         result.winetricks_ready = core::wine::winetricks_available();
         result.umu_ready = core::wine::umu_available();
         return result;

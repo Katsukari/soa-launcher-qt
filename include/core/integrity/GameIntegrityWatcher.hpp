@@ -1,7 +1,6 @@
 #pragma once
 
 #include <QHash>
-#include <QNetworkAccessManager>
 #include <QObject>
 #include <QSet>
 #include <QStringList>
@@ -10,8 +9,12 @@
 #include "core/game/GameVersion.hpp"
 
 class QFileSystemWatcher;
-class QNetworkReply;
 class QTimer;
+
+namespace core::network
+{
+    class SwiftHttpClient;
+}
 
 namespace core::integrity
 {
@@ -57,7 +60,7 @@ namespace core::integrity
         static QByteArray hash_file(const QString& path, qsizetype expected_hex_length);
 
         QFileSystemWatcher* watcher {};
-        QNetworkAccessManager network;
+        core::network::SwiftHttpClient* network {};
         QTimer* refresh_timer {};
         QHash<int, Context> contexts;
         QHash<QString, int> file_versions;

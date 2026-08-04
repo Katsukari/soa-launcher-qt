@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "version": "@PROJECT_VERSION@",
+  "platform": "linux-x86_64",
+  "manifest_url": "@SOA_LAUNCHER_UPDATE_MANIFEST_URL@",
+  "fallback_manifest_url": "@SOA_LAUNCHER_UPDATE_FALLBACK_MANIFEST_URL@",
+  "signing_public_key": "@SOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX@"
+}

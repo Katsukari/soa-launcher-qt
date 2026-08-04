@@ -1,5 +1,6 @@
 #include "core/integrity/GameIntegrityWatcher.hpp"
 
+#include "core/network/SwiftHttpClient.hpp"
 #include "util/Config.hpp"
 
 #include <QCryptographicHash>
@@ -13,8 +14,6 @@
 #include <QFutureWatcher>
 #include <QRegularExpression>
 #include <QtConcurrent/QtConcurrentRun>
-#include <QNetworkReply>
-#include <QNetworkRequest>
 #include <QTimer>
 #include <spdlog/spdlog.h>
 
@@ -28,6 +27,7 @@ namespace core::integrity
     GameIntegrityWatcher::GameIntegrityWatcher(QObject* parent)
         : QObject(parent),
           watcher(new QFileSystemWatcher(this)),
+          network(new core::network::SwiftHttpClient(this)),
           refresh_timer(new QTimer(this))
     {
         refresh_timer->setSingleShot(true);
@@ -126,28 +126,25 @@ namespace core::integrity
                                               const QString& build)
     {
         const QString base = QString::fromLatin1(core::game::profile(version).cdn_base_url);
-        QNetworkRequest request(QUrl(QStringLiteral("%1/%2/manifest.json").arg(base, build)));
-        request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
-                             QNetworkRequest::NoLessSafeRedirectPolicy);
-        request.setTransferTimeout(15000);
-        QNetworkReply* reply = network.get(request);
-        connect(reply, &QNetworkReply::downloadProgress, reply,
-                [reply](const qint64 received, const qint64)
-        {
-            if (received > 32 * 1024 * 1024)
-                reply->abort();
-        });
-        connect(reply, &QNetworkReply::finished, this, [this, reply, version, root, build]()
-        {
-            const QByteArray payload = reply->readAll();
-            const bool ok = reply->error() == QNetworkReply::NoError
-                && payload.size() <= 32 * 1024 * 1024;
-            reply->deleteLater();
-            auto it = contexts.find(key(version));
-            if (!ok || it == contexts.end() || it->root != root || it->version != build)
-                return;
-            apply_manifest(version, payload);
-        });
+        const QUrl url(QStringLiteral("%1/%2/manifest.json").arg(base, build));
+        network->get(
+            url,
+            15000,
+            32 * 1024 * 1024,
+            QByteArray("application/json"),
+            QByteArray("Story-Of-Alicia-Launcher"),
+            false,
+            [this, version, root, build](const core::network::HttpResponse& response)
+            {
+                const bool ok = response.result == soa_http_result_completed
+                    && response.status >= 200
+                    && response.status < 300
+                    && response.data.size() <= 32 * 1024 * 1024;
+                auto it = contexts.find(key(version));
+                if (!ok || it == contexts.end() || it->root != root || it->version != build)
+                    return;
+                apply_manifest(version, response.data);
+            });
     }
 
     QString GameIntegrityWatcher::safe_relative_path(const QString& value)

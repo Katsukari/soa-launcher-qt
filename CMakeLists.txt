@@ -1,23 +1,39 @@
 cmake_minimum_required(VERSION 3.21.1)
 
+set(_SOA_SYNCED_BUILD_DEFAULT OFF)
+if("${CMAKE_SOURCE_DIR};${CMAKE_BINARY_DIR}" MATCHES "[Nn]extcloud")
+    set(_SOA_SYNCED_BUILD_DEFAULT ON)
+endif()
+option(SOA_SUPPRESS_NINJA_REGENERATION
+    "Disable Ninja's automatic CMake regeneration for timestamp-unstable synced folders"
+    ${_SOA_SYNCED_BUILD_DEFAULT})
+if(SOA_SUPPRESS_NINJA_REGENERATION AND CMAKE_GENERATOR MATCHES "^Ninja")
+    set(CMAKE_SUPPRESS_REGENERATION ON CACHE BOOL
+        "Suppress automatic build-system regeneration in the synced launcher tree" FORCE)
+    message(STATUS
+        "Ninja automatic CMake regeneration is disabled for this synced build directory")
+endif()
+unset(_SOA_SYNCED_BUILD_DEFAULT)
+
 if(CMAKE_HOST_APPLE AND NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
     set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum supported macOS version")
 endif()
 
 project(soa_launcher
-        LANGUAGES CXX
+        LANGUAGES C CXX
         DESCRIPTION "Story of Alicia Launcher"
         VERSION 1.0.0
 )
 
-if(DEFINED ENV{GITHUB_REPOSITORY} AND NOT "$ENV{GITHUB_REPOSITORY}" STREQUAL "")
-    set(SOA_LAUNCHER_GITHUB_REPOSITORY_DEFAULT "$ENV{GITHUB_REPOSITORY}")
-else()
-    set(SOA_LAUNCHER_GITHUB_REPOSITORY_DEFAULT "Story-Of-Alicia/soa-launcher-qt")
-endif()
-set(SOA_LAUNCHER_GITHUB_REPOSITORY
-    "${SOA_LAUNCHER_GITHUB_REPOSITORY_DEFAULT}"
-    CACHE STRING "GitHub owner/repository used for launcher releases")
+set(SOA_LAUNCHER_UPDATE_MANIFEST_URL
+    "https://r2.storyofalicia.com/launcher/linux_launcher_version.json"
+    CACHE STRING "HTTPS URL of the signed Linux launcher update manifest")
+set(SOA_LAUNCHER_UPDATE_FALLBACK_MANIFEST_URL
+    "https://github.com/Story-Of-Alicia/soa-launcher-qt/releases/latest/download/linux_launcher_version.json"
+    CACHE STRING "HTTPS fallback URL of the signed Linux launcher update manifest")
+set(SOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX
+    "f93de6173d28bda576e779808f54a9b618b13a6517f7df0556ca51c20a4c0178"
+    CACHE STRING "Raw Ed25519 update signing public key as 64 hexadecimal characters")
 set(SOA_RULES_DOCUMENT_URL
     "https://docs.google.com/document/d/1vry3ZuDtzdS_mX1P2udWlb8z2Q9Atr3p1THZdtZ2EHA/export?format=html"
     CACHE STRING "HTTPS URL of the authoritative rules document")
@@ -100,6 +116,11 @@ add_library(soa_network SHARED
         src/core/network/CourierTypes.swift
         src/core/network/CourierABI.swift
         src/core/network/CourierPing.swift
+        src/core/network/NetworkFoundation.swift
+        src/core/network/SwiftHttpClient.swift
+        src/core/network/LauncherUpdateService.swift
+        src/core/network/DiscordRpcService.swift
+        src/core/network/SwiftNetworkABI.swift
         src/core/network/MD5.swift
 )
 
@@ -110,6 +131,12 @@ target_compile_options(soa_network PRIVATE
 target_include_directories(soa_network PRIVATE
         include
 )
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    find_package(OpenSSL 3.0 REQUIRED COMPONENTS Crypto)
+    target_sources(soa_network PRIVATE src/core/network/UpdateSignature.c)
+    target_link_libraries(soa_network PRIVATE OpenSSL::Crypto)
+endif()
 
 set_target_properties(soa_network PROPERTIES
         AUTOMOC OFF
@@ -142,6 +169,13 @@ set(LAUNCHER_SOURCES
         src/core/Log.cpp
         src/core/discord/DiscordRpc.cpp
         src/core/wine/Shell.cpp
+        src/core/wine/ProcessRunner.cpp
+        src/core/wine/RuntimeLocator.cpp
+        src/core/wine/RuntimeEnvironment.cpp
+        src/core/wine/PrefixSetupJob.cpp
+        src/core/wine/GameSession.cpp
+        src/core/wine/GamePhase.cpp
+        src/core/wine/MacLaunchDiagnostics.cpp
         src/core/wine/WineProcess.cpp
         src/core/wine/MacWineRuntime.cpp
         src/core/runtime/RuntimeManifest.cpp
@@ -152,6 +186,7 @@ set(LAUNCHER_SOURCES
         src/core/update/LauncherUpdateManager.cpp
         src/core/wine/PrefixInspector.cpp
         src/core/network/Courier.cpp
+        src/core/network/SwiftHttpClient.cpp
         src/core/auth/AuthHandler.cpp
         src/util/Config.cpp
         src/util/CredentialStore.cpp
@@ -191,6 +226,11 @@ set(LAUNCHER_HEADERS
         include/widgets/LauncherLog.hpp
         include/widgets/AdvancedSettings.hpp
         include/core/wine/Shell.hpp
+        include/core/wine/ProcessRunner.hpp
+        include/core/wine/RuntimeLocator.hpp
+        include/core/wine/PrefixSetupJob.hpp
+        include/core/wine/GameSession.hpp
+        include/core/wine/MacLaunchDiagnostics.hpp
         include/core/wine/WineProcess.hpp
         include/core/wine/MacWineRuntime.hpp
         include/core/runtime/RuntimeManifest.hpp
@@ -205,7 +245,9 @@ set(LAUNCHER_HEADERS
         include/core/discord/DiscordRpc.hpp
         include/util/Styles.hpp
         include/core/network/Courier.h
+        include/core/network/SwiftNetwork.h
         include/core/network/CourierBridge.hpp
+        include/core/network/SwiftHttpClient.hpp
         include/core/auth/AuthHandler.hpp
         include/util/Config.hpp
         include/util/CredentialStore.hpp
@@ -368,7 +410,9 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 target_compile_definitions(${PROJECT_NAME} PRIVATE
         SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE
         SOA_LAUNCHER_VERSION="${PROJECT_VERSION}"
-        SOA_LAUNCHER_GITHUB_REPOSITORY="${SOA_LAUNCHER_GITHUB_REPOSITORY}"
+        SOA_LAUNCHER_UPDATE_MANIFEST_URL="${SOA_LAUNCHER_UPDATE_MANIFEST_URL}"
+        SOA_LAUNCHER_UPDATE_FALLBACK_MANIFEST_URL="${SOA_LAUNCHER_UPDATE_FALLBACK_MANIFEST_URL}"
+        SOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX="${SOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX}"
         SOA_RULES_DOCUMENT_URL="${SOA_RULES_DOCUMENT_URL}"
 )
 
@@ -423,13 +467,14 @@ if(NOT APPLE)
             LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
 
-    install(FILES packaging/soa-launcher.desktop
+    install(FILES packaging/linux/soa-launcher.desktop
             DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
     )
 
-    install(FILES packaging/soa-launcher.png
+    install(FILES packaging/linux/soa-launcher.png
             DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps
     )
+
 endif()
 
 set(CPACK_PACKAGE_NAME "Story Of Alicia Launcher")
@@ -456,6 +501,9 @@ if(BUILD_TESTING)
             src/core/wine/PrefixInspector.cpp
             src/core/wine/WineProcess.cpp
             src/core/wine/MacWineRuntime.cpp
+            src/core/wine/ProcessRunner.cpp
+            src/core/wine/RuntimeEnvironment.cpp
+            src/core/wine/GamePhase.cpp
             src/core/runtime/RuntimeManifest.cpp
             src/core/runtime/RuntimeManager.cpp
             src/core/runtime/RuntimeProvider.cpp
@@ -491,6 +539,16 @@ if(BUILD_TESTING)
             NAME launcher_tests
             COMMAND launcher_tests
     )
+
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        add_executable(update_signature_tests
+                tests/update_signature_tests.c
+                src/core/network/UpdateSignature.c
+        )
+        target_include_directories(update_signature_tests PRIVATE include)
+        target_link_libraries(update_signature_tests PRIVATE OpenSSL::Crypto)
+        add_test(NAME update_signature_tests COMMAND update_signature_tests)
+    endif()
 
     add_executable(courier_path_tests
             tests/courier_paths_tests.swift
@@ -533,6 +591,35 @@ if(BUILD_TESTING)
     add_test(
             NAME courier_cancel_tests
             COMMAND courier_cancel_tests
+    )
+
+
+    add_executable(swift_network_abi_tests
+            tests/swift_network_abi_tests.swift
+    )
+
+    target_compile_options(swift_network_abi_tests PRIVATE
+            "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xcc -fmodule-map-file=${CMAKE_CURRENT_SOURCE_DIR}/src/core/network/module.modulemap>"
+    )
+
+    target_include_directories(swift_network_abi_tests PRIVATE
+            include
+    )
+
+    target_link_libraries(swift_network_abi_tests PRIVATE
+            soa_network
+    )
+
+    set_target_properties(swift_network_abi_tests PROPERTIES
+            AUTOMOC OFF
+            AUTORCC OFF
+            AUTOUIC OFF
+            Swift_MODULE_NAME SoaSwiftNetworkABITests
+    )
+
+    add_test(
+            NAME swift_network_abi_tests
+            COMMAND swift_network_abi_tests
     )
 
     add_executable(courier_hash_tests

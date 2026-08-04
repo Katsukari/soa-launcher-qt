@@ -8,6 +8,7 @@ class QScrollArea;
 class QLabel;
 class QPushButton;
 class QAbstractButton;
+class QShowEvent;
 
 class WineSelectMenu : public util::modal_overlay::ModalOverlay
 {
@@ -18,6 +19,7 @@ signals:
     void runtime_chosen();
 protected:
     void paint_content(QPainter& painter) override;
+    void showEvent(QShowEvent* event) override;
 private:
     void build_ui();
     void populate();
@@ -34,6 +36,7 @@ private:
     QVector<core::wine::WineInstall> runtimes;
     QFutureWatcher<QVector<core::wine::WineInstall>>* detector {};
     bool scanning {};
+    bool scan_completed {};
     int selected {-1};
     QLabel* runtime_status {};
     QScrollArea* list {};

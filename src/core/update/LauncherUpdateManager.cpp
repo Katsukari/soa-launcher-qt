@@ -3,251 +3,376 @@
 #include "util/LanguageManager.hpp"
 
 #include <QCoreApplication>
-#include <QCryptographicHash>
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
+#include <QMetaObject>
+#include <QProcess>
+#include <QRegularExpression>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QJsonParseError>
-#include <QJsonValue>
-#include <QNetworkAccessManager>
-#include <QNetworkReply>
-#include <QNetworkRequest>
-#include <QProcess>
-#include <QRegularExpression>
 #include <QStandardPaths>
 #include <QTimer>
-#include <QVersionNumber>
 
 #include <spdlog/spdlog.h>
+
+#include <limits>
+#include <algorithm>
+#include <utility>
 
 #ifndef SOA_LAUNCHER_VERSION
 #define SOA_LAUNCHER_VERSION "0.3.0"
 #endif
 
-#ifndef SOA_LAUNCHER_GITHUB_REPOSITORY
-#define SOA_LAUNCHER_GITHUB_REPOSITORY "Story-Of-Alicia/soa-launcher-qt"
+#ifndef SOA_LAUNCHER_UPDATE_MANIFEST_URL
+#define SOA_LAUNCHER_UPDATE_MANIFEST_URL "https://r2.storyofalicia.com/launcher/linux_launcher_version.json"
 #endif
 
-namespace
-{
-    QString normalized_version(QString value)
-    {
-        value = value.trimmed();
-        if (value.startsWith(QLatin1Char('v'), Qt::CaseInsensitive))
-            value.remove(0, 1);
-        return value;
-    }
+#ifndef SOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX
+#define SOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX ""
+#endif
 
-    QStringList prerelease_parts(const QString& version)
-    {
-        const QString without_build = version.section(QLatin1Char('+'), 0, 0);
-        const int dash = without_build.indexOf(QLatin1Char('-'));
-        if (dash < 0)
-            return {};
-        return without_build.mid(dash + 1).split(QLatin1Char('.'), Qt::KeepEmptyParts);
-    }
-
-    QVersionNumber numeric_version(const QString& version, bool& valid)
-    {
-        QString core = normalized_version(version).section(QLatin1Char('+'), 0, 0);
-        const int dash = core.indexOf(QLatin1Char('-'));
-        if (dash >= 0)
-            core.truncate(dash);
-        qsizetype suffix = 0;
-        const QVersionNumber parsed = QVersionNumber::fromString(core, &suffix);
-        valid = !parsed.isNull() && suffix == core.size();
-        return parsed;
-    }
-
-    bool numeric_identifier(const QString& value, qulonglong& number)
-    {
-        if (value.isEmpty())
-            return false;
-        for (const QChar ch : value)
-        {
-            if (!ch.isDigit())
-                return false;
-        }
-        bool ok = false;
-        number = value.toULongLong(&ok);
-        return ok;
-    }
-
-    QString release_directive(const QString& body, const QString& key)
-    {
-        const QRegularExpression expression(
-            QStringLiteral("<!--\\s*soa-launcher-%1\\s*:\\s*([^>]*?)\\s*-->")
-                .arg(QRegularExpression::escape(key)),
-            QRegularExpression::CaseInsensitiveOption);
-        const QRegularExpressionMatch match = expression.match(body);
-        return match.hasMatch() ? match.captured(1).trimmed() : QString();
-    }
-
-    bool required_directive(const QString& body)
-    {
-        const QString value = release_directive(body, QStringLiteral("update")).toLower();
-        if (value == QStringLiteral("required") || value == QStringLiteral("mandatory")
-            || value == QStringLiteral("true") || value == QStringLiteral("yes"))
-            return true;
-        return body.contains(QStringLiteral("[launcher-update-required]"), Qt::CaseInsensitive);
-    }
-
-    QString release_summary(QString body)
-    {
-        const QRegularExpression directives(
-            QStringLiteral("<!--\\s*soa-launcher-[^>]*-->"),
-            QRegularExpression::CaseInsensitiveOption);
-        body.remove(directives);
-        body.replace(QStringLiteral("[launcher-update-required]"), QString(),
-                     Qt::CaseInsensitive);
-        body.replace(QRegularExpression(QStringLiteral("<[^>]+>")), QStringLiteral(" "));
-        body.replace(QRegularExpression(QStringLiteral("\\[([^\\]]+)\\]\\([^\\)]+\\)")),
-                     QStringLiteral("\\1"));
-        const QStringList lines = body.split(QRegularExpression(QStringLiteral("[\\r\\n]+")),
-                                             Qt::SkipEmptyParts);
-        for (QString line : lines)
-        {
-            line = line.trimmed();
-            line.remove(QRegularExpression(QStringLiteral("^[#>*_`~\\-\\s]+")));
-            line = line.simplified();
-            if (line.isEmpty())
-                continue;
-            if (line.size() > 220)
-                line = line.left(217).trimmed() + QStringLiteral("...");
-            return line;
-        }
-        return {};
-    }
-
-    int asset_score(const QString& name, const QString& platform)
-    {
-        const QString lower = name.toLower();
-        int score = 0;
-        if (platform == QStringLiteral("linux-x86_64"))
-        {
-            if (!lower.endsWith(QStringLiteral(".appimage")))
-                return -1;
-            score = 100;
-            if (lower.contains(QStringLiteral("x86_64"))
-                || lower.contains(QStringLiteral("amd64")))
-                score += 100;
-            if (lower.contains(QStringLiteral("arm64"))
-                || lower.contains(QStringLiteral("aarch64")))
-                return -1;
-        }
-        else if (platform == QStringLiteral("macos-arm64"))
-        {
-            if (!lower.endsWith(QStringLiteral(".dmg")))
-                return -1;
-            score = 100;
-            if (lower.contains(QStringLiteral("arm64"))
-                || lower.contains(QStringLiteral("aarch64"))
-                || lower.contains(QStringLiteral("apple-silicon")))
-                score += 100;
-            else if (lower.contains(QStringLiteral("universal")))
-                score += 60;
-            if (lower.contains(QStringLiteral("x86_64"))
-                || lower.contains(QStringLiteral("amd64"))
-                || lower.contains(QStringLiteral("intel")))
-                return -1;
-        }
-        else if (platform == QStringLiteral("macos-x86_64"))
-        {
-            if (!lower.endsWith(QStringLiteral(".dmg")))
-                return -1;
-            score = 100;
-            if (lower.contains(QStringLiteral("x86_64"))
-                || lower.contains(QStringLiteral("amd64"))
-                || lower.contains(QStringLiteral("intel")))
-                score += 100;
-            else if (lower.contains(QStringLiteral("universal")))
-                score += 60;
-            if (lower.contains(QStringLiteral("arm64"))
-                || lower.contains(QStringLiteral("aarch64"))
-                || lower.contains(QStringLiteral("apple-silicon")))
-                return -1;
-        }
-        else
-        {
-            return -1;
-        }
-
-        if (lower.contains(QStringLiteral("story_of_alicia"))
-            || lower.contains(QStringLiteral("story-of-alicia"))
-            || lower.contains(QStringLiteral("soa-launcher")))
-            score += 20;
-        return score;
-    }
-
-    QJsonObject select_release_asset(const QJsonArray& assets, const QString& platform)
-    {
-        QJsonObject selected;
-        int selected_score = -1;
-        for (const QJsonValue& value : assets)
-        {
-            if (!value.isObject())
-                continue;
-            const QJsonObject asset = value.toObject();
-            if (asset.value(QStringLiteral("state")).toString() != QStringLiteral("uploaded"))
-                continue;
-            const int score = asset_score(asset.value(QStringLiteral("name")).toString(), platform);
-            if (score > selected_score)
-            {
-                selected = asset;
-                selected_score = score;
-            }
-        }
-        return selected;
-    }
-
-    QByteArray github_sha256(const QJsonObject& asset)
-    {
-        QString digest = asset.value(QStringLiteral("digest")).toString().trimmed().toLower();
-        if (digest.startsWith(QStringLiteral("sha256:")))
-            digest.remove(0, 7);
-        static const QRegularExpression expression(QStringLiteral("^[0-9a-f]{64}$"));
-        return expression.match(digest).hasMatch() ? digest.toLatin1() : QByteArray();
-    }
-
-    qint64 json_integer(const QJsonValue& value)
-    {
-        if (value.isDouble())
-            return static_cast<qint64>(value.toDouble(-1));
-        if (value.isString())
-        {
-            bool ok = false;
-            const qint64 parsed = value.toString().toLongLong(&ok);
-            return ok ? parsed : -1;
-        }
-        return -1;
-    }
-}
+#ifndef SOA_LAUNCHER_UPDATE_FALLBACK_MANIFEST_URL
+#define SOA_LAUNCHER_UPDATE_FALLBACK_MANIFEST_URL "https://github.com/Story-Of-Alicia/soa-launcher-qt/releases/latest/download/linux_launcher_version.json"
+#endif
 
 namespace core::update
 {
     LauncherUpdateManager::LauncherUpdateManager(QObject* parent)
         : QObject(parent)
     {
-        network = new QNetworkAccessManager(this);
-        check_timeout = new QTimer(this);
-        check_timeout->setSingleShot(true);
-        download_timeout = new QTimer(this);
-        download_timeout->setSingleShot(true);
-        cleanup_previous_linux_package();
+        QString manifest_url = qEnvironmentVariable("SOA_LAUNCHER_UPDATE_MANIFEST_URL").trimmed();
+        if (manifest_url.isEmpty())
+            manifest_url = QString::fromUtf8(SOA_LAUNCHER_UPDATE_MANIFEST_URL).trimmed();
+        const QString public_key = QString::fromUtf8(SOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX).trimmed();
+        const QString fallback_url = QString::fromUtf8(
+            SOA_LAUNCHER_UPDATE_FALLBACK_MANIFEST_URL).trimmed();
+        const QByteArray manifest_url_bytes = manifest_url.toUtf8();
+        const QByteArray public_key_bytes = public_key.toUtf8();
+        const QByteArray fallback_url_bytes = fallback_url.toUtf8();
+        const QByteArray platform_bytes = detected_platform_key().toUtf8();
+        const QByteArray directory_bytes = download_directory().toUtf8();
+        const QByteArray user_agent = QByteArray("Story-Of-Alicia-Launcher/") + SOA_LAUNCHER_VERSION;
+        const bool signing_key_valid = QRegularExpression(
+            QStringLiteral("^[0-9a-fA-F]{64}$")).match(public_key).hasMatch();
+        if (detected_platform_key() == QStringLiteral("linux-x86_64") && !signing_key_valid)
+        {
+            SPDLOG_DEBUG("launcher updates disabled: this build has no signing public key");
+            schedule_health_checkpoint();
+            return;
+        }
+        updater = soa_launcher_updater_create(
+            manifest_url_bytes.constData(),
+            fallback_url_bytes.constData(),
+            public_key_bytes.constData(),
+            SOA_LAUNCHER_VERSION,
+            platform_bytes.constData(),
+            directory_bytes.constData(),
+            user_agent.constData(),
+            qEnvironmentVariableIntValue("SOA_ALLOW_INSECURE_UPDATE_URLS") == 1,
+            &LauncherUpdateManager::check_callback,
+            &LauncherUpdateManager::progress_callback,
+            &LauncherUpdateManager::download_callback,
+            this);
+        schedule_health_checkpoint();
     }
 
     LauncherUpdateManager::~LauncherUpdateManager()
     {
-        if (download_reply)
+        if (updater)
         {
-            download_reply->disconnect(this);
-            download_reply->abort();
+            soa_launcher_updater_shutdown(updater);
+            soa_launcher_updater_destroy(updater);
+            updater = nullptr;
         }
-        if (download_file.isOpen())
-            download_file.close();
-        delete download_hash;
+    }
+
+    void LauncherUpdateManager::check_for_updates()
+    {
+        if (downloading)
+            return;
+        if (!updater)
+        {
+            emit no_update_available();
+            return;
+        }
+        managing_versions = false;
+        reset_release();
+        emit check_started();
+        soa_launcher_updater_check(updater);
+    }
+
+    void LauncherUpdateManager::manage_versions()
+    {
+        if (downloading)
+            return;
+        if (!updater)
+        {
+            emit manual_check_failed(util::i18n::translate(
+                "This launcher build does not contain an update signing key."));
+            return;
+        }
+        managing_versions = true;
+        reset_release();
+        emit check_started();
+        soa_launcher_updater_check(updater);
+    }
+
+    void LauncherUpdateManager::download_and_install()
+    {
+        if (!updater || downloading || !update_available())
+            return;
+        downloading = true;
+        emit download_started();
+        soa_launcher_updater_download(updater);
+    }
+
+    void LauncherUpdateManager::cancel_download()
+    {
+        if (!updater || !downloading)
+            return;
+        soa_launcher_updater_cancel(updater);
+    }
+
+    void LauncherUpdateManager::check_callback(const soa_launcher_check_result result,
+                                               const soa_launcher_error error_code,
+                                               const int http_status,
+                                               const char* error_detail,
+                                               const char* version,
+                                               const char* minimum_version,
+                                               const char* release_message,
+                                               const char* package_kind,
+                                               const char* package_file_name,
+                                               const char* package_url,
+                                               const char* sha256,
+                                               const uint64_t expected_size,
+                                               const bool required,
+                                               const char* releases_json,
+                                               void* ctx)
+    {
+        auto* self = static_cast<LauncherUpdateManager*>(ctx);
+        if (!self)
+            return;
+        QMetaObject::invokeMethod(self,
+            [self,
+             result,
+             error_code,
+             http_status,
+             error_detail = QString::fromUtf8(error_detail ? error_detail : ""),
+             version = QString::fromUtf8(version ? version : ""),
+             minimum_version = QString::fromUtf8(minimum_version ? minimum_version : ""),
+             release_message = QString::fromUtf8(release_message ? release_message : ""),
+             package_kind = QString::fromUtf8(package_kind ? package_kind : ""),
+             package_file_name = QString::fromUtf8(package_file_name ? package_file_name : ""),
+             package_url = QUrl(QString::fromUtf8(package_url ? package_url : "")),
+             sha256 = QByteArray(sha256 ? sha256 : ""),
+             releases_json = QByteArray(releases_json ? releases_json : "[]"),
+             expected_size,
+             required]() mutable
+            {
+                self->handle_check(result,
+                                   error_code,
+                                   http_status,
+                                   std::move(error_detail),
+                                   std::move(version),
+                                   std::move(minimum_version),
+                                   std::move(release_message),
+                                   std::move(package_kind),
+                                   std::move(package_file_name),
+                                   std::move(package_url),
+                                   std::move(sha256),
+                                   expected_size,
+                                   required,
+                                   std::move(releases_json));
+            },
+            Qt::QueuedConnection);
+    }
+
+    void LauncherUpdateManager::progress_callback(const uint64_t received,
+                                                  const uint64_t total,
+                                                  void* ctx)
+    {
+        auto* self = static_cast<LauncherUpdateManager*>(ctx);
+        if (!self)
+            return;
+        QMetaObject::invokeMethod(self, [self, received, total]()
+        {
+            emit self->download_progress(static_cast<qint64>(qMin<qulonglong>(received, std::numeric_limits<qint64>::max())),
+                                         static_cast<qint64>(qMin<qulonglong>(total, std::numeric_limits<qint64>::max())));
+        }, Qt::QueuedConnection);
+    }
+
+    void LauncherUpdateManager::download_callback(const soa_launcher_download_result result,
+                                                  const soa_launcher_error error_code,
+                                                  const int http_status,
+                                                  const char* error_detail,
+                                                  const char* final_path,
+                                                  void* ctx)
+    {
+        auto* self = static_cast<LauncherUpdateManager*>(ctx);
+        if (!self)
+            return;
+        QMetaObject::invokeMethod(self,
+            [self,
+             result,
+             error_code,
+             http_status,
+             error_detail = QString::fromUtf8(error_detail ? error_detail : ""),
+             final_path = QString::fromUtf8(final_path ? final_path : "")]() mutable
+            {
+                self->handle_download(result,
+                                      error_code,
+                                      http_status,
+                                      std::move(error_detail),
+                                      std::move(final_path));
+            },
+            Qt::QueuedConnection);
+    }
+
+    void LauncherUpdateManager::handle_check(const soa_launcher_check_result result,
+                                             const soa_launcher_error error_code,
+                                             const int http_status,
+                                             QString error_detail,
+                                             QString version,
+                                             QString minimum,
+                                             QString release_message,
+                                             QString kind,
+                                             QString file_name,
+                                             QUrl url,
+                                             QByteArray sha256,
+                                             const qulonglong size,
+                                             const bool is_required,
+                                             QByteArray releases_json)
+    {
+        const bool manual_check = managing_versions;
+        if (result != soa_launcher_check_no_update
+            && result != soa_launcher_check_update_available)
+        {
+            reset_release();
+            managing_versions = false;
+            const QString reason = error_message(error_code, http_status, error_detail);
+            SPDLOG_WARN("launcher update check failed: {}", reason.toStdString());
+            if (manual_check)
+                emit manual_check_failed(reason);
+            else
+                emit check_failed(reason);
+            return;
+        }
+        if (!parse_catalogue(releases_json))
+        {
+            reset_release();
+            managing_versions = false;
+            const QString reason = util::i18n::translate(
+                "No valid signed launcher releases could be found.");
+            SPDLOG_WARN("launcher update check failed: {}", reason.toStdString());
+            if (manual_check)
+                emit manual_check_failed(reason);
+            else
+                emit check_failed(reason);
+            return;
+        }
+        if (result == soa_launcher_check_no_update)
+        {
+            reset_release();
+            if (managing_versions && !releases.isEmpty())
+            {
+                managing_versions = false;
+                const QString current = current_version();
+                if (!select_version(current))
+                    select_version(releases.constFirst().version);
+                emit catalogue_ready();
+                return;
+            }
+            managing_versions = false;
+            emit no_update_available();
+            return;
+        }
+        release_version = std::move(version);
+        minimum_version = std::move(minimum);
+        message = std::move(release_message);
+        package_kind = std::move(kind);
+        package_file_name = std::move(file_name);
+        package_url = std::move(url);
+        expected_sha256 = std::move(sha256);
+        expected_size = size;
+        required = is_required;
+        const bool catalogue_requested = managing_versions;
+        managing_versions = false;
+        if (catalogue_requested)
+            emit catalogue_ready();
+        else
+            emit update_found();
+    }
+
+    bool LauncherUpdateManager::parse_catalogue(const QByteArray& releases_json)
+    {
+        releases.clear();
+        QJsonParseError error;
+        const QJsonDocument document = QJsonDocument::fromJson(releases_json, &error);
+        if (error.error != QJsonParseError::NoError || !document.isObject())
+            return false;
+        const QJsonArray entries = document.object().value(QStringLiteral("releases")).toArray();
+        for (const QJsonValue& value : entries)
+        {
+            const QJsonObject entry = value.toObject();
+            Release release;
+            release.version = entry.value(QStringLiteral("version")).toString();
+            release.message = entry.value(QStringLiteral("message")).toString();
+            release.package_kind = QStringLiteral("appimage");
+            release.file_name = entry.value(QStringLiteral("file_name")).toString();
+            release.url = QUrl(entry.value(QStringLiteral("url")).toString());
+            release.sha256 = entry.value(QStringLiteral("sha256")).toString().toLatin1();
+            release.size = entry.value(QStringLiteral("size")).toVariant().toULongLong();
+            if (release.version.isEmpty() || release.file_name.isEmpty() || !release.url.isValid()
+                || release.sha256.size() != 64 || release.size == 0)
+                return false;
+            releases.push_back(std::move(release));
+        }
+        return !releases.isEmpty();
+    }
+
+    bool LauncherUpdateManager::select_version(const QString& version)
+    {
+        if (!updater || downloading)
+            return false;
+        const auto found = std::find_if(releases.cbegin(), releases.cend(), [&version](const Release& release)
+        {
+            return release.version == version;
+        });
+        if (found == releases.cend())
+            return false;
+        const QByteArray version_bytes = found->version.toUtf8();
+        if (!soa_launcher_updater_select_version(updater, version_bytes.constData()))
+            return false;
+        release_version = found->version;
+        minimum_version.clear();
+        message = found->message;
+        package_kind = found->package_kind;
+        package_file_name = found->file_name;
+        package_url = found->url;
+        expected_sha256 = found->sha256;
+        expected_size = found->size;
+        required = false;
+        return true;
+    }
+
+    void LauncherUpdateManager::handle_download(const soa_launcher_download_result result,
+                                                const soa_launcher_error error_code,
+                                                const int http_status,
+                                                QString error_detail,
+                                                QString final_path)
+    {
+        downloading = false;
+        if (result != soa_launcher_download_completed)
+        {
+            const QString reason = error_message(error_code, http_status, error_detail);
+            SPDLOG_ERROR("launcher update failed: {}", reason.toStdString());
+            emit update_failed(reason);
+            return;
+        }
+        final_download_path = std::move(final_path);
+        install_downloaded_package();
     }
 
     void LauncherUpdateManager::reset_release()
@@ -258,371 +383,59 @@ namespace core::update
         package_kind.clear();
         package_file_name.clear();
         final_download_path.clear();
-        partial_download_path.clear();
         package_url.clear();
         expected_sha256.clear();
-        expected_size = -1;
+        expected_size = 0;
         required = false;
     }
 
-    QString LauncherUpdateManager::github_api_url() const
+    QString LauncherUpdateManager::error_message(const soa_launcher_error error_code,
+                                                 const int http_status,
+                                                 const QString& detail) const
     {
-        QString repository = qEnvironmentVariable("SOA_LAUNCHER_GITHUB_REPOSITORY").trimmed();
-        if (repository.isEmpty())
-            repository = QString::fromUtf8(SOA_LAUNCHER_GITHUB_REPOSITORY).trimmed();
-        static const QRegularExpression expression(
-            QStringLiteral("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"));
-        if (!expression.match(repository).hasMatch())
-            return {};
-        return QStringLiteral("https://api.github.com/repos/%1/releases/latest").arg(repository);
-    }
-
-    bool LauncherUpdateManager::insecure_urls_allowed() const
-    {
-        return qEnvironmentVariableIntValue("SOA_ALLOW_INSECURE_UPDATE_URLS") == 1;
-    }
-
-    bool LauncherUpdateManager::validate_package_url(const QUrl& url) const
-    {
-        if (!url.isValid() || url.host().isEmpty())
-            return false;
-        if (url.scheme().compare(QStringLiteral("https"), Qt::CaseInsensitive) == 0)
-            return true;
-        return insecure_urls_allowed()
-            && url.scheme().compare(QStringLiteral("http"), Qt::CaseInsensitive) == 0;
-    }
-
-    void LauncherUpdateManager::check_for_updates()
-    {
-        if (check_reply || downloading)
-            return;
-
-        reset_release();
-        const QUrl url(github_api_url());
-        if (!validate_package_url(url))
+        switch (error_code)
         {
-            emit check_failed(util::i18n::translate(
-                "The launcher GitHub repository setting is invalid."));
-            return;
+            case soa_launcher_error_busy:
+                return util::i18n::translate("A launcher update operation is already running.");
+            case soa_launcher_error_invalid_configuration:
+                return util::i18n::translate("The launcher update configuration is invalid.");
+            case soa_launcher_error_http:
+                return util::i18n::translate("The launcher update server returned HTTP %1.").arg(http_status);
+            case soa_launcher_error_response_too_large:
+                return util::i18n::translate("The launcher update response is unexpectedly large.");
+            case soa_launcher_error_invalid_release:
+                return util::i18n::translate("The launcher update server returned invalid release information.");
+            case soa_launcher_error_missing_asset:
+                return util::i18n::translate("No compatible launcher package was attached to the release.");
+            case soa_launcher_error_unsafe_url:
+                return util::i18n::translate("The launcher release contains an invalid or untrusted package URL.");
+            case soa_launcher_error_missing_digest:
+                return util::i18n::translate("The launcher release package has no valid SHA-256 digest.");
+            case soa_launcher_error_invalid_size:
+                return util::i18n::translate("The launcher release package has an invalid size.");
+            case soa_launcher_error_destination:
+                return util::i18n::translate("The launcher could not create the update file.");
+            case soa_launcher_error_write:
+                return util::i18n::translate("The launcher could not write the downloaded update.");
+            case soa_launcher_error_size_mismatch:
+                return util::i18n::translate("The downloaded launcher update has an unexpected size.");
+            case soa_launcher_error_digest_mismatch:
+                return util::i18n::translate("The downloaded launcher update failed SHA-256 verification.");
+            case soa_launcher_error_finalize:
+                return util::i18n::translate("The launcher could not finalize the downloaded update file.");
+            case soa_launcher_error_cancelled:
+                return util::i18n::translate("The launcher update was cancelled.");
+            case soa_launcher_error_invalid_signature:
+                return util::i18n::translate("The launcher update metadata has an invalid signature.");
+            case soa_launcher_error_network:
+                return detail.isEmpty()
+                    ? util::i18n::translate("The launcher update network request failed.")
+                    : util::i18n::translate("The launcher update network request failed: %1").arg(detail);
+            default:
+                return detail.isEmpty()
+                    ? util::i18n::translate("The launcher update failed.")
+                    : detail;
         }
-
-        QNetworkRequest request(url);
-        request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
-                             QNetworkRequest::NoLessSafeRedirectPolicy);
-        request.setAttribute(QNetworkRequest::CacheLoadControlAttribute,
-                             QNetworkRequest::AlwaysNetwork);
-        request.setHeader(QNetworkRequest::UserAgentHeader,
-                          QByteArray("Story-Of-Alicia-Launcher/") + SOA_LAUNCHER_VERSION);
-        request.setRawHeader("Accept", "application/vnd.github+json");
-        request.setRawHeader("X-GitHub-Api-Version", "2022-11-28");
-
-        emit check_started();
-        QNetworkReply* reply = network->get(request);
-        check_reply = reply;
-        connect(check_timeout, &QTimer::timeout, reply, [reply]()
-        {
-            if (reply->isRunning())
-                reply->abort();
-        });
-        check_timeout->start(12000);
-        connect(reply, &QNetworkReply::finished, this, [this, reply]()
-        {
-            finish_check(reply);
-        });
-    }
-
-    void LauncherUpdateManager::finish_check(QNetworkReply* reply)
-    {
-        check_timeout->stop();
-        check_reply = nullptr;
-        const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-        const QByteArray payload = reply->readAll();
-        const QNetworkReply::NetworkError network_error = reply->error();
-        const QString network_message = reply->errorString();
-        reply->deleteLater();
-
-        if (network_error != QNetworkReply::NoError || status < 200 || status >= 300)
-        {
-            const QString reason = status > 0
-                ? util::i18n::translate("GitHub launcher update check returned HTTP %1.").arg(status)
-                : util::i18n::translate("GitHub launcher update check failed: %1").arg(network_message);
-            SPDLOG_WARN("{}", reason.toStdString());
-            emit check_failed(reason);
-            return;
-        }
-
-        if (payload.size() > 4 * 1024 * 1024)
-        {
-            emit check_failed(util::i18n::translate(
-                "The GitHub release response is unexpectedly large."));
-            return;
-        }
-
-        QJsonParseError parse_error;
-        const QJsonDocument document = QJsonDocument::fromJson(payload, &parse_error);
-        if (parse_error.error != QJsonParseError::NoError || !document.isObject())
-        {
-            emit check_failed(util::i18n::translate(
-                "GitHub returned invalid release information."));
-            return;
-        }
-
-        const QJsonObject release = document.object();
-        if (release.value(QStringLiteral("draft")).toBool(false)
-            || release.value(QStringLiteral("prerelease")).toBool(false))
-        {
-            reset_release();
-            emit no_update_available();
-            return;
-        }
-
-        release_version = normalized_version(release.value(QStringLiteral("tag_name")).toString());
-        if (release_version.isEmpty())
-            release_version = normalized_version(release.value(QStringLiteral("name")).toString());
-        if (release_version.isEmpty())
-        {
-            emit check_failed(util::i18n::translate(
-                "The latest GitHub release has no valid version tag."));
-            return;
-        }
-
-        bool release_version_valid = false;
-        numeric_version(release_version, release_version_valid);
-        if (!release_version_valid)
-        {
-            emit check_failed(util::i18n::translate(
-                "The latest GitHub release has an invalid version tag."));
-            return;
-        }
-
-        const QString current = QString::fromUtf8(SOA_LAUNCHER_VERSION);
-        if (compare_versions(release_version, current) <= 0)
-        {
-            reset_release();
-            emit no_update_available();
-            return;
-        }
-
-        const QString body = release.value(QStringLiteral("body")).toString();
-        minimum_version = normalized_version(
-            release_directive(body, QStringLiteral("minimum-version")));
-        if (!minimum_version.isEmpty())
-        {
-            bool minimum_version_valid = false;
-            numeric_version(minimum_version, minimum_version_valid);
-            if (!minimum_version_valid)
-            {
-                emit check_failed(util::i18n::translate(
-                    "The GitHub release contains an invalid minimum launcher version."));
-                return;
-            }
-        }
-
-        const QJsonObject asset = select_release_asset(
-            release.value(QStringLiteral("assets")).toArray(), detected_platform_key());
-        if (asset.isEmpty())
-        {
-            emit check_failed(util::i18n::translate(
-                "The GitHub release has no launcher package for this platform."));
-            return;
-        }
-
-        package_file_name = safe_file_name(asset.value(QStringLiteral("name")).toString());
-        package_url = QUrl(asset.value(QStringLiteral("browser_download_url")).toString());
-        expected_sha256 = github_sha256(asset);
-        expected_size = json_integer(asset.value(QStringLiteral("size")));
-
-#if defined(Q_OS_MACOS)
-        package_kind = QStringLiteral("dmg");
-#elif defined(Q_OS_LINUX)
-        package_kind = QStringLiteral("appimage");
-#endif
-
-        if (package_file_name.isEmpty() || !validate_package_url(package_url)
-            || expected_sha256.isEmpty() || expected_size <= 0)
-        {
-            emit check_failed(util::i18n::translate(
-                "The GitHub release asset is missing its URL, size, or SHA-256 digest."));
-            return;
-        }
-
-        required = required_directive(body);
-        if (!minimum_version.isEmpty() && compare_versions(current, minimum_version) < 0)
-            required = true;
-        message = release_summary(body);
-
-        SPDLOG_INFO("launcher update available from GitHub: current={} available={} required={} platform={} asset={}",
-                    current.toStdString(), release_version.toStdString(), required,
-                    detected_platform_key().toStdString(), package_file_name.toStdString());
-        emit update_found();
-    }
-
-    void LauncherUpdateManager::download_and_install()
-    {
-        if (!update_available() || downloading)
-            return;
-        begin_download();
-    }
-
-    QString LauncherUpdateManager::choose_download_path() const
-    {
-        QString root = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
-        if (root.isEmpty())
-            root = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
-        if (root.isEmpty())
-            root = QDir::tempPath();
-        QDir directory(root);
-        directory.mkpath(QStringLiteral("Story of Alicia Launcher Updates"));
-        directory.cd(QStringLiteral("Story of Alicia Launcher Updates"));
-        return directory.filePath(package_file_name);
-    }
-
-    void LauncherUpdateManager::begin_download()
-    {
-        final_download_path = choose_download_path();
-        partial_download_path = final_download_path + QStringLiteral(".part");
-        QFile::remove(partial_download_path);
-        download_file.setFileName(partial_download_path);
-        if (!download_file.open(QIODevice::WriteOnly | QIODevice::Truncate))
-        {
-            emit update_failed(util::i18n::translate("The launcher could not create the update download file: %1")
-                                   .arg(download_file.errorString()));
-            return;
-        }
-
-        delete download_hash;
-        download_hash = new QCryptographicHash(QCryptographicHash::Sha256);
-        downloaded_size = 0;
-        download_write_failed = false;
-        downloading = true;
-
-        QNetworkRequest request(package_url);
-        request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
-                             QNetworkRequest::NoLessSafeRedirectPolicy);
-        request.setAttribute(QNetworkRequest::CacheLoadControlAttribute,
-                             QNetworkRequest::AlwaysNetwork);
-        request.setHeader(QNetworkRequest::UserAgentHeader,
-                          QByteArray("Story-Of-Alicia-Launcher/") + SOA_LAUNCHER_VERSION);
-
-        QNetworkReply* reply = network->get(request);
-        download_reply = reply;
-        emit download_started();
-
-        connect(download_timeout, &QTimer::timeout, reply, [reply]()
-        {
-            if (reply->isRunning())
-                reply->abort();
-        });
-        download_timeout->start(60000);
-        connect(reply, &QIODevice::readyRead, this, [this]()
-        {
-            consume_download_data();
-        });
-        connect(reply, &QNetworkReply::downloadProgress, this,
-                [this](const qint64 received, const qint64 total)
-        {
-            download_timeout->start(60000);
-            emit download_progress(received, total);
-        });
-        connect(reply, &QNetworkReply::finished, this, [this]()
-        {
-            finish_download();
-        });
-    }
-
-    void LauncherUpdateManager::consume_download_data()
-    {
-        if (!download_reply || !download_file.isOpen() || download_write_failed)
-            return;
-        const QByteArray data = download_reply->readAll();
-        if (data.isEmpty())
-            return;
-        if (download_file.write(data) != data.size())
-        {
-            download_write_failed = true;
-            download_reply->abort();
-            return;
-        }
-        download_hash->addData(data);
-        downloaded_size += data.size();
-    }
-
-    void LauncherUpdateManager::finish_download()
-    {
-        download_timeout->stop();
-        QNetworkReply* reply = download_reply;
-        consume_download_data();
-        download_reply = nullptr;
-        const int status = reply
-            ? reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()
-            : 0;
-        const QNetworkReply::NetworkError network_error = reply
-            ? reply->error()
-            : QNetworkReply::UnknownNetworkError;
-        const QString network_message = reply
-            ? reply->errorString()
-            : QStringLiteral("Unknown network error");
-        if (reply)
-            reply->deleteLater();
-
-        download_file.flush();
-        download_file.close();
-
-        if (download_write_failed)
-        {
-            fail_download(util::i18n::translate("The launcher could not write the downloaded update."));
-            return;
-        }
-        if (network_error != QNetworkReply::NoError || status < 200 || status >= 300)
-        {
-            fail_download(status > 0
-                ? util::i18n::translate("The launcher update download returned HTTP %1.").arg(status)
-                : util::i18n::translate("The launcher update download failed: %1").arg(network_message));
-            return;
-        }
-        if (expected_size >= 0 && downloaded_size != expected_size)
-        {
-            fail_download(util::i18n::translate("The downloaded launcher update has an unexpected size."));
-            return;
-        }
-        const QByteArray actual_hash = download_hash->result().toHex().toLower();
-        if (actual_hash != expected_sha256)
-        {
-            fail_download(util::i18n::translate("The downloaded launcher update failed SHA-256 verification."));
-            return;
-        }
-
-        QFile::remove(final_download_path);
-        if (!QFile::rename(partial_download_path, final_download_path))
-        {
-            fail_download(util::i18n::translate("The launcher could not finalize the downloaded update file."));
-            return;
-        }
-
-        downloading = false;
-        delete download_hash;
-        download_hash = nullptr;
-        install_downloaded_package();
-    }
-
-    void LauncherUpdateManager::fail_download(const QString& reason)
-    {
-        downloading = false;
-        if (download_file.isOpen())
-            download_file.close();
-        QFile::remove(partial_download_path);
-        delete download_hash;
-        download_hash = nullptr;
-        SPDLOG_ERROR("launcher update failed: {}", reason.toStdString());
-        emit update_failed(reason);
-    }
-
-    void LauncherUpdateManager::cancel_download()
-    {
-        if (!downloading)
-            return;
-        if (download_reply)
-            download_reply->abort();
     }
 
     void LauncherUpdateManager::install_downloaded_package()
@@ -688,7 +501,6 @@ namespace core::update
             const QString staging = current + QStringLiteral(".soa-update-new");
             const QString previous = current + QStringLiteral(".soa-previous");
             QFile::remove(staging);
-            QFile::remove(previous);
             if (!QFile::copy(final_download_path, staging)
                 || !QFile::setPermissions(staging, executable_permissions))
             {
@@ -696,6 +508,7 @@ namespace core::update
                 emit update_failed(util::i18n::translate("The launcher could not stage the replacement AppImage beside the current launcher."));
                 return;
             }
+            QFile::remove(previous);
             if (!QFile::rename(current, previous))
             {
                 QFile::remove(staging);
@@ -731,50 +544,19 @@ namespace core::update
         emit installer_started(target);
     }
 
-    int LauncherUpdateManager::compare_versions(const QString& left, const QString& right)
+    void LauncherUpdateManager::schedule_health_checkpoint()
     {
-        bool left_valid = false;
-        bool right_valid = false;
-        const QVersionNumber left_number = numeric_version(left, left_valid);
-        const QVersionNumber right_number = numeric_version(right, right_valid);
-        if (!left_valid || !right_valid)
-            return QString::compare(normalized_version(left), normalized_version(right), Qt::CaseInsensitive);
-
-        const int numeric_comparison = QVersionNumber::compare(left_number, right_number);
-        if (numeric_comparison != 0)
-            return numeric_comparison;
-
-        const QStringList left_pre = prerelease_parts(normalized_version(left));
-        const QStringList right_pre = prerelease_parts(normalized_version(right));
-        if (left_pre.isEmpty() && right_pre.isEmpty())
-            return 0;
-        if (left_pre.isEmpty())
-            return 1;
-        if (right_pre.isEmpty())
-            return -1;
-
-        const qsizetype count = qMin(left_pre.size(), right_pre.size());
-        for (qsizetype index = 0; index < count; ++index)
+#if defined(Q_OS_LINUX)
+        if (!QCoreApplication::arguments().contains(QStringLiteral("--launcher-updated")))
+            return;
+        const QString current = qEnvironmentVariable("APPIMAGE").trimmed();
+        if (current.isEmpty())
+            return;
+        QTimer::singleShot(15000, this, [current]()
         {
-            qulonglong left_value = 0;
-            qulonglong right_value = 0;
-            const bool left_numeric = numeric_identifier(left_pre[index], left_value);
-            const bool right_numeric = numeric_identifier(right_pre[index], right_value);
-            if (left_numeric && right_numeric)
-            {
-                if (left_value < right_value) return -1;
-                if (left_value > right_value) return 1;
-                continue;
-            }
-            if (left_numeric != right_numeric)
-                return left_numeric ? -1 : 1;
-            const int comparison = QString::compare(left_pre[index], right_pre[index], Qt::CaseInsensitive);
-            if (comparison != 0)
-                return comparison;
-        }
-        if (left_pre.size() < right_pre.size()) return -1;
-        if (left_pre.size() > right_pre.size()) return 1;
-        return 0;
+            QFile::remove(current + QStringLiteral(".soa-previous"));
+        });
+#endif
     }
 
     QString LauncherUpdateManager::detected_platform_key()
@@ -792,22 +574,14 @@ namespace core::update
 #endif
     }
 
-    QString LauncherUpdateManager::safe_file_name(const QString& value)
+    QString LauncherUpdateManager::download_directory()
     {
-        QString result = QFileInfo(value.trimmed()).fileName();
-        result.replace(QRegularExpression(QStringLiteral("[^A-Za-z0-9._ -]")), QStringLiteral("_"));
-        while (result.startsWith(QLatin1Char('.')))
-            result.remove(0, 1);
-        return result.left(180);
-    }
-
-    void LauncherUpdateManager::cleanup_previous_linux_package()
-    {
-#if defined(Q_OS_LINUX)
-        const QString current = qEnvironmentVariable("APPIMAGE").trimmed();
-        if (!current.isEmpty())
-            QFile::remove(current + QStringLiteral(".soa-previous"));
-#endif
+        QString directory = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
+        if (directory.isEmpty())
+            directory = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
+        if (directory.isEmpty())
+            directory = QDir::tempPath();
+        return directory;
     }
 
     bool LauncherUpdateManager::update_available() const
@@ -838,5 +612,19 @@ namespace core::update
     QString LauncherUpdateManager::downloaded_path() const
     {
         return final_download_path;
+    }
+
+    QStringList LauncherUpdateManager::available_versions() const
+    {
+        QStringList versions;
+        versions.reserve(releases.size());
+        for (const Release& release : releases)
+            versions.push_back(release.version);
+        return versions;
+    }
+
+    QString LauncherUpdateManager::current_version()
+    {
+        return QString::fromLatin1(SOA_LAUNCHER_VERSION);
     }
 }

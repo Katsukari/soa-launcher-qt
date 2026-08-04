@@ -7,11 +7,13 @@
 #include "util/SimpleUtils.hpp"
 
 #include <QFontMetrics>
+#include <QComboBox>
 #include <QIcon>
 #include <QLabel>
 #include <QPainter>
 #include <QProgressBar>
 #include <QPushButton>
+#include <QVersionNumber>
 
 namespace
 {
@@ -96,6 +98,25 @@ void LauncherUpdate::setup_controls()
     details_label->setFont(details_font);
     details_label->setStyleSheet(QStringLiteral("color:#A08C7B; background:transparent;"));
 
+    version_combo = new QComboBox(this);
+    version_combo->setGeometry(local_rect(w, {154, 180, 272, 36}));
+    version_combo->setStyleSheet(QStringLiteral(
+        "QComboBox { background:#F7F0EB; color:#4F1717; border:1px solid #A98678; "
+        "border-radius:7px; padding:5px 12px; }"
+        "QComboBox::drop-down { border:0; width:28px; }"
+        "QComboBox QAbstractItemView { background:#F7F0EB; color:#4F1717; "
+        "selection-background-color:#EBDCD3; border:1px solid #A98678; }"));
+    version_combo->hide();
+    connect(version_combo, &QComboBox::currentTextChanged, this, [this](const QString& version)
+    {
+        if (catalogue_mode && !version.isEmpty())
+        {
+            release_version = version;
+            emit version_selected(version);
+            retranslate_content();
+        }
+    });
+
     progress_bar = new QProgressBar(this);
     progress_bar->setGeometry(local_rect(w, {74, 188, 432, 18}));
     progress_bar->setRange(0, 1000);
@@ -150,6 +171,22 @@ void LauncherUpdate::setup_controls()
             emit postponed();
     });
 
+    refresh_layout();
+    retranslate_content();
+}
+
+void LauncherUpdate::set_versions(const QString& installed_version, const QStringList& versions,
+                                  const bool catalogue_visible)
+{
+    current_version = installed_version;
+    catalogue_mode = catalogue_visible && !versions.isEmpty();
+    version_combo->blockSignals(true);
+    version_combo->clear();
+    version_combo->addItems(versions);
+    const int selected = version_combo->findText(release_version);
+    if (selected >= 0)
+        version_combo->setCurrentIndex(selected);
+    version_combo->blockSignals(false);
     refresh_layout();
     retranslate_content();
 }
@@ -220,11 +257,14 @@ void LauncherUpdate::refresh_layout()
 {
     const QSize w = window()->size();
     const bool progress_visible = downloading_update || starting_installer;
+    details_label->setGeometry(local_rect(w, catalogue_mode
+        ? QRect{68, 142, 444, 34} : QRect{68, 142, 444, 54}));
     progress_bar->setVisible(progress_visible);
     progress_label->setVisible(progress_visible);
+    version_combo->setVisible(catalogue_mode && !progress_visible);
     update_button->setGeometry(local_rect(w, progress_visible
         ? QRect{74, 229, 432, 67}
-        : QRect{74, 199, 432, 67}));
+        : catalogue_mode ? QRect{74, 225, 432, 67} : QRect{74, 199, 432, 67}));
     update_button->setIconSize(update_button->size());
     update_button_label->setGeometry(update_button->rect());
     update_button->setEnabled(!progress_visible);
@@ -257,12 +297,11 @@ void LauncherUpdate::retranslate_content()
     }
     else
     {
-        title_label->setText(util::i18n::translate(required_update
-            ? "LAUNCHER UPDATE REQUIRED"
-            : "LAUNCHER UPDATE AVAILABLE"));
-        message_label->setText(util::i18n::translate(required_update
-            ? "Version %1 is available. You must update the launcher before continuing."
-            : "Version %1 is available for the launcher.").arg(release_version));
+        title_label->setText(util::i18n::translate(
+            catalogue_mode ? "LAUNCHER VERSIONS" : "LAUNCHER UPDATE AVAILABLE"));
+        message_label->setText(catalogue_mode
+            ? util::i18n::translate("Choose a signed launcher release from the last year.")
+            : util::i18n::translate("Version %1 is available for the launcher.").arg(release_version));
 #if defined(Q_OS_MACOS)
         const QString default_details = util::i18n::translate(
             "The installer will open automatically. The launcher will close.");
@@ -270,8 +309,19 @@ void LauncherUpdate::retranslate_content()
         const QString default_details = util::i18n::translate(
             "The AppImage will update and restart automatically.");
 #endif
-        details_label->setText(release_message.isEmpty() ? default_details : release_message);
-        set_update_button_text(QStringLiteral("UPDATE NOW"));
+        details_label->setText(catalogue_mode
+            ? util::i18n::translate("Installed: %1 · Selected: %2")
+                .arg(current_version, release_version)
+            : release_message.isEmpty() ? default_details : release_message);
+        if (!catalogue_mode)
+            set_update_button_text(QStringLiteral("UPDATE NOW"));
+        else if (release_version == current_version)
+            set_update_button_text(QStringLiteral("REINSTALL VERSION"));
+        else if (QVersionNumber::compare(QVersionNumber::fromString(release_version),
+                                         QVersionNumber::fromString(current_version)) < 0)
+            set_update_button_text(QStringLiteral("DOWNGRADE"));
+        else
+            set_update_button_text(QStringLiteral("UPDATE NOW"));
     }
 
     fit_label(title_label, util::layout::scaled(25, window()->size()), 18);
