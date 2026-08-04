@@ -19,4 +19,3 @@ PUBLIC_HEX="$(openssl pkey -in "$OUTPUT" -pubout -outform DER | tail -c 32 | od 
 
 echo "Private key created at $OUTPUT. Keep it offline and never commit it."
 echo "SOA_UPDATE_PUBLIC_KEY_HEX=$PUBLIC_HEX"
-echo "soa_developer_key=$PUBLIC_HEX"

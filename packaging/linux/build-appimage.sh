@@ -205,10 +205,9 @@ jq -n \
   --arg fallback_manifest_url \
     "https://github.com/Story-Of-Alicia/soa-launcher-qt/releases/latest/download/linux_launcher_version.json" \
   --arg signing_public_key "$SOA_UPDATE_PUBLIC_KEY_HEX" \
-  --arg soa_developer_key "$SOA_UPDATE_PUBLIC_KEY_HEX" \
   '{schema: 1, version: $version, platform: "linux-x86_64",
     manifest_url: $manifest_url, fallback_manifest_url: $fallback_manifest_url,
-    signing_public_key: $signing_public_key, soa_developer_key: $soa_developer_key}' \
+    signing_public_key: $signing_public_key}' \
   >"$APPDIR/usr/share/soa-launcher/update/linux_launcher_version.json"
 
 cp soa-launcher.png "$APPDIR/soa-launcher.png"

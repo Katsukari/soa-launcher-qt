@@ -520,11 +520,10 @@ final class LauncherUpdateService: @unchecked Sendable
     {
         guard let manifest = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               (manifest["schema"] as? NSNumber)?.intValue == 1,
-              manifest["platform"] as? String == "linux-x86_64",
-              (manifest["soa_developer_key"] as? String)?.lowercased() == publicKeyHex else {
+              manifest["platform"] as? String == "linux-x86_64" else {
             throw LauncherServiceFailure(
                 soa_launcher_error_invalid_release,
-                "The launcher update is not identified as a Story of Alicia release")
+                "The signed launcher release manifest is invalid")
         }
 
         let tag = normalizedVersion(manifest["version"] as? String ?? "")
@@ -609,7 +608,6 @@ final class LauncherUpdateService: @unchecked Sendable
         guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               (root["schema"] as? NSNumber)?.intValue == 1,
               root["platform"] as? String == "linux-x86_64",
-              (root["soa_developer_key"] as? String)?.lowercased() == publicKeyHex,
               let entries = root["releases"] as? [[String: Any]],
               !entries.isEmpty, entries.count <= 128 else {
             throw LauncherServiceFailure(
