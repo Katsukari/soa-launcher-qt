@@ -20,12 +20,12 @@ The launcher is designed to work for regular players without requiring knowledge
 
 ## Supported platforms
 
-| Platform                      | Status                                                               |
-|-------------------------------|----------------------------------------------------------------------|
-| Linux x86_64                  | AppImage  in releases                                                |
-| Linux ARM64                   | On the todo list                                                     |
-| macOS Intel and Apple Silicon | Experimental DMG (under heavy development with its own wine runtime) |
-| Windows                       | Use the original Windows launcher                                    |
+| Platform                      | Status                                                    |
+|-------------------------------|-----------------------------------------------------------|
+| Linux x86_64                  | AppImage  in releases                                     |
+| Linux ARM64                   | On the todo list                                          |
+| macOS Intel and Apple Silicon | Experimental .app that you have to build yourself for now |
+| Windows                       | Use the original Windows launcher                         |
 
 ## Installing the launcher
 
@@ -50,19 +50,16 @@ Linux users can choose between Wine, Proton through UMU, or a custom runtime.
 
 ### macOS
 
-1. Download the DMG.
-2. Open it and move the launcher into Applications.
-3. Start the launcher and follow the setup instructions.
+Currently the macOS launcher has to be built from source.
+Read [`BUILDING.md`](docs/BUILDING.md).
 
-Apple Silicon Macs use the bundled Intel game runtime through Rosetta. The launcher will explain how to install Rosetta when it is required.
+You can read about why in [`PLATFORM_MACOS.md`](docs/PLATFORM_MACOS.md).
 
 ## Documentation
-
 - [`BUILDING.md`](docs/BUILDING.md) - building the launcher from source
 - [`CONTRIBUTING.md`](docs/CONTRIBUTING.md) - contributing code, translations, or documentation
-- [`SECURITY_INTEGRATION.md`](docs/SECURITY_INTEGRATION.md) - launcher and server security boundaries
+- [`SECURITY.md`](docs/SECURITY_INTEGRATION.md) - launcher security
 - [`CONFIG_REFERENCE.md`](docs/CONFIG_REFERENCE.md) - persisted launcher configuration
-- [`RUNTIME_ARCHITECTURE.md`](docs/RUNTIME_ARCHITECTURE.md) - macOS runtime package structure
 - [`PLATFORM_LINUX.md`](docs/PLATFORM_LINUX.md) - Linux behavior and packaging
 - [`PLATFORM_MACOS.md`](docs/PLATFORM_MACOS.md) - macOS behavior and packaging
 
