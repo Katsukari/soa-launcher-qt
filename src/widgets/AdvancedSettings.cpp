@@ -20,11 +20,7 @@ namespace aset = util::layout::advanced_settings;
 
 namespace
 {
-#if defined(Q_OS_MACOS)
     constexpr int kAdvancedRowCount = 4;
-#else
-    constexpr int kAdvancedRowCount = 3;
-#endif
 }
 
 AdvancedSettings::AdvancedSettings(QWidget* parent) : QWidget(parent)
@@ -33,10 +29,10 @@ AdvancedSettings::AdvancedSettings(QWidget* parent) : QWidget(parent)
     setup_game_args_option();
 #if defined(Q_OS_MACOS)
     setup_macos_compatibility_option();
-    setup_macos_deep_diagnostics_option();
 #else
     setup_umu_runner_option();
 #endif
+    setup_diagnostics_option();
 }
 void AdvancedSettings::setup_game_path_option()
 {
@@ -65,13 +61,8 @@ void AdvancedSettings::setup_game_path_option()
         {
             if (!Config::instance().path_inside_prefix(dir))
             {
-#if defined(Q_OS_MACOS)
-                const QString message = QStringLiteral(
-                    "The game folder must remain inside the selected runtime prefix.");
-#else
                 const QString message = QStringLiteral(
                     "The game folder must remain inside the selected Wine prefix.");
-#endif
                 LauncherDialog::warning(
                     this,
                     QStringLiteral("Invalid Game Folder"),
@@ -93,13 +84,8 @@ void AdvancedSettings::setup_game_path_option()
         }
         if (!Config::instance().path_inside_prefix(candidate))
         {
-#if defined(Q_OS_MACOS)
-            const QString message = QStringLiteral(
-                "The game folder must remain inside the selected runtime prefix.");
-#else
             const QString message = QStringLiteral(
                 "The game folder must remain inside the selected Wine prefix.");
-#endif
             LauncherDialog::warning(
                 this,
                 QStringLiteral("Invalid Game Folder"),
@@ -124,7 +110,7 @@ void AdvancedSettings::setup_game_args_option()
                             "GAME LAUNCH ARGUMENTS",
                             "Passed to Alicia.exe. Optional for most players.");
     auto* field = new QLineEdit(this);
-    field->setPlaceholderText("Alicia.exe (default)");
+    field->setPlaceholderText(util::i18n::translate("%1 (default)").arg(QStringLiteral("Alicia.exe")));
     field->setAccessibleName(QStringLiteral("Game launch arguments"));
     field->setStyleSheet(util::styles::k_field);
     field->setGeometry(ls::ctrl_pos(w, y).x(), ls::ctrl_pos(w, y).y(),
@@ -154,25 +140,27 @@ void AdvancedSettings::setup_macos_compatibility_option()
     util::simple_utils::make_label_block(
         this, w, y,
         "COMPATIBILITY PROFILE",
-        "Normal is recommended. Display fallbacks only change targeted graphics behavior.");
+        "Normal is recommended. Fallback profiles isolate targeted graphics or audio behavior.");
 
     const QStringList labels {
         QStringLiteral("Normal (recommended)"),
         QStringLiteral("Safe display"),
         QStringLiteral("Low graphics"),
-        QStringLiteral("Mac GL fallback")
+        QStringLiteral("Mac GL fallback"),
+        QStringLiteral("Audio isolation (diagnostic)")
     };
     const QStringList ids {
         QStringLiteral("default"),
         QStringLiteral("safe-display"),
         QStringLiteral("low-graphics"),
-        QStringLiteral("gl-behind")
+        QStringLiteral("gl-behind"),
+        QStringLiteral("audio-isolation")
     };
 
     auto* dropdown = new ImageDropdown(labels, this);
     dropdown->setAccessibleName(QStringLiteral("macOS compatibility profile"));
     dropdown->setAccessibleDescription(
-        QStringLiteral("Select a targeted runtime compatibility profile"));
+        QStringLiteral("Select a targeted Wine compatibility profile"));
     dropdown->move(ls::ctrl_pos(w, y));
     const int current = ids.indexOf(Config::instance().macos_compatibility_profile());
     dropdown->set_index(current >= 0 ? current : 0);
@@ -192,23 +180,29 @@ void AdvancedSettings::setup_macos_compatibility_option()
 #endif
 }
 
-void AdvancedSettings::setup_macos_deep_diagnostics_option()
+void AdvancedSettings::setup_diagnostics_option()
 {
-#if defined(Q_OS_MACOS)
     const QSize w = window()->size();
     const int y = aset::row(3, kAdvancedRowCount);
+#if defined(Q_OS_MACOS)
+    const char* description =
+        "Creates labeled Alicia and Wine logs, a launch timeline, summary and host sample. Leave off for normal play.";
+#else
+    const char* description =
+        "Creates labeled Alicia and Wine logs, a launch timeline and summary. Leave off for normal play.";
+#endif
     util::simple_utils::make_label_block(
         this, w, y,
-        "DEVELOPER DEEP DIAGNOSTICS",
-        "Adds verbose runtime traces and host sampling. Leave off for normal play.");
+        "DIAGNOSTIC MODE",
+        description);
 
     auto* slider = util::simple_utils::make_flat_button(this);
     const QRect geometry = ls::slider_rect(w, y);
     slider->setGeometry(geometry);
     slider->setIconSize(geometry.size());
-    slider->setAccessibleName(QStringLiteral("Developer deep diagnostics"));
+    slider->setAccessibleName(QStringLiteral("Diagnostic mode"));
     slider->setAccessibleDescription(
-        QStringLiteral("Enable verbose launch traces and host sampling"));
+        QStringLiteral("Create detailed files for each game launch"));
 
     const auto paint = [slider, size = geometry.size()](const bool enabled)
     {
@@ -218,18 +212,17 @@ void AdvancedSettings::setup_macos_deep_diagnostics_option()
         slider->setIcon(QIcon(asset.normal.scaled(
             size, Qt::KeepAspectRatio, Qt::SmoothTransformation)));
     };
-    paint(Config::instance().macos_deep_diagnostics());
+    paint(Config::instance().diagnostics_enabled());
     connect(slider, &QPushButton::clicked, this, [paint]()
     {
-        Config::instance().set_macos_deep_diagnostics(
-            !Config::instance().macos_deep_diagnostics());
-        paint(Config::instance().macos_deep_diagnostics());
+        Config::instance().set_diagnostics_enabled(
+            !Config::instance().diagnostics_enabled());
+        paint(Config::instance().diagnostics_enabled());
     });
     connect(&Config::instance(), &Config::changed, slider, [paint]()
     {
-        paint(Config::instance().macos_deep_diagnostics());
+        paint(Config::instance().diagnostics_enabled());
     });
-#endif
 }
 
 

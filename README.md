@@ -1,7 +1,5 @@
 # Story of Alicia Launcher
 
-[![Build macOS and Linux](https://github.com/Story-Of-Alicia/soa-launcher-qt/actions/workflows/cmake-multi-platform.yml/badge.svg)](https://github.com/Story-Of-Alicia/soa-launcher-qt/actions/workflows/cmake-multi-platform.yml)
-
 The official **Story of Alicia** launcher for Linux and macOS.
 
 The launcher can:
@@ -10,7 +8,7 @@ The launcher can:
 - Verify and repair damaged files
 - Manage both supported game versions
 - Set up Wine or Proton on Linux
-- Use the bundled Story of Alicia runtime on macOS
+- Detect and use Wine installations on macOS
 - Sign in through Discord
 - Start the game and collect useful diagnostics when something goes wrong
 
@@ -20,12 +18,12 @@ The launcher is designed to work for regular players without requiring knowledge
 
 ## Supported platforms
 
-| Platform                      | Status                                                               |
-|-------------------------------|----------------------------------------------------------------------|
-| Linux x86_64                  | AppImage  in releases                                                |
-| Linux ARM64                   | On the todo list                                                     |
-| macOS Intel and Apple Silicon | Experimental DMG (under heavy development with its own wine runtime) |
-| Windows                       | Use the original Windows launcher                                    |
+| Platform | Package |
+|---|---|
+| Linux x86_64 | AppImage |
+| macOS Apple Silicon | DMG; Rosetta may be needed for Intel-only Wine |
+| macOS Intel | DMG |
+| Windows | Use the original Windows launcher |
 
 ## Installing the launcher
 
@@ -37,16 +35,16 @@ Download the newest package from the project's **Releases** page.
 2. Allow it to run:
 
    ```sh
-   chmod +x Story_Of_Alicia-x86_64.AppImage
+   chmod +x Story_Of_Alicia_Launcher_1.0.0_x86_64.AppImage
    ```
 
 3. Open it:
 
    ```sh
-   ./Story_Of_Alicia-x86_64.AppImage
+   ./Story_Of_Alicia_Launcher_1.0.0_x86_64.AppImage
    ```
 
-Linux users can choose between Wine, Proton through UMU, or a custom runtime.
+Linux users can choose between Wine and Proton through UMU.
 
 ### macOS
 
@@ -54,23 +52,29 @@ Linux users can choose between Wine, Proton through UMU, or a custom runtime.
 2. Open it and move the launcher into Applications.
 3. Start the launcher and follow the setup instructions.
 
-Apple Silicon Macs use the bundled Intel game runtime through Rosetta. The launcher will explain how to install Rosetta when it is required.
+The launcher scans for Wine on the Mac and also lets the user select a Wine app,
+executable, or installation folder. On Apple Silicon, macOS may require Rosetta
+when the selected Wine installation is Intel-only.
 
 ## Documentation
 
-- [`BUILDING.md`](docs/BUILDING.md) — building the launcher from source
-- [`CONTRIBUTING.md`](docs/CONTRIBUTING.md) — contributing code, translations, or documentation
-- [`SECURITY.md`](docs/SECURITY.md) — reporting security problems
-- [`SECURITY_INTEGRATION.md`](docs/SECURITY_INTEGRATION.md) — launcher and server security boundaries
-- [`CONFIG_REFERENCE.md`](docs/CONFIG_REFERENCE.md) — persisted launcher configuration
-- [`RUNTIME_ARCHITECTURE.md`](docs/RUNTIME_ARCHITECTURE.md) — macOS runtime package structure
-- [`PLATFORM_LINUX.md`](docs/PLATFORM_LINUX.md) — Linux behavior and packaging
-- [`PLATFORM_MACOS.md`](docs/PLATFORM_MACOS.md) — macOS behavior and packaging
-- [`TRANSLATING.md`](docs/TRANSLATING.md) — adding or updating launcher translations
+- [`LAUNCHER_UPDATES.md`](docs/LAUNCHER_UPDATES.md) — signed Linux launcher updates
+- [`FIRST_TEST.md`](packaging/macos/FIRST_TEST.md) — macOS hardware test checklist
+- [`SIGNING.md`](packaging/macos/SIGNING.md) — macOS signing and notarization
 
 ## Diagnostics
 
-The launcher writes diagnostic logs when setup, updating, or game launching fails.
+The launcher always writes `launcher.log`. On Linux and macOS, enabling
+**Diagnostic Mode** in Advanced Settings adds a labeled folder for each game
+run containing `alicia.log`, `wine.log`, `timeline.jsonl`, and `summary.txt`.
+macOS can also add an optional host-process sample. Leave Diagnostic Mode off
+for normal play.
+
+`alicia.log` comes from a Windows x86 diagnostic hook adapted for Wine from
+[SergeantSerk's log-hook project](https://github.com/SergeantSerk/log-hook).
+The exact upstream snapshot, author attribution, modifications, MinHook license,
+and redistribution warning are recorded in
+[`third_party/alicia-log-hook/UPSTREAM.md`](third_party/alicia-log-hook/UPSTREAM.md).
 
 On macOS, a diagnostic archive can also be created with:
 

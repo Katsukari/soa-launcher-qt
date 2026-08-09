@@ -2,14 +2,12 @@
 #include "widgets/LauncherDialog.hpp"
 #include <QFileDialog>
 #include <QFileInfo>
-#include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
 #include <functional>
 
 #include "core/wine/Shell.hpp"
 #include "core/wine/WineRegistry.hpp"
-#include "core/runtime/RuntimeProvider.hpp"
 #include "util/Assets.hpp"
 #include "util/Config.hpp"
 #include "util/Layout.hpp"
@@ -31,16 +29,6 @@ namespace
             if (!field->hasFocus()) field->setText(getter());
         });
     }
-
-#if defined(Q_OS_MACOS)
-    QString runtime_override_display()
-    {
-        const QString selected = Config::instance().wine_binary().trimmed();
-        const QString launcherDefault =
-            core::runtime::RuntimeProvider::default_selector().trimmed();
-        return selected == launcherDefault ? QString() : selected;
-    }
-#endif
 }
 
 WineSettings::WineSettings(core::wine::Shell* shell_, QWidget* parent)
@@ -49,11 +37,7 @@ WineSettings::WineSettings(core::wine::Shell* shell_, QWidget* parent)
     setup_dxvk_option();
     setup_prefix_option();
     setup_wine_binary_option();
-#if defined(Q_OS_MACOS)
-    setup_macos_components_option();
-#else
     setup_tricks_option();
-#endif
     setup_wine_args_option();
 }
 
@@ -64,7 +48,7 @@ void WineSettings::setup_dxvk_option()
 #if defined(Q_OS_MACOS)
     util::simple_utils::make_label_block(this, w, y,
         "USE DXVK",
-        "Unavailable in the current macOS runtime. The launcher keeps this off.");
+        "Unavailable on macOS. Wine uses its built-in Direct3D renderer.");
 
     auto* slider = util::simple_utils::make_flat_button(this);
     const QRect sr = ls::slider_rect(w, y);
@@ -76,9 +60,9 @@ void WineSettings::setup_dxvk_option()
     slider->setEnabled(false);
     slider->setAccessibleName(QStringLiteral("Use DXVK"));
     slider->setAccessibleDescription(
-        QStringLiteral("Unavailable for the current macOS runtime"));
+        QStringLiteral("Unavailable on macOS"));
     slider->setToolTip(QStringLiteral(
-        "DXVK is not included in the current macOS runtime and cannot be enabled."));
+        "DXVK requires Vulkan and cannot be enabled by this macOS launcher."));
 #else
     util::simple_utils::make_label_block(this, w, y,
         "USE DXVK", "Translate Direct3D to Vulkan for better performance.");
@@ -111,55 +95,25 @@ void WineSettings::setup_prefix_option()
 {
     const QSize w = window()->size();
     const int y = wset::row(1);
-#if defined(Q_OS_MACOS)
-    const QString description = QStringLiteral(
-        "Launcher-owned 64-bit compatibility prefix. Keep it under Application Support unless testing a clean prefix.");
-    const QString title = QStringLiteral("RUNTIME PREFIX");
-#else
     const QString description = QStringLiteral("The isolated Wine environment the game runs in.");
     const QString title = QStringLiteral("WINE PREFIX");
-#endif
     util::simple_utils::make_label_block(this, w, y, title, description);
 
     auto* field = new QLineEdit(this);
     field->setText(Config::instance().wine_prefix());
-    field->setAccessibleName(QStringLiteral("Runtime prefix path"));
+    field->setAccessibleName(QStringLiteral("Wine prefix path"));
     field->setStyleSheet(util::styles::k_field);
-#if defined(Q_OS_MACOS)
-    const int chooseWidth = util::layout::scaled(76, w);
-    const int inputGap = util::layout::scaled(6, w);
-    const int inputHeight = qMax(32, util::layout::scaled(40, w));
-    const int controlX = ls::ctrl_x(w);
-    const int controlWidth = ls::ctrl_w(w);
-    field->setGeometry(controlX, util::layout::scaled(y, w),
-                       controlWidth - chooseWidth - inputGap, inputHeight);
-#else
     field->setGeometry(ls::field_rect(w, y));
-#endif
     sync_field(field, []() { return Config::instance().wine_prefix(); });
 
-#if defined(Q_OS_MACOS)
-    auto* browse = new QPushButton(QStringLiteral("Choose"), this);
-#else
     auto* browse = new QPushButton(QStringLiteral("..."), this);
-#endif
     browse->setCursor(Qt::PointingHandCursor);
     browse->setStyleSheet(util::styles::k_neutral_button);
-#if defined(Q_OS_MACOS)
-    browse->setGeometry(controlX + controlWidth - chooseWidth,
-                        util::layout::scaled(y, w), chooseWidth, inputHeight);
-    browse->setAccessibleName(QStringLiteral("Choose runtime prefix folder"));
-#else
     browse->setGeometry(ls::browse_rect(w, y));
     browse->setAccessibleName(QStringLiteral("Choose Wine prefix folder"));
-#endif
     connect(browse, &QPushButton::clicked, this, [this, field]()
     {
-#if defined(Q_OS_MACOS)
-        const QString title = QStringLiteral("Select Runtime Prefix Folder");
-#else
         const QString title = QStringLiteral("Select Wine Prefix Folder");
-#endif
         const QString dir = QFileDialog::getExistingDirectory(
             this, util::i18n::translate(title));
         if (!dir.isEmpty())
@@ -181,8 +135,8 @@ void WineSettings::setup_wine_binary_option()
     const int y = wset::row(2);
 #if defined(Q_OS_MACOS)
     util::simple_utils::make_label_block(this, w, y,
-        "CUSTOM RUNTIME OVERRIDE",
-        "Optional. Leave blank to use the runtime included with the launcher.");
+        "CUSTOM WINE",
+        "A Wine app, executable, or installation folder. Blank uses Wine from PATH.");
 #else
     util::simple_utils::make_label_block(this, w, y,
         "CUSTOM WINE / PROTON",
@@ -190,39 +144,17 @@ void WineSettings::setup_wine_binary_option()
 #endif
 
     auto* field = new QLineEdit(this);
-#if defined(Q_OS_MACOS)
-    field->setPlaceholderText(QStringLiteral("Bundled runtime (default)"));
-#else
-    field->setPlaceholderText(QStringLiteral("system wine"));
-#endif
-    field->setAccessibleName(QStringLiteral("Custom runtime path"));
+    field->setPlaceholderText(util::i18n::translate("system wine"));
+    field->setAccessibleName(QStringLiteral("Custom Wine path"));
     field->setStyleSheet(util::styles::k_field);
-#if defined(Q_OS_MACOS)
-    const int chooseWidth = util::layout::scaled(76, w);
-    const int inputGap = util::layout::scaled(6, w);
-    const int inputHeight = qMax(32, util::layout::scaled(40, w));
-    const int controlX = ls::ctrl_x(w);
-    const int controlWidth = ls::ctrl_w(w);
-    field->setGeometry(controlX, util::layout::scaled(y, w),
-                       controlWidth - chooseWidth - inputGap, inputHeight);
-#else
     field->setGeometry(ls::field_rect(w, y));
-#endif
-#if defined(Q_OS_MACOS)
-    field->setText(runtime_override_display());
-    sync_field(field, []() { return runtime_override_display(); });
-#else
     field->setText(Config::instance().wine_binary());
     sync_field(field, []() { return Config::instance().wine_binary(); });
-#endif
 
     auto apply = [this, field](const QString& raw)
     {
         QString path = raw.trimmed();
-#if defined(Q_OS_MACOS)
-        if (path.isEmpty())
-            path = core::runtime::RuntimeProvider::default_selector();
-#else
+#if !defined(Q_OS_MACOS)
         const QFileInfo info(path);
         if (info.isFile() && info.fileName() == QStringLiteral("proton"))
             path = info.absolutePath();
@@ -233,21 +165,14 @@ void WineSettings::setup_wine_binary_option()
             QString error;
             if (!cw::WineRegistry::inspect_path(path, install, &error))
             {
-                LauncherDialog::warning(this, QStringLiteral("Runtime Not Usable"),
-                    error.isEmpty() ? QStringLiteral("The selected runtime could not be used.") : error);
-#if defined(Q_OS_MACOS)
-                field->setText(runtime_override_display());
-#else
+                LauncherDialog::warning(this, QStringLiteral("Wine Not Usable"),
+                    error.isEmpty() ? QStringLiteral("The selected Wine installation could not be used.") : error);
                 field->setText(Config::instance().wine_binary());
-#endif
                 return;
             }
         }
         if (path == Config::instance().wine_binary())
         {
-#if defined(Q_OS_MACOS)
-            field->setText(runtime_override_display());
-#endif
             return;
         }
         Config::instance().set_wine_binary(path);
@@ -255,26 +180,16 @@ void WineSettings::setup_wine_binary_option()
 #if defined(Q_OS_MACOS)
         Config::instance().set_setup_runtime_preference(QStringLiteral("wine"));
 #endif
-#if defined(Q_OS_MACOS)
-        field->setText(runtime_override_display());
-#else
         field->setText(path);
-#endif
     };
 
-#if defined(Q_OS_MACOS)
-    auto* browse = new QPushButton(QStringLiteral("Choose"), this);
-#else
     auto* browse = new QPushButton(QStringLiteral("..."), this);
-#endif
     browse->setCursor(Qt::PointingHandCursor);
     browse->setStyleSheet(util::styles::k_neutral_button);
-#if defined(Q_OS_MACOS)
-    browse->setGeometry(controlX + controlWidth - chooseWidth,
-                        util::layout::scaled(y, w), chooseWidth, inputHeight);
-    browse->setAccessibleName(QStringLiteral("Choose custom macOS runtime"));
-#else
     browse->setGeometry(ls::browse_rect(w, y));
+#if defined(Q_OS_MACOS)
+    browse->setAccessibleName(QStringLiteral("Choose Wine app, executable, or folder"));
+#else
     browse->setAccessibleName(QStringLiteral("Choose Wine binary or Proton script"));
 #endif
     connect(browse, &QPushButton::clicked, this, [this, apply]()
@@ -283,26 +198,28 @@ void WineSettings::setup_wine_binary_option()
         const int selection = LauncherDialog::choose(
             this,
             LauncherDialog::Tone::Question,
-            QStringLiteral("Select Custom macOS Runtime"),
-            QStringLiteral("Select a runtime application, executable, or folder. Clear the field to restore the bundled default."),
+            QStringLiteral("Select Wine"),
+            QStringLiteral("Select a Wine application, executable, or installation folder."),
             {
                 {QStringLiteral("Cancel"), LauncherDialog::Cancelled,
                  LauncherDialog::ActionStyle::Neutral, true},
-                {QStringLiteral("Runtime Folder"), LauncherDialog::Primary,
+                {QStringLiteral("Wine Folder"), LauncherDialog::Primary,
                  LauncherDialog::ActionStyle::Primary, false},
-                {QStringLiteral("Runtime App or Executable"), LauncherDialog::Secondary,
+                {QStringLiteral("Wine App or Executable"), LauncherDialog::Secondary,
                  LauncherDialog::ActionStyle::Primary, false}
             });
         QString path;
         if (selection == LauncherDialog::Primary)
             path = QFileDialog::getExistingDirectory(
-                this, util::i18n::translate("Select Runtime Folder"));
+                this, util::i18n::translate("Select Wine Folder"));
         else if (selection == LauncherDialog::Secondary)
             path = QFileDialog::getOpenFileName(
                 this,
-                util::i18n::translate("Select Runtime App or Executable"),
+                util::i18n::translate("Select Wine App or Executable"),
                 QStringLiteral("/Applications"),
-                util::i18n::translate("Applications (*.app);;All Files (*)"));
+                QStringLiteral("%1 (*.app);;%2 (*)")
+                .arg(util::i18n::translate("Applications"),
+                     util::i18n::translate("All Files")));
         else
             return;
         if (!path.isEmpty())
@@ -318,14 +235,13 @@ void WineSettings::setup_wine_binary_option()
 
 void WineSettings::setup_tricks_option()
 {
-#if !defined(Q_OS_MACOS)
     const QSize w = window()->size();
     const int y = wset::row(3);
     util::simple_utils::make_label_block(this, w, y,
         "WINETRICKS", "Path to Winetricks. Blank uses the one on PATH.");
 
     auto* field = new QLineEdit(this);
-    field->setPlaceholderText(QStringLiteral("from PATH"));
+    field->setPlaceholderText(util::i18n::translate("from %1").arg(QStringLiteral("PATH")));
     field->setAccessibleName(QStringLiteral("Winetricks path"));
     field->setStyleSheet(util::styles::k_field);
     field->setGeometry(ls::field_rect(w, y));
@@ -352,30 +268,6 @@ void WineSettings::setup_tricks_option()
         if (field->text() != Config::instance().winetricks_binary())
             Config::instance().set_winetricks_binary(field->text());
     });
-#endif
-}
-
-void WineSettings::setup_macos_components_option()
-{
-#if defined(Q_OS_MACOS)
-    const QSize w = window()->size();
-    const int y = wset::row(3);
-    util::simple_utils::make_label_block(this, w, y,
-        "RUNTIME COMPONENTS",
-        "Game-local DirectX, Visual C++ and PhysX components are checked before every launch.");
-
-    auto* status = new QLabel(QStringLiteral("Managed automatically"), this);
-    status->setAlignment(Qt::AlignVCenter | Qt::AlignLeft);
-    status->setStyleSheet(
-        QStringLiteral("QLabel { background: rgba(216,205,192,0.62); "
-                       "border: 1px solid #C9BBAA; border-radius: 6px; "
-                       "padding: 0 8px; color: #6B5148; font-family: 'Inter'; }"));
-    status->setGeometry(ls::ctrl_x(w), util::layout::scaled(y, w),
-                        ls::ctrl_w(w), qMax(32, util::layout::scaled(40, w)));
-    status->setAccessibleName(QStringLiteral("Runtime components"));
-    status->setAccessibleDescription(
-        QStringLiteral("Managed automatically and verified before launch"));
-#endif
 }
 
 
@@ -383,24 +275,14 @@ void WineSettings::setup_wine_args_option()
 {
     const QSize w = window()->size();
     const int y = wset::row(4);
-#if defined(Q_OS_MACOS)
-    const QString title = QStringLiteral("RUNTIME ENVIRONMENT VARIABLES");
-    const QString description = QStringLiteral(
-        "Optional non-reserved KEY=VALUE entries. Launcher-owned runtime, translation, graphics and prefix variables cannot be overridden.");
-#else
     const QString title = QStringLiteral("WINE ENVIRONMENT VARIABLES");
     const QString description = QStringLiteral(
         "Space-separated KEY=VALUE entries, for example WINEDEBUG=-all.");
-#endif
     util::simple_utils::make_label_block(this, w, y, title, description);
 
     auto* field = new QLineEdit(this);
-#if defined(Q_OS_MACOS)
-    field->setPlaceholderText(QStringLiteral("CUSTOM_OPTION=1"));
-#else
     field->setPlaceholderText(QStringLiteral("WINEESYNC=1"));
-#endif
-    field->setAccessibleName(QStringLiteral("Runtime environment variables"));
+    field->setAccessibleName(QStringLiteral("Wine environment variables"));
     field->setStyleSheet(util::styles::k_field);
     field->setGeometry(ls::ctrl_pos(w, y).x(), ls::ctrl_pos(w, y).y(),
                        ls::ctrl_w(w), qMax(32, util::layout::scaled(40, w)));

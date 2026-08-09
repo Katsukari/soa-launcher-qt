@@ -31,9 +31,7 @@ class PrerequisitesIntro : public util::modal_overlay::ModalOverlay
         {
             core::system::SystemProfile profile;
             QVector<core::wine::WineInstall> runtimes;
-    #if !defined(Q_OS_MACOS)
             bool winetricks_ready {};
-    #endif
             bool umu_ready {};
         };
 
@@ -59,8 +57,6 @@ class PrerequisitesIntro : public util::modal_overlay::ModalOverlay
         QPushButton* choose_own_button {};
 
         bool detection_complete {};
-    #if !defined(Q_OS_MACOS)
         bool winetricks_ready {};
-    #endif
         bool umu_ready {};
 };

@@ -1,6 +1,5 @@
 #include "core/wine/MacWineRuntime.hpp"
 
-#include <QCoreApplication>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -8,25 +7,19 @@
 #include <QStandardPaths>
 #include <QSysInfo>
 
-#include "core/runtime/RuntimeManager.hpp"
-
 namespace core::wine::macos
 {
     namespace
     {
         QStringList candidate_relative_paths()
         {
-
-
             return {
-                QStringLiteral("payload/StoryOfAliciaRuntime.app/Contents/Resources/wine/bin/wine"),
                 QStringLiteral("bin/wine"),
                 QStringLiteral("files/bin/wine"),
                 QStringLiteral("dist/bin/wine"),
                 QStringLiteral("Contents/Resources/wine/bin/wine"),
                 QStringLiteral("Contents/Resources/Libraries/Wine/bin/wine"),
                 QStringLiteral("Contents/SharedSupport/CrossOver/bin/wine"),
-                QStringLiteral("payload/StoryOfAliciaRuntime.app/Contents/Resources/wine/bin/wine64"),
                 QStringLiteral("bin/wine64"),
                 QStringLiteral("files/bin/wine64"),
                 QStringLiteral("dist/bin/wine64"),
@@ -64,7 +57,7 @@ namespace core::wine::macos
             {
                 if (failure)
                     *failure = QStringLiteral(
-                        "The runtime host command could not be prepared.");
+                        "The Wine host command could not be prepared.");
                 return {};
             }
 
@@ -78,7 +71,7 @@ namespace core::wine::macos
             {
                 if (failure)
                 {
-                    *failure = QStringLiteral("The runtime failed to start: %1")
+                    *failure = QStringLiteral("Wine failed to start: %1")
                         .arg(process.errorString());
                 }
                 return {};
@@ -91,7 +84,7 @@ namespace core::wine::macos
                 process.waitForFinished(1000);
                 if (failure)
                     *failure = QStringLiteral(
-                        "The runtime did not answer its version request before the timeout.");
+                        "Wine did not answer its version request before the timeout.");
                 return {};
             }
             if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0)
@@ -100,9 +93,9 @@ namespace core::wine::macos
                 {
                     const QString output = QString::fromUtf8(process.readAll()).trimmed().left(512);
                     *failure = output.isEmpty()
-                        ? QStringLiteral("The runtime version request exited with code %1.")
+                        ? QStringLiteral("The Wine version request exited with code %1.")
                               .arg(process.exitCode())
-                        : QStringLiteral("The runtime version request exited with code %1: %2")
+                        : QStringLiteral("The Wine version request exited with code %1: %2")
                               .arg(process.exitCode()).arg(output);
                 }
                 return {};
@@ -153,11 +146,6 @@ namespace core::wine::macos
 #endif
     }
 
-    QString default_runtime_root()
-    {
-        return QDir(application_support_root()).filePath(QStringLiteral("runtimes"));
-    }
-
     QString default_log_root()
     {
         return QDir(application_support_root()).filePath(QStringLiteral("logs"));
@@ -166,19 +154,12 @@ namespace core::wine::macos
     QString resolve_wine_executable(const QString& selected_path)
     {
         const QString selected = selected_path.trimmed();
-        if (core::runtime::RuntimeManager::is_managed_selector(selected))
-            return core::runtime::RuntimeManager().resolve_active_entrypoint(
-                QStringLiteral("wine"));
-
         if (selected.isEmpty())
         {
-#if defined(Q_OS_MACOS)
-
-
-            return {};
-#else
-            return QStandardPaths::findExecutable(QStringLiteral("wine"));
-#endif
+            QString system_wine = QStandardPaths::findExecutable(QStringLiteral("wine"));
+            if (system_wine.isEmpty())
+                system_wine = QStandardPaths::findExecutable(QStringLiteral("wine64"));
+            return system_wine;
         }
 
         const QFileInfo supplied(selected);
@@ -275,7 +256,7 @@ namespace core::wine::macos
         if (!result.executable_file)
         {
             result.failure = QStringLiteral(
-                "No executable runtime entry point was found in this selection.");
+                "No executable Wine entry point was found in this selection.");
             return result;
         }
 
@@ -286,7 +267,7 @@ namespace core::wine::macos
         if (result.requires_rosetta && !result.rosetta_available)
         {
             result.failure = QStringLiteral(
-                "This runtime is Intel-only and Rosetta is not installed.");
+                "This Wine installation is Intel-only and Rosetta is not installed.");
             return result;
         }
 
@@ -296,7 +277,7 @@ namespace core::wine::macos
         {
             result.failure = probe_failure.isEmpty()
                 ? QStringLiteral(
-                      "The runtime could not complete its version check. It may be quarantined, incomplete, or missing a dependency.")
+                      "Wine could not complete its version check. It may be quarantined, incomplete, or missing a dependency.")
                 : probe_failure;
             return result;
         }

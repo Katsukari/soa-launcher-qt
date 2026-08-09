@@ -112,11 +112,7 @@ void WineInstall::setup_buttons()
 
     connect(change_path_button, &QPushButton::clicked, this, [this]
     {
-#if defined(Q_OS_MACOS)
-        const QString title = QStringLiteral("Select Runtime Prefix Location");
-#else
         const QString title = QStringLiteral("Select Wine Prefix Location");
-#endif
         const QString dir = QFileDialog::getExistingDirectory(
             this, util::i18n::translate(title));
         if (!dir.isEmpty())
@@ -147,6 +143,7 @@ void WineInstall::start_install()
         return;
     }
 
+#if !defined(Q_OS_MACOS)
     const QString wine_path = Config::instance().wine_binary();
     const core::wine::RuntimeType type = core::wine::WineRegistry::identify(wine_path);
 
@@ -157,6 +154,7 @@ void WineInstall::start_install()
         update();
         return;
     }
+#endif
     warn_message.clear();
 
     set_installing(true);
@@ -199,11 +197,7 @@ void WineInstall::paint_content(QPainter& painter)
     title_font.setWeight(QFont::Black);
     painter.setFont(title_font);
     painter.setPen(util::colors::k_text_maroon);
-#if defined(Q_OS_MACOS)
-    const QString title = QStringLiteral("RUNTIME PREFIX INSTALLATION");
-#else
     const QString title = QStringLiteral("WINE PREFIX INSTALLATION");
-#endif
     painter.drawText(util::layout::install_modal::title(w), Qt::AlignCenter,
                      util::i18n::translate(title));
 
@@ -212,13 +206,8 @@ void WineInstall::paint_content(QPainter& painter)
     body_font.setWeight(QFont::Medium);
     painter.setFont(body_font);
     painter.setPen(util::colors::k_text_body);
-#if defined(Q_OS_MACOS)
-    const QString description = QStringLiteral(
-        "The runtime prefix will be created in the selected directory. Keep the default path unless you need an isolated test setup.");
-#else
     const QString description = QStringLiteral(
         "The Wine prefix will be installed in the selected directory. You can keep the default path or choose a custom one.");
-#endif
     painter.drawText(
         util::layout::install_modal::body(w),
         Qt::AlignHCenter | Qt::AlignTop | Qt::TextWordWrap,

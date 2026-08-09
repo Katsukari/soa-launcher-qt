@@ -141,7 +141,6 @@ void soa_launcher_updater_destroy(soa_launcher_updater* updater);
 void soa_launcher_updater_check(soa_launcher_updater* updater);
 void soa_launcher_updater_download(soa_launcher_updater* updater);
 void soa_launcher_updater_cancel(soa_launcher_updater* updater);
-bool soa_launcher_updater_select_version(soa_launcher_updater* updater, const char* version);
 
 bool soa_verify_ed25519(const uint8_t* public_key,
                         uint64_t public_key_size,

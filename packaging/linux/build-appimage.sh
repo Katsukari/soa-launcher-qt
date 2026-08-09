@@ -109,6 +109,8 @@ require_command timeout
 require_command desktop-file-validate
 require_command jq
 require_command openssl
+require_command i686-w64-mingw32-gcc
+require_command i686-w64-mingw32-g++
 
 TEMPORARY_UPDATE_KEY=""
 UPDATE_HISTORY_TEMP=""
@@ -191,6 +193,7 @@ cmake \
   -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
   -DBUILD_TESTING=OFF \
+  -DSOA_REQUIRE_ALICIA_LOG_HOOK=ON \
   -DSOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX="$SOA_UPDATE_PUBLIC_KEY_HEX" \
   -DCMAKE_CXX_FLAGS="-march=x86-64 -mtune=generic"
 

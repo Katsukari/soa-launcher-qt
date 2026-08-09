@@ -211,13 +211,8 @@ void GameInstall::paint_content(QPainter& painter)
     body_font.setWeight(QFont::Medium);
     painter.setFont(body_font);
     painter.setPen(util::colors::k_text_body);
-#if defined(Q_OS_MACOS)
-    const QString installDescription = QStringLiteral(
-        "The game will be downloaded into the selected directory inside your runtime prefix. Keep the default path or choose a custom one.");
-#else
     const QString installDescription = QStringLiteral(
         "The game will be downloaded into the selected directory inside your Wine prefix. You can keep the default path or choose a custom one.");
-#endif
     painter.drawText(
         util::layout::install_modal::body(w),
         Qt::AlignHCenter | Qt::AlignTop | Qt::TextWordWrap,
@@ -264,13 +259,8 @@ void GameInstall::paint_content(QPainter& painter)
         warn_font.setWeight(QFont::DemiBold);
         painter.setFont(warn_font);
         painter.setPen(util::colors::k_warning);
-#if defined(Q_OS_MACOS)
-        const QString warning = QStringLiteral(
-            "The game must be installed inside the runtime prefix.");
-#else
         const QString warning = QStringLiteral(
             "The game must be installed inside the Wine prefix.");
-#endif
         painter.drawText(
             util::layout::install_modal::warning_line(w),
             Qt::AlignHCenter | Qt::AlignVCenter,

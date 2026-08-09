@@ -150,7 +150,7 @@ AliciaChooser::AliciaChooser(AuthHandler* auth_, core::wine::Shell* shell_,
     reset_path_button->setAccessibleName(QStringLiteral("Reset launcher settings"));
     reset_path_button->setStyleSheet(k_reset_link);
     reset_path_button->setGeometry(util::layout::alicia_chooser::reset(w));
-    reset_path_button->setToolTip("Reset launcher settings and sign-in without deleting the shared prefix or either game");
+    reset_path_button->setToolTip(util::i18n::translate("Reset launcher settings and sign-in without deleting the shared prefix or either game"));
     connect(reset_path_button, &QPushButton::clicked, this, [this]()
     {
         emit reset_config_requested();
@@ -214,31 +214,19 @@ void AliciaChooser::on_stage_changed(const Stage stage)
         case Stage::NeedsRuntime:
 #if defined(Q_OS_MACOS)
             message = welcome_message(
-                game_version, util::i18n::translate("restore or select a compatible runtime"));
+                game_version, util::i18n::translate("choose Wine"));
 #else
             message = welcome_message(game_version, util::i18n::translate("choose Wine or Proton"));
 #endif
             break;
         case Stage::NeedsPrefix:
-#if defined(Q_OS_MACOS)
-            message = util::i18n::translate("The shared runtime prefix needs to be created before installing the game.");
-#else
             message = util::i18n::translate("The shared Wine prefix needs to be created before installing the game.");
-#endif
             break;
         case Stage::PrefixBroken:
-#if defined(Q_OS_MACOS)
-            message = util::i18n::translate("The shared runtime prefix is incomplete and needs repair.");
-#else
             message = util::i18n::translate("The shared Wine prefix is incomplete and needs repair.");
-#endif
             break;
         case Stage::SettingUpPrefix:
-#if defined(Q_OS_MACOS)
-            message = util::i18n::translate("Preparing the shared runtime prefix...");
-#else
             message = util::i18n::translate("Preparing the shared Wine prefix...");
-#endif
             break;
         case Stage::NeedsDownload:
             message = welcome_message(game_version, util::i18n::translate("download the game"));
@@ -402,10 +390,12 @@ void AliciaChooser::setup_login_state()
     disclaimer_label->setTextFormat(Qt::RichText);
     disclaimer_label->setOpenExternalLinks(true);
     disclaimer_label->setText(
-        "By clicking the \u201CProceed with Discord\u201D button, you acknowledge that your "
-        "Discord ID will be stored on our database servers indefinitely for identification "
-        "and service purposes. This data can be removed upon request by emailing "
-        "<a href=\"mailto:dev@storyofalicia.com\" style=\"color:#2FB4E0;\">dev@storyofalicia.com</a>.");
+        util::i18n::translate(
+            "By clicking the \u201CProceed with Discord\u201D button, you acknowledge that your "
+            "Discord ID will be stored on our database servers indefinitely for identification "
+            "and service purposes. This data can be removed upon request by emailing %1.")
+            .arg(QStringLiteral("<a href=\"mailto:dev@storyofalicia.com\" "
+                                "style=\"color:#2FB4E0;\">dev@storyofalicia.com</a>")));
     disclaimer_label->setStyleSheet(k_note_box);
     disclaimer_label->setGeometry(util::layout::alicia_chooser::disclaimer(w));
     add_soft_shadow(disclaimer_label, 18.0, 6.0, QColor(64, 40, 27, 62));
@@ -429,10 +419,13 @@ void AliciaChooser::setup_waiting_state()
     steps_label->setWordWrap(true);
     steps_label->setTextFormat(Qt::RichText);
     steps_label->setText(
-        "<b>1.</b>&nbsp; Open the exact copied sign-in link in the browser you want to use.<br>"
-        "<b>2.</b>&nbsp; Sign in with Discord and authorize the launcher.<br>"
-        "<b>3.</b>&nbsp; Click <b>“Open Story of Alicia Launcher”</b> when prompted.<br>"
-        "<b>4.</b>&nbsp; If login did not work, cancel and try again.");
+        QStringLiteral("<b>1.</b>&nbsp; %1<br><b>2.</b>&nbsp; %2<br>"
+                       "<b>3.</b>&nbsp; %3<br><b>4.</b>&nbsp; %4")
+            .arg(util::i18n::translate("Open the exact copied sign-in link in the browser you want to use."),
+                 util::i18n::translate("Sign in with Discord and authorize the launcher."),
+                 util::i18n::translate("Click %1 when prompted.")
+                     .arg(QStringLiteral("<b>“Open Story of Alicia Launcher”</b>")),
+                 util::i18n::translate("If login did not work, cancel and try again.")));
     steps_label->setStyleSheet(k_note_box);
     steps_label->setGeometry(util::layout::alicia_chooser::steps(w));
     add_soft_shadow(steps_label, 18.0, 6.0, QColor(64, 40, 27, 62));

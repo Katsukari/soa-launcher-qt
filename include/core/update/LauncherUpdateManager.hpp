@@ -3,10 +3,8 @@
 #include "core/network/SwiftNetwork.h"
 
 #include <QByteArray>
-#include <QList>
 #include <QObject>
 #include <QString>
-#include <QStringList>
 #include <QUrl>
 
 namespace core::update
@@ -20,10 +18,8 @@ namespace core::update
         ~LauncherUpdateManager() override;
 
         void check_for_updates();
-        void manage_versions();
         void download_and_install();
         void cancel_download();
-        bool select_version(const QString& version);
 
         [[nodiscard]] bool update_available() const;
         [[nodiscard]] bool update_required() const;
@@ -31,16 +27,12 @@ namespace core::update
         [[nodiscard]] QString release_message() const;
         [[nodiscard]] QString platform_key() const;
         [[nodiscard]] QString downloaded_path() const;
-        [[nodiscard]] QStringList available_versions() const;
-        [[nodiscard]] static QString current_version();
 
     signals:
         void check_started();
         void no_update_available();
         void update_found();
-        void catalogue_ready();
         void check_failed(const QString& reason);
-        void manual_check_failed(const QString& reason);
         void download_started();
         void download_progress(qint64 received, qint64 total);
         void installer_started(const QString& path);
@@ -82,7 +74,7 @@ namespace core::update
                           QByteArray sha256,
                           qulonglong expected_size,
                           bool required,
-                          QByteArray releases_json);
+                          QString releases_json);
         void handle_download(soa_launcher_download_result result,
                              soa_launcher_error error_code,
                              int http_status,
@@ -98,18 +90,6 @@ namespace core::update
                                             const QString& detail) const;
         [[nodiscard]] static QString detected_platform_key();
         [[nodiscard]] static QString download_directory();
-        bool parse_catalogue(const QByteArray& releases_json);
-
-        struct Release
-        {
-            QString version;
-            QString message;
-            QString package_kind;
-            QString file_name;
-            QUrl url;
-            QByteArray sha256;
-            qulonglong size {};
-        };
 
         soa_launcher_updater* updater {};
         QString release_version;
@@ -120,10 +100,10 @@ namespace core::update
         QString final_download_path;
         QUrl package_url;
         QByteArray expected_sha256;
+        QString release_catalogue_json;
         qulonglong expected_size {};
         bool required {};
         bool downloading {};
-        bool managing_versions {};
-        QList<Release> releases;
+        QString configuration_error;
     };
 }

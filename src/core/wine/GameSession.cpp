@@ -1,5 +1,8 @@
 #include "core/wine/GameSession.hpp"
 
+#include "core/wine/AliciaLogHook.hpp"
+
+#include <QCoreApplication>
 #include <QDateTime>
 #include <QDir>
 #include <QFile>
@@ -28,6 +31,8 @@ namespace core::wine
 
     namespace
     {
+
+        constexpr const char* k_default_virtual_desktop = "1280x720";
         constexpr int k_registry_timeout_ms = 45 * 1000;
         constexpr int k_probe_timeout_ms = 5 * 1000;
 #if defined(Q_OS_MACOS)
@@ -1074,7 +1079,7 @@ namespace core::wine
         {
             if (phase_ == GamePhase::Launching)
             {
-                fail_game_launch(QStringLiteral("The runtime started, but the launcher "
+                fail_game_launch(QStringLiteral("The compatibility process started, but the launcher "
                                                 "could not verify whether Alicia.exe "
                                                 "started."));
                 return;
@@ -1179,9 +1184,7 @@ namespace core::wine
                                           .arg(wrapper_result_.exit_code));
             fail_game_launch(QStringLiteral("Alicia.exe was not observed within %1 "
                                             "seconds. The launcher ended monitoring "
-                                            "instead of waiting forever. The launch "
-                                            "timeline records whether the runtime host "
-                                            "was still running or had already exited.")
+                                            "instead of waiting forever.")
                                  .arg(k_absolute_start_timeout_ms / 1000));
             return;
         }
@@ -1197,25 +1200,23 @@ namespace core::wine
                                           .arg(verification_attempts_)
                                           .arg(wrapper_result_.exit_code)
                                           .arg(wrapper_result_.crashed));
-            fail_game_launch(QStringLiteral("The runtime launch process exited and "
+            fail_game_launch(QStringLiteral("The compatibility process exited and "
                                             "Alicia.exe was not observed within %1 "
                                             "seconds. The launcher stopped monitoring "
-                                            "instead of leaving the runtime host in the "
-                                            "background. Open the generated "
-                                            "runtime-doctor and launch timeline reports "
-                                            "for the first missing library or graphics "
-                                            "error.")
+                                            "instead of leaving the Wine host in the "
+                                            "background. Check launcher.log for the first "
+                                            "missing library or graphics error.")
                                  .arg(k_wrapper_exit_grace_ms / 1000));
             return;
         }
 
         if (verification_attempts_ >= k_start_max_attempts)
         {
-            QString detail = QStringLiteral("The runtime started, but Alicia.exe was "
+            QString detail = QStringLiteral("The compatibility process started, but Alicia.exe was "
                                             "never observed in the process list.");
             if (wrapper_state_ == WrapperState::Finished)
             {
-                detail += QStringLiteral(" The runtime launch process exited with "
+                detail += QStringLiteral(" The compatibility process exited with "
                                          "code %1%2.")
                               .arg(wrapper_result_.exit_code)
                               .arg(wrapper_result_.crashed ? QStringLiteral(" after a crash")
@@ -1223,7 +1224,7 @@ namespace core::wine
             }
             detail += QStringLiteral(" The launcher stayed in Launching instead "
                                      "of falsely reporting Running; check the "
-                                     "diagnostic log for the first runtime or DLL "
+                                     "launcher log for the first Wine or DLL "
                                      "error.");
             fail_game_launch(detail);
             return;
@@ -1343,10 +1344,10 @@ namespace core::wine
                                                   .arg(tracked_host_process_.pid)
                                                   .arg(tracked_game_process_.pid));
                     const auto configuration = diagnostics_.configuration();
-                    if (configuration.deep_diagnostics && !diagnostic_sample_armed_)
+                    if (configuration.enabled && !diagnostic_sample_armed_)
                     {
                         diagnostic_sample_armed_ = true;
-                        diagnostics_.arm_deep_sample(tracked_game_process_.pid,
+                        diagnostics_.arm_host_sample(tracked_game_process_.pid,
                                                      tracked_host_process_.pid);
                     }
                 }))
@@ -1370,15 +1371,9 @@ namespace core::wine
         wrapper_finished_at_ms_ = QDateTime::currentMSecsSinceEpoch();
         if (!result.started && result.outcome == CommandOutcome::FailedToStart)
         {
-#if defined(Q_OS_MACOS)
-            fail_game_launch(QStringLiteral("The runtime could not start the game launch "
-                                            "process: %1")
-                                 .arg(result.error_message));
-#else
             fail_game_launch(QStringLiteral("Wine could not start the game launch "
                                             "process: %1")
                                  .arg(result.error_message));
-#endif
             return;
         }
 
@@ -1414,8 +1409,8 @@ namespace core::wine
     {
         if (diagnostics_.diagnostic_path().isEmpty())
             return {};
-        return util::i18n::translate("\n\nDiagnostic log: %1\nLaunch timeline: %2")
-            .arg(diagnostics_.diagnostic_path(), diagnostics_.timeline_path());
+        return util::i18n::translate("\n\nDiagnostic run: %1")
+            .arg(QFileInfo(diagnostics_.diagnostic_path()).absolutePath());
     }
 
     void GameSession::fail_game_launch(const QString& message)
@@ -1437,7 +1432,7 @@ namespace core::wine
         if (!transition(GamePhase::Finished))
             return;
         stop_probe();
-        diagnostics_.cancel_deep_sample();
+        diagnostics_.cancel_host_sample();
         if (runner_.is_busy())
             runner_.terminate(CommandOutcome::Cancelled);
 
@@ -1481,7 +1476,7 @@ namespace core::wine
             return;
         }
         stop_probe();
-        diagnostics_.cancel_deep_sample();
+        diagnostics_.cancel_host_sample();
         diagnostics_.finish(QStringLiteral("monitoring_lost"), last_wrapper_exit, false, message);
         diagnostics_.close_log();
 
@@ -1522,7 +1517,7 @@ namespace core::wine
         if (!transition(GamePhase::Finished))
             return;
         stop_probe();
-        diagnostics_.cancel_deep_sample();
+        diagnostics_.cancel_host_sample();
 
         const qint64 duration_ms = diagnostics_.elapsed_ms();
         QString timeline_outcome;
@@ -1646,7 +1641,11 @@ namespace core::wine
 
         const auto& profile = core::game::profile(launch_->version);
         const QString prefix = Config::instance().prefix_root();
+#if defined(Q_OS_MACOS)
+        constexpr bool proton = false;
+#else
         const bool proton = runtime_.runtime_is_proton();
+#endif
         const QString sensitive_token = launch_->token;
         const auto diagnostics_configuration = diagnostics_.begin(
             launch_->version, prefix, launch_->game_directory, launch_->executable_path,
@@ -1665,11 +1664,30 @@ namespace core::wine
         const bool effective_dxvk = false;
         const QString compatibility_profile = diagnostics_configuration.profile;
         const QString runtime_executable = diagnostics_configuration.runtime.executable;
+        const bool force_windowed_d3d9 =
+            compatibility_profile == QStringLiteral("safe-display") ||
+            compatibility_profile == QStringLiteral("low-graphics");
 #else
-        Q_UNUSED(diagnostics_configuration);
         const bool requested_dxvk = Config::instance().use_dxvk();
         const bool effective_dxvk =
             requested_dxvk && (proton || PrefixInspector::dxvk_installed(prefix));
+        constexpr bool force_windowed_d3d9 = false;
+#endif
+#if defined(Q_OS_MACOS)
+        const QString injector_marker_dir =
+            QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+        const bool bypass_alicia_injector =
+            (qEnvironmentVariableIntValue("SOA_BYPASS_ALICIA_INJECTOR") == 1 ||
+             QFileInfo(QDir(injector_marker_dir)
+                           .filePath(QStringLiteral("no-injector")))
+                 .exists()) &&
+            !force_windowed_d3d9;
+        if (bypass_alicia_injector)
+        {
+            SPDLOG_INFO("Alicia injector bypassed (no hook, no audio this run)");
+        }
+#else
+        constexpr bool bypass_alicia_injector = false;
 #endif
         if (requested_dxvk && !effective_dxvk)
         {
@@ -1680,16 +1698,64 @@ namespace core::wine
             }
         }
 
-        QString windows_executable;
-        if (!proton)
+        QString path_error;
+        const QString windows_executable =
+            windows_path_for_prefix_file(prefix, launch_->executable_path, &path_error);
+        if (windows_executable.isEmpty())
         {
-            QString path_error;
-            windows_executable =
-                windows_path_for_prefix_file(prefix, launch_->executable_path, &path_error);
-            if (windows_executable.isEmpty())
+            fail_game_launch(path_error);
+            return;
+        }
+
+        AliciaLogHook::Preparation alicia_log_hook;
+        if (!bypass_alicia_injector)
+        {
+#if defined(Q_OS_MACOS)
+            const bool audio_needs_hook =
+                qEnvironmentVariable("SOA_AUDIO_PIPE").trimmed() != QStringLiteral("0") &&
+                qEnvironmentVariable("SOA_AUDIO_NULL_BACKEND").trimmed() != QStringLiteral("1");
+#else
+            constexpr bool audio_needs_hook = false;
+#endif
+            alicia_log_hook = AliciaLogHook::prepare(
+                prefix, diagnostics_.run_directory(), force_windowed_d3d9,
+                audio_needs_hook);
+        }
+        else
+        {
+            diagnostics_.append_event(
+                QStringLiteral("alicia_log_hook_bypassed"),
+                QStringLiteral("launcher arguments and authentication preserved; "
+                               "injector and hook disabled by SOA_BYPASS_ALICIA_INJECTOR=1"));
+            SPDLOG_INFO("Alicia injector bypass enabled; launching Alicia.exe directly with "
+                        "launcher-managed authentication arguments");
+        }
+        if (alicia_log_hook.requested)
+        {
+            if (alicia_log_hook.available)
             {
-                fail_game_launch(path_error);
-                return;
+                diagnostics_.append_event(
+                    QStringLiteral("alicia_log_hook_ready"),
+                    QStringLiteral("output=%1 upstream=SergeantSerk/log-hook "
+                                   "force_windowed=%2")
+                        .arg(alicia_log_hook.log_host_path)
+                        .arg(force_windowed_d3d9));
+            }
+            else
+            {
+                diagnostics_.append_event(QStringLiteral("alicia_log_hook_unavailable"),
+                                          alicia_log_hook.failure);
+                SPDLOG_WARN("Alicia hook unavailable: {}",
+                            alicia_log_hook.failure.toStdString());
+                if (force_windowed_d3d9)
+                {
+                    fail_game_launch(QStringLiteral(
+                        "The 1024x720 windowed D3D9 compatibility hook could not be prepared: %1")
+                                         .arg(alicia_log_hook.failure));
+                    return;
+                }
+                if (callbacks_.user_notice)
+                    callbacks_.user_notice(alicia_log_hook.failure);
             }
         }
 
@@ -1802,6 +1868,7 @@ namespace core::wine
             return false;
         };
 
+#if !defined(Q_OS_MACOS)
         if (proton)
         {
             const QString umu = umu_path();
@@ -1829,30 +1896,230 @@ namespace core::wine
             }
             runtime_.apply_wine_environment(environment);
 
-            QStringList arguments {launch_->executable_path};
+            if (alicia_log_hook.available)
+            {
+                if (!alicia_log_hook.log_windows_path.isEmpty())
+                {
+                    environment.insert(QStringLiteral("SOA_ALICIA_LOG_PATH"),
+                                       alicia_log_hook.log_windows_path);
+                    environment.insert(QStringLiteral("SOA_ALICIA_LOG_REDACT"), sensitive_token);
+                    environment.insert(QStringLiteral("SOA_ALICIA_LOG_ALL"), QStringLiteral("0"));
+                }
+                if (force_windowed_d3d9)
+                {
+                    environment.insert(QStringLiteral("SOA_D3D9_FORCE_WINDOWED"),
+                                       QStringLiteral("1"));
+                    environment.insert(QStringLiteral("SOA_D3D9_WINDOW_WIDTH"),
+                                       QStringLiteral("1024"));
+                    environment.insert(QStringLiteral("SOA_D3D9_WINDOW_HEIGHT"),
+                                       QStringLiteral("720"));
+                }
+            }
+
+            QStringList arguments;
+            if (alicia_log_hook.available)
+            {
+                arguments << alicia_log_hook.injector_host_path << windows_executable;
+            }
+            else
+            {
+                arguments << launch_->executable_path;
+            }
             arguments.append(game_arguments);
             start_wrapper(umu, arguments, environment,
                           QStringLiteral("umu-run could not be started."));
             return;
         }
+#endif
 
         QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
         environment.insert(QStringLiteral("WINEPREFIX"), prefix);
 #if defined(Q_OS_MACOS)
         environment.insert(QStringLiteral("WINEARCH"), QStringLiteral("win64"));
         environment.insert(QStringLiteral("WINEDEBUG"), diagnostics_configuration.wine_debug);
-        environment.insert(QStringLiteral("WINEDLLOVERRIDES"),
-                           QStringLiteral("d3d9,ddraw,dinput8,dsound=b;"
-                                          "d3dx9_31,d3dx9_42,d3dcompiler_42,"
-                                          "d3dcompiler_47,msvcp100,msvcr100=n,b"));
+        const QString graphics_marker_dir =
+            QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+        const bool wined3d_forced =
+            qEnvironmentVariable("SOA_D3D_BACKEND").trimmed() ==
+                QStringLiteral("wined3d") ||
+            QFileInfo(QDir(graphics_marker_dir)
+                          .filePath(QStringLiteral("use-wined3d")))
+                .exists();
+
+        QString macos_dll_overrides =
+            QStringLiteral("d3d9,ddraw,dinput8,dsound=b;"
+                           "d3dx9_31,d3dx9_42,d3dcompiler_42,"
+                           "d3dcompiler_47,msvcp100,msvcr100=n,b");
+        SPDLOG_INFO("Graphics backend: builtin wined3d (OpenGL){}",
+                    wined3d_forced ? " (forced)" : "");
+        const bool audio_pipe =
+            qEnvironmentVariable("SOA_AUDIO_PIPE").trimmed() != QStringLiteral("0") &&
+            qEnvironmentVariable("SOA_AUDIO_NULL_BACKEND").trimmed() != QStringLiteral("1");
+        if (audio_pipe && alicia_log_hook.available)
+        {
+            const QString app_data =
+                QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+            QDir().mkpath(app_data);
+            const QString helper =
+                QDir(app_data).filePath(QStringLiteral("soa-audio-host"));
+
+            QStringList helper_sources;
+            const QString helper_override =
+                qEnvironmentVariable("SOA_AUDIO_HOST_PATH").trimmed();
+            if (!helper_override.isEmpty())
+            {
+                helper_sources << helper_override;
+            }
+            if (!alicia_log_hook.audio_host_host_path.isEmpty())
+            {
+                helper_sources << alicia_log_hook.audio_host_host_path;
+            }
+            const QDir application_dir(QCoreApplication::applicationDirPath());
+            helper_sources
+                << application_dir.filePath(
+                       QStringLiteral("alicia-log-hook/soa-audio-host"))
+                << application_dir.filePath(
+                       QStringLiteral("../Resources/alicia-log-hook/soa-audio-host"))
+                << application_dir.filePath(QStringLiteral("soa-audio-host"));
+
+            const QFileInfo installed(helper);
+            for (const QString& raw_source : helper_sources)
+            {
+                const QFileInfo source(QDir::cleanPath(raw_source));
+                if (!source.isFile())
+                {
+                    continue;
+                }
+                if (installed.exists() &&
+                    installed.lastModified() >= source.lastModified())
+                {
+                    break;
+                }
+                QFile::remove(helper);
+                if (QFile::copy(source.absoluteFilePath(), helper))
+                {
+                    SPDLOG_INFO("Installed audio helper from {} to {}",
+                                source.absoluteFilePath().toStdString(),
+                                helper.toStdString());
+                }
+                break;
+            }
+
+            if (QFileInfo(helper).isFile())
+            {
+                QFile::setPermissions(helper, QFile::permissions(helper) |
+                                                  QFileDevice::ExeOwner |
+                                                  QFileDevice::ExeGroup |
+                                                  QFileDevice::ExeOther);
+            }
+
+            if (QFileInfo(helper).isExecutable())
+            {
+                const QString port =
+                    qEnvironmentVariable("SOA_AUDIO_PIPE_PORT").trimmed();
+                QStringList helper_arguments { QStringLiteral("--exit-after-stream") };
+                if (!port.isEmpty())
+                {
+                    helper_arguments << QStringLiteral("--port") << port;
+                }
+                if (QProcess::startDetached(helper, helper_arguments))
+                {
+                    environment.insert(QStringLiteral("SOA_AUDIO_PIPE"),
+                                       QStringLiteral("1"));
+                    if (!port.isEmpty())
+                    {
+                        environment.insert(QStringLiteral("SOA_AUDIO_PIPE_PORT"), port);
+                    }
+                    SPDLOG_INFO("Started native audio helper: {}",
+                                helper.toStdString());
+                }
+                else
+                {
+                    SPDLOG_WARN("Could not start {}; falling back to silent audio",
+                                helper.toStdString());
+                }
+            }
+            else
+            {
+                SPDLOG_WARN("No soa-audio-host at {} and no source to install "
+                            "from; audio will be silent. Copy it there by hand "
+                            "or set SOA_AUDIO_HOST_PATH. Sources tried:",
+                            helper.toStdString());
+                for (const QString& candidate : helper_sources)
+                {
+                    SPDLOG_WARN("  {}", QDir::cleanPath(candidate).toStdString());
+                }
+            }
+        }
+
+        if (!environment.contains(QStringLiteral("SOA_AUDIO_PIPE")) &&
+            MacLaunchDiagnostics::profile_disables_audio(compatibility_profile))
+        {
+
+            environment.insert(QStringLiteral("SOA_AUDIO_NULL_BACKEND"), QStringLiteral("1"));
+            SPDLOG_INFO("Audio isolation: enabling in-process null DirectSound backend");
+        }
+
+        const QString custom_wine_overrides =
+            qEnvironmentVariable("SOA_WINE_DLL_OVERRIDES").trimmed();
+        if (!custom_wine_overrides.isEmpty())
+        {
+            macos_dll_overrides += QLatin1Char(';') + custom_wine_overrides;
+            SPDLOG_INFO("Appending custom Wine DLL overrides: {}",
+                        custom_wine_overrides.toStdString());
+        }
+        environment.insert(QStringLiteral("WINEDLLOVERRIDES"), macos_dll_overrides);
+        SPDLOG_INFO("Effective Alicia WINEDLLOVERRIDES: {}",
+                    macos_dll_overrides.toStdString());
         environment.insert(QStringLiteral("WINE_FULLSCREEN_FSR"), QStringLiteral("0"));
+
+        if (QFileInfo(QDir(graphics_marker_dir).filePath(QStringLiteral("use-esync")))
+                .exists() ||
+            qEnvironmentVariable("SOA_ENABLE_ESYNC").trimmed() == QStringLiteral("1"))
+        {
+            environment.insert(QStringLiteral("WINEESYNC"), QStringLiteral("1"));
+            SPDLOG_INFO("esync enabled (opt-in)");
+        }
+        if (QFileInfo(QDir(graphics_marker_dir).filePath(QStringLiteral("use-msync")))
+                .exists() ||
+            qEnvironmentVariable("SOA_ENABLE_MSYNC").trimmed() == QStringLiteral("1"))
+        {
+            environment.insert(QStringLiteral("WINEMSYNC"), QStringLiteral("1"));
+            SPDLOG_INFO("msync enabled (opt-in)");
+        }
+
+        if (QFileInfo(QDir(graphics_marker_dir).filePath(QStringLiteral("metal-hud")))
+                .exists())
+        {
+            environment.insert(QStringLiteral("MTL_HUD_ENABLED"), QStringLiteral("1"));
+            SPDLOG_INFO("Metal performance HUD enabled");
+        }
 #else
-        environment.insert(QStringLiteral("WINEDEBUG"), QStringLiteral("-all"));
+        environment.insert(QStringLiteral("WINEDEBUG"), diagnostics_configuration.wine_debug);
         environment.insert(QStringLiteral("WINEDLLOVERRIDES"),
                            effective_dxvk ? QStringLiteral("d3d9,d3d10core,d3d11,dxgi=n")
                                           : QStringLiteral("d3d9,d3d10core,d3d11,dxgi=b"));
 #endif
         runtime_.apply_wine_environment(environment);
+        if (alicia_log_hook.available)
+        {
+            if (!alicia_log_hook.log_windows_path.isEmpty())
+            {
+                environment.insert(QStringLiteral("SOA_ALICIA_LOG_PATH"),
+                                   alicia_log_hook.log_windows_path);
+                environment.insert(QStringLiteral("SOA_ALICIA_LOG_REDACT"), sensitive_token);
+                environment.insert(QStringLiteral("SOA_ALICIA_LOG_ALL"), QStringLiteral("0"));
+            }
+            if (force_windowed_d3d9)
+            {
+                environment.insert(QStringLiteral("SOA_D3D9_FORCE_WINDOWED"),
+                                   QStringLiteral("1"));
+                environment.insert(QStringLiteral("SOA_D3D9_WINDOW_WIDTH"),
+                                   QStringLiteral("1024"));
+                environment.insert(QStringLiteral("SOA_D3D9_WINDOW_HEIGHT"),
+                                   QStringLiteral("720"));
+            }
+        }
 
         QStringList arguments;
 #if defined(Q_OS_MACOS)
@@ -1860,24 +2127,29 @@ namespace core::wine
             MacLaunchDiagnostics::profile_uses_virtual_desktop(compatibility_profile);
         if (virtual_desktop)
         {
+
+            static const QRegularExpression geometry_pattern(
+                QStringLiteral("^[0-9]{3,5}x[0-9]{3,5}$"));
+            QString geometry = qEnvironmentVariable("SOA_VIRTUAL_DESKTOP").trimmed();
+            if (!geometry_pattern.match(geometry).hasMatch())
+                geometry = QString::fromLatin1(k_default_virtual_desktop);
             arguments << QStringLiteral("explorer")
-                      << QStringLiteral("/desktop=StoryOfAlicia,1280x720") << windows_executable;
+                      << QStringLiteral("/desktop=StoryOfAlicia,%1").arg(geometry);
+            SPDLOG_INFO("Virtual desktop geometry {}", geometry.toStdString());
         }
-        else
+        if (alicia_log_hook.available)
         {
-            arguments << windows_executable;
+            arguments << alicia_log_hook.injector_windows_path;
         }
+        arguments << windows_executable;
         arguments.append(game_arguments);
 
         const auto& runtime_context = diagnostics_configuration.runtime;
         if (runtime_context.usable)
         {
-            SPDLOG_INFO("Alicia runtime session: source={} identity={} "
-                        "version={} base={} prefix_schema={} profile={}",
+            SPDLOG_INFO("Alicia Wine session: source={} executable={} profile={}",
                         runtime_context.source.toStdString(),
-                        runtime_context.identity.toStdString(),
-                        runtime_context.runtime_version.toStdString(),
-                        runtime_context.wine_version.toStdString(), runtime_context.prefix_schema,
+                        runtime_context.executable.toStdString(),
                         compatibility_profile.toStdString());
         }
         const QStringList logged_arguments = redacted_command_args(arguments, {sensitive_token});
@@ -1892,11 +2164,14 @@ namespace core::wine
                         : "behind",
                     runtime_.wine_binary().toStdString(),
                     logged_arguments.join(QLatin1Char(' ')).toStdString());
-        start_wrapper(runtime_.wine_binary(), arguments, environment,
-                      QStringLiteral("The selected macOS runtime could not start "
-                                     "Alicia.exe. Check the generated launch "
-                                     "timeline and diagnostic report."));
+        const QString launch_failure = diagnostics_.diagnostic_path().isEmpty()
+            ? QStringLiteral("Wine could not start Alicia.exe. Check launcher.log for details.")
+            : QStringLiteral("Wine could not start Alicia.exe. Check the labeled diagnostic run at %1.")
+                  .arg(QFileInfo(diagnostics_.diagnostic_path()).absolutePath());
+        start_wrapper(runtime_.wine_binary(), arguments, environment, launch_failure);
 #else
+        if (alicia_log_hook.available)
+            arguments << alicia_log_hook.injector_windows_path;
         arguments << windows_executable;
         arguments.append(game_arguments);
         start_wrapper(runtime_.wine_binary(), arguments, environment,

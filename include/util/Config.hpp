@@ -40,7 +40,7 @@ namespace util::config
         bool    runtime_selected() const;
         QString wine_args() const;
         QString macos_compatibility_profile() const;
-        bool    macos_deep_diagnostics() const;
+        bool    diagnostics_enabled() const;
 
         bool    prerequisites_confirmed() const;
         QString setup_runtime_preference() const;
@@ -75,7 +75,7 @@ namespace util::config
         void set_runtime_selected(bool value);
         void set_wine_args(const QString& value);
         void set_macos_compatibility_profile(const QString& value);
-        void set_macos_deep_diagnostics(bool value);
+        void set_diagnostics_enabled(bool value);
 
         void set_prerequisites_confirmed(bool value);
         void set_setup_runtime_preference(const QString& value);

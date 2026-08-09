@@ -6,7 +6,6 @@
 
 #include <utility>
 
-#include "core/runtime/RuntimeManager.hpp"
 #include "core/wine/MacWineRuntime.hpp"
 #include "core/wine/WineRegistry.hpp"
 #include "util/Config.hpp"
@@ -100,12 +99,6 @@ namespace core::wine
             return QFileInfo(proton_server).isExecutable() ? proton_server : QString();
         }
 
-        if (core::runtime::RuntimeManager::is_managed_selector(settings().configured_runtime))
-        {
-            return core::runtime::RuntimeManager().resolve_active_entrypoint(
-                QStringLiteral("wineserver"));
-        }
-
         const QString wine = resolved_executable(wine_binary());
         if (!wine.isEmpty())
         {
@@ -118,14 +111,6 @@ namespace core::wine
 
     QString RuntimeLocator::wineboot_binary() const
     {
-        if (core::runtime::RuntimeManager::is_managed_selector(settings().configured_runtime))
-        {
-            const QString managed = core::runtime::RuntimeManager().resolve_active_entrypoint(
-                QStringLiteral("wineboot"));
-            if (!managed.isEmpty())
-                return managed;
-        }
-
         const QString wine = resolved_executable(wine_binary());
         if (QFileInfo(wine).isAbsolute())
         {
@@ -134,30 +119,6 @@ namespace core::wine
                 return sibling;
         }
         return wine;
-    }
-
-    QString RuntimeLocator::runtime_self_test_binary() const
-    {
-        if (core::runtime::RuntimeManager::is_managed_selector(settings().configured_runtime))
-        {
-            return core::runtime::RuntimeManager().resolve_active_entrypoint(
-                QStringLiteral("self_test"));
-        }
-
-#if defined(Q_OS_MACOS)
-        const QString runtime_root = macos::runtime_root_for_executable(wine_binary());
-        for (const QString& relative :
-             {QStringLiteral("Contents/Resources/tools/self-test-macos.sh"),
-              QStringLiteral("tools/self-test-macos.sh")})
-        {
-            const QString candidate = QDir(runtime_root).filePath(relative);
-            if (QFileInfo(candidate).isFile() && QFileInfo(candidate).isExecutable())
-            {
-                return candidate;
-            }
-        }
-#endif
-        return {};
     }
 
     bool RuntimeLocator::runtime_is_proton() const
@@ -250,41 +211,12 @@ namespace core::wine
         const QFileInfo info(program);
         bool valid = info.isFile() && info.isExecutable();
 #if defined(Q_OS_MACOS)
-        const QString configured = settings().configured_runtime;
-        if (valid && core::runtime::RuntimeManager::is_managed_selector(configured))
-        {
-            const auto package = core::runtime::RuntimeManager().active();
-            valid =
-                package.usable &&
-                package.manifest.graphics_backends.contains(QStringLiteral("wined3d-opengl"),
-                                                            Qt::CaseInsensitive) &&
-                QFileInfo(package.wine_executable).canonicalFilePath() == info.canonicalFilePath();
-            if (!valid)
-            {
-                SPDLOG_ERROR("managed runtime validation failed: {}",
-                             package.failure.toStdString());
-            }
-        }
-        else if (valid &&
-                 QFileInfo(QDir(configured).filePath(QStringLiteral("runtime.json"))).isFile())
-        {
-            const auto package = core::runtime::RuntimeManager::inspect_package(configured);
-            valid =
-                package.usable &&
-                package.manifest.graphics_backends.contains(QStringLiteral("wined3d-opengl"),
-                                                            Qt::CaseInsensitive) &&
-                QFileInfo(package.wine_executable).canonicalFilePath() == info.canonicalFilePath();
-            if (!valid)
-            {
-                SPDLOG_ERROR("runtime package validation failed: {}",
-                             package.failure.toStdString());
-            }
-        }
         if (valid && macos::executable_requires_rosetta(program) && !macos::rosetta_is_available())
         {
             valid = false;
         }
 #endif
+        SPDLOG_DEBUG("runtime {}: {}", program.toStdString(), valid ? "usable" : "not executable");
         return valid;
     }
 }

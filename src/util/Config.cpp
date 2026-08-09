@@ -17,7 +17,6 @@
 #include <utility>
 
 #include "core/Log.hpp"
-#include "core/runtime/RuntimeProvider.hpp"
 #include "core/wine/WineRegistry.hpp"
 #include "core/wine/MacWineRuntime.hpp"
 #include "util/CredentialStore.hpp"
@@ -340,8 +339,8 @@ namespace util::config
             d->values.value(QStringLiteral("use_dxvk")).toBool();
         d->values[QStringLiteral("runtime_selected")] =
             d->values.value(QStringLiteral("runtime_selected")).toBool();
-        d->values[QStringLiteral("macos_deep_diagnostics")] =
-            d->values.value(QStringLiteral("macos_deep_diagnostics")).toBool();
+        d->values[QStringLiteral("diagnostics_enabled")] =
+            d->values.value(QStringLiteral("diagnostics_enabled")).toBool();
         d->values[QStringLiteral("prerequisites_confirmed")] =
             d->values.value(QStringLiteral("prerequisites_confirmed")).toBool();
         d->values[QStringLiteral("rules_accepted")] =
@@ -541,11 +540,11 @@ namespace util::config
                 d->values[key] = found;
         };
 
-#if !defined(Q_OS_MACOS)
         probe(QStringLiteral("wine_binary"), QStringLiteral("wine"));
         if (d->values.value(QStringLiteral("wine_binary")).toString().isEmpty())
             probe(QStringLiteral("wine_binary"), QStringLiteral("wine64"));
         probe(QStringLiteral("winetricks_binary"), QStringLiteral("winetricks"));
+#if !defined(Q_OS_MACOS)
         probe(QStringLiteral("umu_binary"), QStringLiteral("umu-run"));
         if (d->values.value(QStringLiteral("umu_binary")).toString().isEmpty())
         {
@@ -553,10 +552,6 @@ namespace util::config
             if (QFileInfo(local).isExecutable())
                 d->values[QStringLiteral("umu_binary")] = local;
         }
-#else
-
-
-        Q_UNUSED(probe);
 #endif
     }
 
@@ -599,7 +594,14 @@ namespace util::config
         setIfMissing(QStringLiteral("runtime_selected"), false);
         setIfMissing(QStringLiteral("wine_args"), QString());
         setIfMissing(QStringLiteral("macos_compatibility_profile"), QStringLiteral("default"));
-        setIfMissing(QStringLiteral("macos_deep_diagnostics"), false);
+        if (!d->values.contains(QStringLiteral("diagnostics_enabled")) &&
+            d->values.contains(QStringLiteral("macos_deep_diagnostics")))
+        {
+            d->values[QStringLiteral("diagnostics_enabled")] =
+                d->values.value(QStringLiteral("macos_deep_diagnostics")).toBool();
+        }
+        setIfMissing(QStringLiteral("diagnostics_enabled"), false);
+        d->values.remove(QStringLiteral("macos_deep_diagnostics"));
         setIfMissing(QStringLiteral("rosetta_x87_path"), QString());
         setIfMissing(QStringLiteral("prerequisites_confirmed"), false);
         setIfMissing(QStringLiteral("setup_assistant_version"), 0);
@@ -621,9 +623,6 @@ namespace util::config
         d->values.remove(QStringLiteral("setup_pc_age"));
 
 #if defined(Q_OS_MACOS)
-        const QString defaultRuntime = core::runtime::RuntimeProvider::default_selector();
-
-
         const QString oldDefault = QDir(QDir::homePath()).filePath(QStringLiteral("soa-launcher"));
         const QString storedPrefix = absolute_clean_path(
             d->values.value(QStringLiteral("wine_prefix")).toString());
@@ -631,7 +630,6 @@ namespace util::config
             d->values[QStringLiteral("wine_prefix")] = defaultPrefix;
         d->values[QStringLiteral("wine_arch")] = QStringLiteral("win64");
         d->values[QStringLiteral("use_dxvk")] = false;
-        d->values[QStringLiteral("winetricks_binary")] = QString();
         if (d->values.value(QStringLiteral("setup_runtime_preference")).toString() == QStringLiteral("proton"))
             d->values[QStringLiteral("setup_runtime_preference")] = QStringLiteral("wine");
         if (core::wine::WineRegistry::identify(
@@ -642,12 +640,13 @@ namespace util::config
             d->values[QStringLiteral("wine_binary")] = QString();
             d->values[QStringLiteral("runtime_selected")] = false;
         }
-        QString selectedRuntime =
-            d->values.value(QStringLiteral("wine_binary")).toString().trimmed();
-        if (selectedRuntime.isEmpty())
-            selectedRuntime = defaultRuntime;
-        d->values[QStringLiteral("wine_binary")] = selectedRuntime;
-        d->values[QStringLiteral("runtime_selected")] = !selectedRuntime.isEmpty();
+        if (d->values.value(QStringLiteral("wine_binary")).toString().trimmed()
+                == QStringLiteral("managed://active"))
+        {
+            SPDLOG_INFO("config: clearing obsolete managed Wine selection on macOS");
+            d->values[QStringLiteral("wine_binary")] = QString();
+            d->values[QStringLiteral("runtime_selected")] = false;
+        }
 #endif
         d->values[QStringLiteral("wine_prefix")] = normalize_wine_prefix(
             d->values.value(QStringLiteral("wine_prefix")).toString());
@@ -807,15 +806,12 @@ namespace util::config
         return value == QStringLiteral("safe-display")
             || value == QStringLiteral("low-graphics")
             || value == QStringLiteral("gl-behind")
+            || value == QStringLiteral("audio-isolation")
             ? value : QStringLiteral("default");
     }
-    bool Config::macos_deep_diagnostics() const
+    bool Config::diagnostics_enabled() const
     {
-#if defined(Q_OS_MACOS)
-        return d->values.value(QStringLiteral("macos_deep_diagnostics")).toBool();
-#else
-        return false;
-#endif
+        return d->values.value(QStringLiteral("diagnostics_enabled")).toBool();
     }
     bool Config::prerequisites_confirmed() const
     {
@@ -874,9 +870,6 @@ namespace util::config
     bool Config::runtime_is_proton() const
     {
 #if defined(Q_OS_MACOS)
-
-
-
         return false;
 #else
         return core::wine::WineRegistry::identify(wine_binary())
@@ -1061,21 +1054,18 @@ namespace util::config
         const QString normalized = candidate == QStringLiteral("safe-display")
             || candidate == QStringLiteral("low-graphics")
             || candidate == QStringLiteral("gl-behind")
+            || candidate == QStringLiteral("audio-isolation")
             ? candidate : QStringLiteral("default");
         if (macos_compatibility_profile() == normalized) return;
         d->values[QStringLiteral("macos_compatibility_profile")] = normalized;
         persist_change();
     }
-    void Config::set_macos_deep_diagnostics(const bool value)
+    void Config::set_diagnostics_enabled(const bool value)
     {
-#if defined(Q_OS_MACOS)
-        if (macos_deep_diagnostics() == value)
+        if (diagnostics_enabled() == value)
             return;
-        d->values[QStringLiteral("macos_deep_diagnostics")] = value;
+        d->values[QStringLiteral("diagnostics_enabled")] = value;
         persist_change();
-#else
-        Q_UNUSED(value);
-#endif
     }
     void Config::set_prerequisites_confirmed(const bool value)
     {

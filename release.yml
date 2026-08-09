@@ -1,0 +1,98 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-linux:
+    name: Linux release build
+    if: ${{ vars.SOA_ACTIONS_ENABLED != 'false' && vars.SOA_RELEASE_ENABLED != 'false' && vars.SOA_LINUX_ENABLED != 'false' }}
+    uses: ./.github/workflows/build-linux.yml
+    secrets: inherit
+
+  build-macos-arm64:
+    name: Apple Silicon release build
+    if: ${{ vars.SOA_ACTIONS_ENABLED != 'false' && vars.SOA_RELEASE_ENABLED != 'false' && vars.SOA_MACOS_ARM64_ENABLED != 'false' }}
+    uses: ./.github/workflows/build-macos-arm64.yml
+    secrets: inherit
+
+  build-macos-intel:
+    name: Intel macOS release build
+    if: ${{ vars.SOA_ACTIONS_ENABLED != 'false' && vars.SOA_RELEASE_ENABLED != 'false' && vars.SOA_MACOS_INTEL_ENABLED != 'false' }}
+    uses: ./.github/workflows/build-macos-intel.yml
+    secrets: inherit
+
+  publish:
+    name: Publish GitHub Release
+    needs:
+      - build-linux
+      - build-macos-arm64
+      - build-macos-intel
+    if: ${{ needs.build-linux.result == 'success' && needs.build-macos-arm64.result == 'success' && needs.build-macos-intel.result == 'success' }}
+    runs-on: ubuntu-22.04
+    permissions:
+      actions: read
+      contents: write
+
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          path: release-assets
+
+      - name: Verify release packages
+        run: |
+          set -euo pipefail
+          mapfile -t packages < <(find release-assets -type f \
+            \( -name '*.AppImage' -o -name '*.dmg' \) -print | sort)
+          if [ "${#packages[@]}" -ne 3 ]; then
+            printf 'Expected one AppImage and two DMGs, found %s:\n' "${#packages[@]}" >&2
+            printf '%s\n' "${packages[@]}" >&2
+            exit 1
+          fi
+
+          mapfile -t metadata < <(find release-assets -type f \
+            \( -name 'linux_launcher_version.json' \
+               -o -name 'linux_launcher_version.json.sig' \
+               -o -name 'linux_launcher_versions.json' \
+               -o -name 'linux_launcher_versions.json.sig' \) -print | sort)
+          if [ "${#metadata[@]}" -ne 4 ]; then
+            printf 'Expected four signed Linux metadata files, found %s:\n' "${#metadata[@]}" >&2
+            printf '%s\n' "${metadata[@]}" >&2
+            exit 1
+          fi
+
+          printf '%s\n' "${packages[@]}"
+          printf '%s\n' "${metadata[@]}"
+
+      - name: Publish release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mapfile -t packages < <(find release-assets -type f \
+            \( -name '*.AppImage' -o -name '*.dmg' \) -print | sort)
+          mapfile -t metadata < <(find release-assets -type f \
+            \( -name 'linux_launcher_version.json' \
+               -o -name 'linux_launcher_version.json.sig' \
+               -o -name 'linux_launcher_versions.json' \
+               -o -name 'linux_launcher_versions.json.sig' \) -print | sort)
+          assets=("${packages[@]}" "${metadata[@]}")
+
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "${assets[@]}" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "${assets[@]}" \
+              --title "$GITHUB_REF_NAME" \
+              --generate-notes \
+              --verify-tag
+          fi

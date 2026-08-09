@@ -27,7 +27,6 @@ namespace core::wine
         [[nodiscard]] RuntimeSettings settings() const;
         [[nodiscard]] QString wine_binary() const;
         [[nodiscard]] QString wineboot_binary() const;
-        [[nodiscard]] QString runtime_self_test_binary() const;
         [[nodiscard]] bool runtime_is_proton() const;
         [[nodiscard]] QString proton_root() const;
         [[nodiscard]] QString proton_binary() const;

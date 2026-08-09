@@ -6,7 +6,6 @@
 
 #include <utility>
 
-#include "core/runtime/RuntimeManager.hpp"
 #include "core/wine/MacWineRuntime.hpp"
 #include "core/wine/PrefixInspector.hpp"
 #include "core/wine/RuntimeLocator.hpp"
@@ -44,13 +43,8 @@ namespace core::wine
         if (!active_ && !runner_.is_busy())
             return true;
 
-#if defined(Q_OS_MACOS)
-        const QString busy_message =
-            QStringLiteral("Another runtime or game process is already running.");
-#else
         const QString busy_message =
             QStringLiteral("Another Wine or game process is already running.");
-#endif
         if (callbacks_.fail_user)
         {
             callbacks_.fail_user(QStringLiteral("Launcher Busy"), busy_message);
@@ -166,11 +160,7 @@ namespace core::wine
         reset_state();
         if (callbacks_.setup_status)
             callbacks_.setup_status(message);
-#if defined(Q_OS_MACOS)
-        const QString title = QStringLiteral("Runtime Setup Failed");
-#else
         const QString title = QStringLiteral("Wine Setup Failed");
-#endif
         if (callbacks_.fail_user)
             callbacks_.fail_user(title, message);
         if (callbacks_.setup_finished)
@@ -421,8 +411,8 @@ namespace core::wine
             if (!inspection.exists || !inspection.structure_valid ||
                 inspection.architecture == PrefixArchitecture::Win32)
             {
-                finish_failure(QStringLiteral("Prefix setup finished, but the runtime "
-                                              "prefix structure is incomplete or "
+                finish_failure(QStringLiteral("Prefix setup finished, but the Wine prefix "
+                                              "structure is incomplete or "
                                               "incompatible."));
             }
             else
@@ -479,86 +469,15 @@ namespace core::wine
         if (!ensure_idle())
             return;
 #if defined(Q_OS_MACOS)
-        core::runtime::RuntimeInstallation managed_runtime;
-        if (core::runtime::RuntimeManager::is_managed_selector(Config::instance().wine_binary()))
-        {
-            managed_runtime = core::runtime::RuntimeManager().active();
-            if (!managed_runtime.usable)
-            {
-                if (callbacks_.fail_user)
-                {
-                    callbacks_.fail_user(QStringLiteral("Runtime Not Ready"),
-                                         managed_runtime.failure.isEmpty()
-                                             ? QStringLiteral("The managed runtime is "
-                                                              "incomplete.")
-                                             : managed_runtime.failure);
-                }
-                if (callbacks_.setup_finished)
-                    callbacks_.setup_finished(false);
-                return;
-            }
-            if (managed_runtime.manifest.platform.compare(QStringLiteral("macos"),
-                                                          Qt::CaseInsensitive) != 0 ||
-                !managed_runtime.manifest.graphics_backends.contains(
-                    QStringLiteral("wined3d-opengl"), Qt::CaseInsensitive))
-            {
-                if (callbacks_.fail_user)
-                {
-                    callbacks_.fail_user(QStringLiteral("Incompatible Runtime"),
-                                         QStringLiteral("This runtime does not declare "
-                                                        "the supported macOS graphics "
-                                                        "backend."));
-                }
-                if (callbacks_.setup_finished)
-                    callbacks_.setup_finished(false);
-                return;
-            }
-            SPDLOG_INFO("prefix setup using managed runtime: "
-                        "identity={} contract={} prefix_schema={} "
-                        "wine={}",
-                        managed_runtime.manifest.identity().toStdString(),
-                        managed_runtime.manifest.launcher_contract,
-                        managed_runtime.manifest.prefix_schema,
-                        managed_runtime.wine_executable.toStdString());
-        }
-
         const QString configured_runtime = Config::instance().wine_binary();
-        if (QFileInfo(QDir(configured_runtime).filePath(QStringLiteral("runtime.json"))).isFile())
-        {
-            const auto package = core::runtime::RuntimeManager::inspect_package(configured_runtime);
-            if (!package.usable || !package.manifest.graphics_backends.contains(
-                                       QStringLiteral("wined3d-opengl"), Qt::CaseInsensitive))
-            {
-                if (callbacks_.fail_user)
-                {
-                    callbacks_.fail_user(QStringLiteral("Invalid Runtime Package"),
-                                         package.failure.isEmpty()
-                                             ? QStringLiteral("The runtime package does "
-                                                              "not declare the supported "
-                                                              "macOS graphics backend.")
-                                             : package.failure);
-                }
-                if (callbacks_.setup_finished)
-                    callbacks_.setup_finished(false);
-                return;
-            }
-            SPDLOG_INFO("prefix setup using packaged runtime: "
-                        "identity={} contract={} prefix_schema={} "
-                        "executable={}",
-                        package.manifest.identity().toStdString(),
-                        package.manifest.launcher_contract, package.manifest.prefix_schema,
-                        package.wine_executable.toStdString());
-        }
-
         const QString runtime_executable = macos::resolve_wine_executable(configured_runtime);
         if (runtime_executable.isEmpty() || !QFileInfo(runtime_executable).isExecutable())
         {
             if (callbacks_.fail_user)
             {
-                callbacks_.fail_user(QStringLiteral("Invalid macOS Runtime"),
-                                     QStringLiteral("No executable runtime entry point "
-                                                    "was found in the selected app or "
-                                                    "folder."));
+                callbacks_.fail_user(QStringLiteral("Wine Not Available"),
+                                     QStringLiteral("No executable Wine entry point was "
+                                                    "found in the selected app or folder."));
             }
             if (callbacks_.setup_finished)
                 callbacks_.setup_finished(false);
@@ -570,8 +489,8 @@ namespace core::wine
             if (callbacks_.fail_user)
             {
                 callbacks_.fail_user(QStringLiteral("Rosetta Required"),
-                                     QStringLiteral("The selected runtime is Intel-only. "
-                                                    "Request Rosetta in the runtime "
+                                     QStringLiteral("The selected Wine installation is Intel-only. "
+                                                    "Request Rosetta in the Wine "
                                                     "chooser, complete the macOS prompt, "
                                                     "then retry."));
             }
@@ -599,7 +518,7 @@ namespace core::wine
         {
 #if defined(Q_OS_MACOS)
             const QString prefix_message =
-                QStringLiteral("The runtime prefix directory could not be "
+                QStringLiteral("The Wine prefix directory could not be "
                                "created.");
 #else
             const QString prefix_message = QStringLiteral("The Wine prefix directory could not be "
@@ -627,21 +546,8 @@ namespace core::wine
 
         QVector<SetupCommand> commands;
 #if defined(Q_OS_MACOS)
-        const QString self_test = runtime_.runtime_self_test_binary();
-        if (!self_test.isEmpty())
-        {
-            commands.push_back({QStringLiteral("Running the runtime integrity "
-                                               "self-test..."),
-                                self_test,
-                                {macos::runtime_root_for_executable(runtime_executable)},
-                                QProcessEnvironment::systemEnvironment(),
-                                5 * 60 * 1000,
-                                false,
-                                false,
-                                false});
-        }
-        const QString validate_runtime_message = QStringLiteral("Validating the macOS runtime...");
-        const QString create_prefix_message = QStringLiteral("Creating the runtime prefix...");
+        const QString validate_runtime_message = QStringLiteral("Validating Wine...");
+        const QString create_prefix_message = QStringLiteral("Creating Wine prefix...");
 #else
         const QString validate_runtime_message = QStringLiteral("Validating Wine runtime...");
         const QString create_prefix_message = QStringLiteral("Creating Wine prefix...");
@@ -773,7 +679,7 @@ namespace core::wine
         Config::instance().set_use_dxvk(false);
         if (callbacks_.user_notice)
         {
-            callbacks_.user_notice(QStringLiteral("macOS uses the runtime's built-in Direct3D "
+            callbacks_.user_notice(QStringLiteral("macOS uses Wine's built-in Direct3D "
                                                   "9 backend in this version. DXVK is "
                                                   "intentionally unavailable until a tested "
                                                   "Metal/Vulkan path exists."));

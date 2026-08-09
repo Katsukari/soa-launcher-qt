@@ -9,7 +9,6 @@ import Darwin
 #endif
 import Soa_Courier
 
-
 final class DNSResolutionRace: @unchecked Sendable
 {
     private let lock = NSLock()
@@ -283,8 +282,7 @@ final class SwiftHttpClient: @unchecked Sendable
 #else
         let streamType = SOCK_STREAM
 #endif
-        // Darwin and Glibc expose addrinfo fields in different declaration
-        // orders, so avoid the platform-specific memberwise initializer.
+
         var hints = addrinfo()
         hints.ai_flags = AI_ADDRCONFIG
         hints.ai_family = AF_UNSPEC

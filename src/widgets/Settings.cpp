@@ -102,11 +102,7 @@ void Settings::setup_tabs()
     auto* tab_wine = make_tab(1);
     auto* tab_advanced = make_tab(2);
     tab_general->setAccessibleName(QStringLiteral("Launcher settings tab"));
-#if defined(Q_OS_MACOS)
-    tab_wine->setAccessibleName(QStringLiteral("Runtime settings tab"));
-#else
     tab_wine->setAccessibleName(QStringLiteral("Wine settings tab"));
-#endif
     tab_advanced->setAccessibleName(QStringLiteral("Advanced settings tab"));
 
     connect(tab_general,  &QPushButton::clicked, this, [this]() { set_tab(0); });
@@ -154,11 +150,7 @@ void Settings::paint_content(QPainter& painter)
         tf.setWeight(QFont::Black);
         painter.setFont(tf);
         painter.setPen(util::colors::k_text_maroon);
-#if defined(Q_OS_MACOS)
-        const char* runtimeTitle = "RUNTIME SETTINGS";
-#else
         const char* runtimeTitle = "WINE SETTINGS";
-#endif
         const char* title =
             (active_tab == 1) ? runtimeTitle :
             (active_tab == 2) ? "ADVANCED SETTINGS" : "LAUNCHER SETTINGS";
@@ -178,11 +170,7 @@ void Settings::paint_content(QPainter& painter)
 
     for (int i = 0; i < 3; ++i)
     {
-#if defined(Q_OS_MACOS)
-        const char* runtimeLabel = "RUNTIME";
-#else
         const char* runtimeLabel = "WINE";
-#endif
         const char* labels[] = {"LAUNCHER", runtimeLabel, "ADVANCED"};
         const QRect r = util::layout::settings::tab_rect(w, i, expanded);
         const bool  on = i == active_tab;
