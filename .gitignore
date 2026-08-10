@@ -81,3 +81,4 @@ Testing/
 /packaging/linux/linux_launcher_versions.json
 /packaging/linux/linux_launcher_versions.json.sig
 .DS_Store
+/packaging/soa-update-key.pem

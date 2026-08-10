@@ -11,23 +11,30 @@ project(soa_launcher
 )
 
 set(SOA_LAUNCHER_UPDATE_MANIFEST_URL
-    "https://r2.storyofalicia.com/launcher/linux_launcher_version.json"
-    CACHE STRING "HTTPS URL of the launcher update manifest")
+        "https://r2.storyofalicia.com/launcher/linux_launcher_version.json"
+        CACHE STRING "HTTPS URL of the launcher update manifest")
 set(SOA_LAUNCHER_UPDATE_FALLBACK_MANIFEST_URL
-    "https://github.com/Story-Of-Alicia/soa-launcher-qt/releases/latest/download/linux_launcher_version.json"
-    CACHE STRING "Fallback HTTPS URL of the launcher update manifest")
+        "https://github.com/Story-Of-Alicia/soa-launcher-qt/releases/latest/download/linux_launcher_version.json"
+        CACHE STRING "Fallback HTTPS URL of the launcher update manifest")
 set(SOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX
-    "f3c027a5393a7f839644d2181b3f51c859f8bf4978e1b7733b95d815352d6c3f"
-    CACHE STRING "Raw Ed25519 update-signing public key as 64 hexadecimal characters")
+        "f3c027a5393a7f839644d2181b3f51c859f8bf4978e1b7733b95d815352d6c3f"
+        CACHE STRING "Raw Ed25519 update-signing public key as 64 hexadecimal characters")
 
-if(SOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX
-        AND NOT SOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX MATCHES "^[0-9A-Fa-f]{64}$")
-    message(FATAL_ERROR
-            "SOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX must be exactly 64 hexadecimal characters")
+string(LENGTH
+        "${SOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX}"
+        SOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX_LENGTH
+)
+
+if(SOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX)
+    if(NOT SOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX_LENGTH EQUAL 64
+            OR NOT SOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX MATCHES "^[0-9A-Fa-f]+$")
+        message(FATAL_ERROR
+                "SOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX must be exactly 64 hexadecimal characters")
+    endif()
 endif()
 set(SOA_RULES_DOCUMENT_URL
-    "https://docs.google.com/document/d/1vry3ZuDtzdS_mX1P2udWlb8z2Q9Atr3p1THZdtZ2EHA/export?format=html"
-    CACHE STRING "HTTPS URL of the authoritative rules document")
+        "https://docs.google.com/document/d/1vry3ZuDtzdS_mX1P2udWlb8z2Q9Atr3p1THZdtZ2EHA/export?format=html"
+        CACHE STRING "HTTPS URL of the authoritative rules document")
 
 if(NOT APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
     message(FATAL_ERROR "soa_launcher currently supports Linux and macOS only")
@@ -49,7 +56,7 @@ set(CMAKE_AUTORCC ON)
 include(CTest)
 option(SOA_ALLOW_FETCHCONTENT "Allow downloading missing dependencies during configure" ON)
 option(SOA_REQUIRE_ALICIA_LOG_HOOK
-       "Fail configuration unless the Windows x86 Alicia diagnostic hook can be built" OFF)
+        "Fail configuration unless the Windows x86 Alicia diagnostic hook can be built" OFF)
 
 set(SOA_PORTABLE_CXX_OPTIONS)
 
@@ -288,13 +295,13 @@ qt_add_executable(${PROJECT_NAME}
 )
 
 set(SOA_ALICIA_LOG_HOOK_SOURCE_DIR
-    "${CMAKE_CURRENT_SOURCE_DIR}/third_party/alicia-log-hook")
+        "${CMAKE_CURRENT_SOURCE_DIR}/third_party/alicia-log-hook")
 set(SOA_ALICIA_LOG_HOOK_OUTPUT_DIR
-    "${CMAKE_CURRENT_BINARY_DIR}/alicia-log-hook")
+        "${CMAKE_CURRENT_BINARY_DIR}/alicia-log-hook")
 set(SOA_ALICIA_LOG_HOOK_INJECTOR
-    "${SOA_ALICIA_LOG_HOOK_OUTPUT_DIR}/SoaAliciaLogInjector.exe")
+        "${SOA_ALICIA_LOG_HOOK_OUTPUT_DIR}/SoaAliciaLogInjector.exe")
 set(SOA_ALICIA_LOG_HOOK_DLL
-    "${SOA_ALICIA_LOG_HOOK_OUTPUT_DIR}/SoaAliciaLogHook.dll")
+        "${SOA_ALICIA_LOG_HOOK_OUTPUT_DIR}/SoaAliciaLogHook.dll")
 
 find_program(SOA_MINGW_C_COMPILER NAMES i686-w64-mingw32-gcc)
 find_program(SOA_MINGW_CXX_COMPILER NAMES i686-w64-mingw32-g++)
@@ -331,12 +338,12 @@ if(SOA_MINGW_C_COMPILER AND SOA_MINGW_CXX_COMPILER)
     )
     if(APPLE)
         add_executable(soa_audio_host
-            "${SOA_ALICIA_LOG_HOOK_SOURCE_DIR}/src/soa-audio-host.c")
+                "${SOA_ALICIA_LOG_HOOK_SOURCE_DIR}/src/soa-audio-host.c")
         set_target_properties(soa_audio_host PROPERTIES
-            OUTPUT_NAME "soa-audio-host"
-            RUNTIME_OUTPUT_DIRECTORY "${SOA_ALICIA_LOG_HOOK_OUTPUT_DIR}")
+                OUTPUT_NAME "soa-audio-host"
+                RUNTIME_OUTPUT_DIRECTORY "${SOA_ALICIA_LOG_HOOK_OUTPUT_DIR}")
         target_link_libraries(soa_audio_host PRIVATE
-            "-framework AudioToolbox" "-framework CoreFoundation")
+                "-framework AudioToolbox" "-framework CoreFoundation")
     endif()
 
     add_custom_target(soa_alicia_log_hook ALL
@@ -466,6 +473,10 @@ if(APPLE)
         )
     endif()
 else()
+    set_target_properties(soa_network PROPERTIES
+            INSTALL_RPATH "$ORIGIN"
+    )
+
     set_target_properties(${PROJECT_NAME} PROPERTIES
             INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}"
     )

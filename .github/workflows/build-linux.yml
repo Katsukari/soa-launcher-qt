@@ -45,27 +45,57 @@ jobs:
             build-essential \
             clang \
             cmake \
+            curl \
             desktop-file-utils \
             file \
+            gnupg2 \
             gcc-mingw-w64-i686 \
             g++-mingw-w64-i686 \
             libfuse2 \
             libgl1-mesa-dev \
+            libcurl4-openssl-dev \
+            libedit2 \
+            libgcc-11-dev \
+            libpython3-dev \
+            libsqlite3-0 \
+            libstdc++-11-dev \
             libwayland-dev \
+            libxml2-dev \
+            libz3-dev \
             libxcb-cursor0 \
             libxkbcommon-dev \
             libxkbcommon-x11-0 \
             ninja-build \
             patchelf \
+            pkg-config \
             jq \
             libssl-dev \
             wget \
+            unzip \
+            zlib1g-dev \
             xvfb
 
       - name: Install pinned Linux Swift toolchain
-        uses: swift-actions/setup-swift@7ca6abe6b3b0e8b5421b88be48feee39cbf52c6a
-        with:
-          swift-version: "6.3.2"
+        env:
+          SWIFT_VERSION: "6.3.2"
+        run: |
+          set -euo pipefail
+          archive="swift-${SWIFT_VERSION}-RELEASE-ubuntu22.04.tar.gz"
+          toolchain="swift-${SWIFT_VERSION}-RELEASE-ubuntu22.04"
+          base_url="https://download.swift.org/swift-${SWIFT_VERSION}-release/ubuntu2204/swift-${SWIFT_VERSION}-RELEASE"
+
+          curl --fail --location --retry 5 --retry-all-errors \
+            --output "$RUNNER_TEMP/$archive" \
+            "$base_url/$archive"
+          curl --fail --location --retry 5 --retry-all-errors \
+            --output "$RUNNER_TEMP/$archive.sig" \
+            "$base_url/$archive.sig"
+          curl --fail --location --retry 5 --retry-all-errors \
+            https://swift.org/keys/all-keys.asc | gpg --batch --import
+          gpg --batch --verify "$RUNNER_TEMP/$archive.sig" "$RUNNER_TEMP/$archive"
+
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/$toolchain/usr/bin" >> "$GITHUB_PATH"
 
       - name: Install Qt
         uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730
