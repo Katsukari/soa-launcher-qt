@@ -17,7 +17,7 @@ set(SOA_LAUNCHER_UPDATE_FALLBACK_MANIFEST_URL
     "https://github.com/Story-Of-Alicia/soa-launcher-qt/releases/latest/download/linux_launcher_version.json"
     CACHE STRING "Fallback HTTPS URL of the launcher update manifest")
 set(SOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX
-    ""
+    "f3c027a5393a7f839644d2181b3f51c859f8bf4978e1b7733b95d815352d6c3f"
     CACHE STRING "Raw Ed25519 update-signing public key as 64 hexadecimal characters")
 
 if(SOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX

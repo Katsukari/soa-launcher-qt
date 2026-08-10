@@ -111,6 +111,7 @@ jobs:
         env:
           QMAKE: ${{ env.QT_ROOT_DIR }}/bin/qmake
           SOA_UPDATE_SIGNING_KEY_B64: ${{ secrets.SOA_UPDATE_SIGNING_KEY_B64 }}
+          SOA_UPDATE_PUBLIC_KEY_HEX: ${{ vars.SOA_UPDATE_PUBLIC_KEY_HEX }}
         run: ./packaging/linux/build-appimage.sh
 
       - name: Verify Linux AppImage

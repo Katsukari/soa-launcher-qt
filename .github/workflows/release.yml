@@ -36,7 +36,13 @@ jobs:
       - build-linux
       - build-macos-arm64
       - build-macos-intel
-    if: ${{ needs.build-linux.result == 'success' && needs.build-macos-arm64.result == 'success' && needs.build-macos-intel.result == 'success' }}
+    if: >-
+      ${{ always()
+          && needs.build-linux.result == 'success'
+          && needs.build-macos-arm64.result != 'failure'
+          && needs.build-macos-intel.result != 'failure'
+          && needs.build-macos-arm64.result != 'cancelled'
+          && needs.build-macos-intel.result != 'cancelled' }}
     runs-on: ubuntu-22.04
     permissions:
       actions: read
@@ -49,15 +55,39 @@ jobs:
           path: release-assets
 
       - name: Verify release packages
+        env:
+          MACOS_ARM64_RESULT: ${{ needs.build-macos-arm64.result }}
+          MACOS_INTEL_RESULT: ${{ needs.build-macos-intel.result }}
         run: |
           set -euo pipefail
-          mapfile -t packages < <(find release-assets -type f \
-            \( -name '*.AppImage' -o -name '*.dmg' \) -print | sort)
-          if [ "${#packages[@]}" -ne 3 ]; then
-            printf 'Expected one AppImage and two DMGs, found %s:\n' "${#packages[@]}" >&2
-            printf '%s\n' "${packages[@]}" >&2
+          mapfile -t appimages < <(find release-assets -type f -name '*.AppImage' -print | sort)
+          mapfile -t disk_images < <(find release-assets -type f -name '*.dmg' -print | sort)
+
+          if [ "${#appimages[@]}" -ne 1 ]; then
+            printf 'Expected one AppImage, found %s:\n' "${#appimages[@]}" >&2
+            printf '%s\n' "${appimages[@]}" >&2
             exit 1
           fi
+
+          expected_dmgs=0
+          if [ "$MACOS_ARM64_RESULT" = "success" ]; then
+            expected_dmgs=$((expected_dmgs + 1))
+          fi
+          if [ "$MACOS_INTEL_RESULT" = "success" ]; then
+            expected_dmgs=$((expected_dmgs + 1))
+          fi
+          if [ "${#disk_images[@]}" -ne "$expected_dmgs" ]; then
+            printf 'Expected %s DMGs for the macOS jobs that ran, found %s:\n' \
+              "$expected_dmgs" "${#disk_images[@]}" >&2
+            printf '%s\n' "${disk_images[@]}" >&2
+            exit 1
+          fi
+          if [ "$expected_dmgs" -lt 2 ]; then
+            printf '::warning::Publishing without macOS builds (arm64=%s intel=%s)\n' \
+              "$MACOS_ARM64_RESULT" "$MACOS_INTEL_RESULT"
+          fi
+
+          packages=("${appimages[@]}" "${disk_images[@]}")
 
           mapfile -t metadata < <(find release-assets -type f \
             \( -name 'linux_launcher_version.json' \
