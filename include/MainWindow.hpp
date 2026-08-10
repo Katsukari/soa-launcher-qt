@@ -118,6 +118,7 @@ private:
     bool minimized_for_game {};
     bool force_quit_requested {};
     bool launcher_update_check_complete {};
+    bool manual_launcher_update_check {};
     QSystemTrayIcon* tray_icon {};
     QMenu* tray_menu {};
     QAction* open_launcher_action {};
@@ -129,9 +130,9 @@ private:
     QActionGroup* language_action_group {};
     QPushButton* language_button {};
     QPushButton* show_log_button {};
+    QPushButton* check_updates_button {};
     QPushButton* credits_button {};
     QPushButton* about_button {};
-    QPushButton* launcher_versions_button {};
     QLabel* version_label {};
     QPushButton* close_button {};
     QPushButton* minimize_button {};

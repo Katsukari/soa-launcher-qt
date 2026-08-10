@@ -152,13 +152,8 @@ namespace core::state
         if (!config.path_inside_prefix(installPath))
         {
             update_check_complete = true;
-#if defined(Q_OS_MACOS)
-            const QString warning = QStringLiteral(
-                "The configured game folder is outside the active runtime prefix.");
-#else
             const QString warning = QStringLiteral(
                 "The configured game folder is outside the active Wine prefix.");
-#endif
             set_warning(warning);
             recompute();
             return;

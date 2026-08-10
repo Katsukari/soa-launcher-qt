@@ -5,7 +5,6 @@
 #include "util/Colors.hpp"
 #include "util/Config.hpp"
 #include "util/Layout.hpp"
-#include "core/runtime/RuntimeProvider.hpp"
 
 #include <QGraphicsDropShadowEffect>
 #include <QLabel>
@@ -15,7 +14,6 @@
 #include <QShowEvent>
 
 #include <algorithm>
-#include <utility>
 #include <QStringList>
 #include <QtConcurrent/QtConcurrentRun>
 
@@ -123,7 +121,7 @@ PrerequisitesIntro::PrerequisitesIntro(QWidget* parent)
             recommendation_title->setText(util::i18n::translate("CHECKING"));
 #if defined(Q_OS_MACOS)
             recommendation_body->setText(util::i18n::translate(
-                "Checking the Story of Alicia runtime and macOS compatibility."));
+                "Looking for a usable Wine setup. Nothing will be installed automatically."));
 #else
             recommendation_body->setText(util::i18n::translate(
                 "Looking for a usable Wine or Proton setup. Nothing will be installed automatically."));
@@ -180,12 +178,7 @@ void PrerequisitesIntro::setup_controls()
     connect(continue_button, &QPushButton::clicked,
             this, &PrerequisitesIntro::apply_recommendation);
 
-#if defined(Q_OS_MACOS)
-    choose_own_button = new QPushButton(QStringLiteral("LOCATE RUNTIME"), this);
-    choose_own_button->hide();
-#else
     choose_own_button = new QPushButton(QStringLiteral("CHOOSE MY OWN"), this);
-#endif
     choose_own_button->setCursor(Qt::PointingHandCursor);
     choose_own_button->setStyleSheet(k_secondary_style);
     QFont secondary_font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
@@ -193,7 +186,7 @@ void PrerequisitesIntro::setup_controls()
     secondary_font.setWeight(QFont::Black);
     choose_own_button->setFont(secondary_font);
     choose_own_button->setGeometry(local_rect(w, {440, 330, 180, 54}));
-    choose_own_button->setAccessibleName(QStringLiteral("Choose a runtime manually"));
+    choose_own_button->setAccessibleName(QStringLiteral("Choose Wine manually"));
     connect(choose_own_button, &QPushButton::clicked,
             this, &PrerequisitesIntro::choose_own_requested);
 }
@@ -206,61 +199,33 @@ void PrerequisitesIntro::start_detection()
     recommendation_body->setStyleSheet(k_recommendation_style);
 #if defined(Q_OS_MACOS)
     recommendation_body->setText(util::i18n::translate(
-        "Checking the Story of Alicia runtime and macOS compatibility."));
+        "Looking for a usable Wine setup. Nothing will be installed automatically."));
 #else
     recommendation_body->setText(util::i18n::translate(
         "Looking for a usable Wine or Proton setup. Nothing will be installed automatically."));
 #endif
     continue_button->setText(util::i18n::translate("CHECKING..."));
     continue_button->setEnabled(false);
+    const auto detection = []()
+    {
+        DetectionResult result;
+        result.profile = core::system::detect_system_profile();
+        result.runtimes = core::wine::WineRegistry::scan();
 #if defined(Q_OS_MACOS)
-    const QString savedRuntime = util::config::Config::instance().wine_binary();
-    const auto detection = [savedRuntime]()
-    {
-        DetectionResult result;
-        result.profile = core::system::detect_system_profile();
-        const auto resolution = core::runtime::RuntimeProvider::resolve(
-            savedRuntime, false);
-        if (resolution.usable)
-        {
-            core::wine::WineInstall runtime;
-            runtime.name = resolution.display_name;
-            runtime.path = resolution.selector;
-            runtime.type = core::wine::RuntimeType::Wine;
-            runtime.version = QStringLiteral("managed by launcher");
-            runtime.requires_rosetta = resolution.requires_rosetta;
-            runtime.rosetta_available = resolution.rosetta_available;
-            runtime.usable = true;
-            result.runtimes.append(runtime);
-        }
-        result.umu_ready = false;
-        return result;
-    };
-#else
-    const auto& config = util::config::Config::instance();
-    const QString savedRuntime = config.wine_binary();
-    const bool reuseSavedRuntime = config.prerequisites_confirmed()
-        && config.runtime_selected() && !savedRuntime.trimmed().isEmpty();
-    const auto detection = [savedRuntime, reuseSavedRuntime]()
-    {
-        DetectionResult result;
-        result.profile = core::system::detect_system_profile();
-        if (reuseSavedRuntime)
-        {
-            core::wine::WineInstall runtime;
-            if (core::wine::WineRegistry::inspect_path(savedRuntime, runtime)
-                && runtime.usable)
-            {
-                result.runtimes.append(std::move(runtime));
-            }
-        }
-        if (result.runtimes.isEmpty())
-            result.runtimes = core::wine::WineRegistry::scan();
-        result.winetricks_ready = core::wine::winetricks_available();
-        result.umu_ready = core::wine::umu_available();
-        return result;
-    };
+        result.runtimes.erase(
+            std::remove_if(result.runtimes.begin(), result.runtimes.end(),
+                           [](const core::wine::WineInstall& runtime)
+                           {
+                               return runtime.type == core::wine::RuntimeType::Proton;
+                           }),
+            result.runtimes.end());
 #endif
+        result.winetricks_ready = core::wine::winetricks_available();
+#if !defined(Q_OS_MACOS)
+        result.umu_ready = core::wine::umu_available();
+#endif
+        return result;
+    };
     detector->setFuture(QtConcurrent::run(detection));
 }
 
@@ -269,9 +234,7 @@ void PrerequisitesIntro::finish_detection()
     const DetectionResult result = detector->result();
     system_profile = result.profile;
     runtimes = result.runtimes;
-#if !defined(Q_OS_MACOS)
     winetricks_ready = result.winetricks_ready;
-#endif
     umu_ready = result.umu_ready;
     detection_complete = true;
     update_recommendation();
@@ -318,20 +281,16 @@ QStringList PrerequisitesIntro::missing_requirements(const core::wine::RuntimeTy
     QStringList missing;
     if (!best_runtime(type))
     {
-#if defined(Q_OS_MACOS)
-        missing << util::i18n::translate("Runtime");
-#else
         missing << (type == core::wine::RuntimeType::Proton
                         ? util::i18n::translate("Proton")
                         : util::i18n::translate("Wine"));
-#endif
     }
 #if !defined(Q_OS_MACOS)
     if (type == core::wine::RuntimeType::Proton && !umu_ready)
         missing << util::i18n::translate("UMU");
+#endif
     if (!winetricks_ready)
         missing << util::i18n::translate("Winetricks");
-#endif
     return missing;
 }
 
@@ -356,17 +315,12 @@ bool PrerequisitesIntro::profile_ready(QString* blocker) const
     if (system_profile.cpu_architecture == core::system::CpuArchitecture::Arm64
         && !system_profile.rosetta_available)
     {
-        const bool intelRuntimeFound = std::any_of(runtimes.cbegin(), runtimes.cend(),
-            [](const core::wine::WineInstall& runtime)
-            {
-                return runtime.type == core::wine::RuntimeType::Wine
-                    && runtime.requires_rosetta;
-            });
-        if (intelRuntimeFound)
+        const auto* runtime = best_runtime(core::wine::RuntimeType::Wine);
+        if (runtime && runtime->requires_rosetta)
         {
             if (blocker)
                 *blocker = QStringLiteral(
-                    "An Intel macOS runtime was found, but Rosetta is unavailable. "
+                    "An Intel Wine installation was found, but Rosetta is unavailable. "
                     "Request Rosetta, complete the macOS prompt, then rescan.");
             return false;
         }
@@ -391,10 +345,9 @@ bool PrerequisitesIntro::profile_ready(QString* blocker) const
     else
     {
 #if defined(Q_OS_MACOS)
-        Q_UNUSED(install_wording);
         *blocker = QStringLiteral(
-            "The Story of Alicia runtime was not found. Use Locate Runtime to select the custom runtime app or folder.\n\nMissing: %1.")
-            .arg(missing_text);
+            "Wine and Winetricks are required to prepare Alicia's Windows components.\n\nMissing: %1. %2, then restart the launcher.")
+            .arg(missing_text, install_wording);
 #else
         *blocker = QStringLiteral(
             "Pure Wine needs both Wine and Winetricks.\n\nMissing: %1. %2, then restart the launcher.")
@@ -409,13 +362,9 @@ void PrerequisitesIntro::update_recommendation()
     if (!detection_complete) return;
 
     const auto runtime_type = recommended_runtime();
-#if defined(Q_OS_MACOS)
-    const QString runtime_label = util::i18n::translate("RUNTIME");
-#else
     const QString runtime_label = runtime_type == core::wine::RuntimeType::Proton
         ? util::i18n::translate("PROTON")
         : util::i18n::translate("WINE");
-#endif
 
     QString blocker;
     if (!profile_ready(&blocker))
@@ -425,23 +374,19 @@ void PrerequisitesIntro::update_recommendation()
         recommendation_body->setText(util::i18n::translate(blocker));
         continue_button->setText(util::i18n::translate("USE THIS SETUP"));
         continue_button->setEnabled(false);
-#if defined(Q_OS_MACOS)
         choose_own_button->show();
-#endif
         return;
     }
 
     const auto* runtime = best_runtime(runtime_type);
-#if defined(Q_OS_MACOS)
-    choose_own_button->hide();
-#endif
+    choose_own_button->show();
     recommendation_title->setText(util::i18n::translate("%1 READY").arg(runtime_label));
     recommendation_body->setStyleSheet(k_recommendation_style);
 #if defined(Q_OS_MACOS)
     recommendation_body->setText(util::i18n::translate(
-        "%1 passed its macOS compatibility probe. Alicia will use the shared "
-        "64-bit runtime prefix and the supported built-in graphics path. "
-        "Game-local components are verified before launch.")
+        "%1 is the recommended Wine setup for this Mac. Alicia will use "
+        "compatibility graphics and a 64-bit Wine prefix. Nothing will be "
+        "installed automatically.")
         .arg(runtime ? runtime->name : runtime_label));
 #else
     recommendation_body->setText(util::i18n::translate(
@@ -520,7 +465,7 @@ void PrerequisitesIntro::paint_content(QPainter& painter)
     painter.setPen(util::colors::k_text_caption);
 #if defined(Q_OS_MACOS)
     const QString note = QStringLiteral(
-        "Select another runtime or compatibility profile at any time.");
+        "You can still choose a different Wine installation manually.");
 #else
     const QString note = QStringLiteral(
         "You can still choose a different runtime manually.");

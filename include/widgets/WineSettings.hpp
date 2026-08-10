@@ -17,7 +17,6 @@ private:
     void setup_prefix_option();
     void setup_wine_binary_option();
     void setup_tricks_option();
-    void setup_macos_components_option();
     void setup_wine_args_option();
 
     core::wine::Shell* shell {};

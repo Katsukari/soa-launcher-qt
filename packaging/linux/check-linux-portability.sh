@@ -55,6 +55,22 @@ if ! find "$ROOT" \( -type f -o -type l \) -name 'libswiftCore.so*' \
   FAILED=1
 fi
 
+HOOK_ROOT="$ROOT/usr/libexec/soa-launcher/alicia-log-hook"
+for hook_artifact in SoaAliciaLogInjector.exe SoaAliciaLogHook.dll; do
+  hook_path="$HOOK_ROOT/$hook_artifact"
+  if [ ! -s "$hook_path" ]; then
+    echo "Bundled Alicia diagnostic component is missing: $hook_path" >&2
+    FAILED=1
+    continue
+  fi
+  hook_description="$(file -b "$hook_path" 2>/dev/null || true)"
+  if [[ "$hook_description" != *"PE32 executable"* ]] \
+      || [[ "$hook_description" == *"PE32+"* ]]; then
+    echo "Alicia diagnostic component is not Windows x86 PE32: $hook_path ($hook_description)" >&2
+    FAILED=1
+  fi
+done
+
 while IFS= read -r -d '' item; do
   if ! file -b "$item" 2>/dev/null | grep -q '^ELF '; then
     continue

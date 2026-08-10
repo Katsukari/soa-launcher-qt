@@ -36,7 +36,6 @@ private:
     QVector<core::wine::WineInstall> runtimes;
     QFutureWatcher<QVector<core::wine::WineInstall>>* detector {};
     bool scanning {};
-    bool scan_completed {};
     int selected {-1};
     QLabel* runtime_status {};
     QScrollArea* list {};

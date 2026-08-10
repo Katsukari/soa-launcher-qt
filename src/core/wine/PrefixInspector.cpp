@@ -1,5 +1,4 @@
 #include "core/wine/PrefixInspector.hpp"
-#include "core/runtime/RuntimeManager.hpp"
 #include "core/wine/MacWineRuntime.hpp"
 
 #include <QDateTime>
@@ -20,21 +19,6 @@ namespace core::wine
 
         QString runtime_fingerprint(const QString& runtime)
         {
-            QString identity = runtime;
-            if (core::runtime::RuntimeManager::is_managed_selector(runtime))
-            {
-                const core::runtime::RuntimeInstallation active =
-                    core::runtime::RuntimeManager().active();
-                if (!active.usable)
-                    return runtime + QStringLiteral("|unavailable");
-                identity = active.manifest.identity();
-                const QFileInfo executable(active.wine_executable);
-                return QStringLiteral("%1|%2|%3")
-                    .arg(identity)
-                    .arg(executable.size())
-                    .arg(executable.lastModified().toMSecsSinceEpoch());
-            }
-
             QFileInfo target(runtime);
             if (target.isDir())
             {
@@ -51,7 +35,7 @@ namespace core::wine
             const QString canonical = target.canonicalFilePath();
             const QString path = canonical.isEmpty() ? target.absoluteFilePath() : canonical;
             return QStringLiteral("%1|%2|%3")
-                .arg(identity == runtime ? path : identity)
+                .arg(path)
                 .arg(target.exists() ? target.size() : -1)
                 .arg(target.exists() ? target.lastModified().toMSecsSinceEpoch() : -1);
         }

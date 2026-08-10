@@ -108,9 +108,9 @@ struct SwiftNetworkABITests
         soa_http_client_destroy(client)
 
         guard let updater = soa_launcher_updater_create(
-            "file:///invalid-manifest.json",
-            "file:///invalid-fallback.json",
-            "invalid-key",
+            "https://example.com/launcher/version",
+            "https://example.com/launcher/fallback-version",
+            "0000000000000000000000000000000000000000000000000000000000000000",
             "1.0.0",
             "linux-x86_64",
             NSTemporaryDirectory(),

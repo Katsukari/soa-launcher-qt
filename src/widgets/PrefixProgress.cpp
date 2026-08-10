@@ -89,11 +89,7 @@ PrefixProgress::PrefixProgress(core::wine::Shell* shell_, QWidget* parent)
         else if (status == QStringLiteral("Starting...")
                  || status.contains(QStringLiteral("Validating"), Qt::CaseInsensitive))
         {
-#if defined(Q_OS_MACOS)
-            status = QStringLiteral("Runtime prefix setup failed.");
-#else
             status = QStringLiteral("Wine prefix setup failed.");
-#endif
         }
         update();
     });
@@ -162,13 +158,8 @@ void PrefixProgress::paint_content(QPainter& painter)
     title_font.setWeight(QFont::Black);
     painter.setFont(title_font);
     painter.setPen(util::colors::k_text_maroon);
-#if defined(Q_OS_MACOS)
-    painter.drawText(dl::title(w), Qt::AlignCenter,
-                     util::i18n::translate("INSTALLING RUNTIME PREFIX"));
-#else
     painter.drawText(dl::title(w), Qt::AlignCenter,
                      util::i18n::translate("INSTALLING WINE PREFIX"));
-#endif
 
     QFont label_font = util::assets::fonts[util::assets::Font::Inter];
     label_font.setPixelSize(util::layout::scaled(util::layout::text::k_body, w));

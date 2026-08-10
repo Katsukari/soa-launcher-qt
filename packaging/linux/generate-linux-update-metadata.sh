@@ -69,10 +69,15 @@ if [ -n "$HISTORY_INPUT" ] && [ -f "$HISTORY_INPUT" ]; then
   rm -f "$VERIFY_SIGNATURE" "$VERIFY_PUBLIC_KEY"
   trap - EXIT
   jq --slurpfile current "$MANIFEST" \
-    'del(.soa_developer_key)
-     | .releases |= map(del(.soa_developer_key))
-     | .releases = ([.releases[] | select(.version != $current[0].version)] + [$current[0]])
-     | .releases |= sort_by(.version)' "$HISTORY_INPUT" >"$HISTORY"
+    'def release_fields:
+       {schema, platform, version, minimum_version, message, file_name, url, mirrors,
+        sha256, size, released_at, required}
+       | with_entries(select(.value != null));
+     {schema: 1, platform: "linux-x86_64",
+      releases: ([.releases[] | release_fields
+                  | select(.version != $current[0].version)]
+                 + [($current[0] | release_fields)])
+                | sort_by(.version)}' "$HISTORY_INPUT" >"$HISTORY"
 else
   jq -n --slurpfile current "$MANIFEST" \
     '{schema: 1, platform: "linux-x86_64", releases: $current}' >"$HISTORY"

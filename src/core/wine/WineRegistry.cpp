@@ -1,7 +1,6 @@
 #include "core/wine/WineRegistry.hpp"
 
 #include <QtGlobal>
-#include <QCoreApplication>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -14,7 +13,6 @@
 #include <string>
 
 #include "core/Log.hpp"
-#include "core/runtime/RuntimeManager.hpp"
 #include "core/wine/MacWineRuntime.hpp"
 #include "util/Config.hpp"
 #include <spdlog/spdlog.h>
@@ -70,10 +68,6 @@ namespace core::wine
 
     QString WineRegistry::resolve_wine_executable(const QString& path)
     {
-        if (core::runtime::RuntimeManager::is_managed_selector(path))
-            return core::runtime::RuntimeManager().resolve_active_entrypoint(
-                QStringLiteral("wine"));
-
 #if defined(Q_OS_MACOS)
         return macos::resolve_wine_executable(path);
 #else
@@ -103,66 +97,6 @@ namespace core::wine
                                     QString* error)
     {
         install = {};
-        const bool managed = core::runtime::RuntimeManager::is_managed_selector(path);
-        core::runtime::RuntimeInstallation managedInstallation;
-        if (managed)
-        {
-            managedInstallation = core::runtime::RuntimeManager().active();
-            if (!managedInstallation.usable)
-            {
-                if (error) *error = managedInstallation.failure;
-                install.path = QString::fromLatin1(core::runtime::k_managed_active_selector);
-                install.type = RuntimeType::Wine;
-                install.name = QStringLiteral("Story of Alicia Managed Runtime");
-                install.issue = managedInstallation.failure;
-                return false;
-            }
-        }
-
-#if defined(Q_OS_MACOS)
-        if (managed
-            && !managedInstallation.manifest.graphics_backends.contains(
-                QStringLiteral("wined3d-opengl"),
-                Qt::CaseInsensitive))
-        {
-            const QString message = QStringLiteral(
-                "The managed runtime does not declare the supported macOS graphics backend.");
-            if (error) *error = message;
-            install.path = QString::fromLatin1(
-                core::runtime::k_managed_active_selector);
-            install.type = RuntimeType::Wine;
-            install.name = managedInstallation.manifest.display_name;
-            install.issue = message;
-            return false;
-        }
-
-        const bool packaged = !managed
-            && QFileInfo(QDir(path).filePath(
-                   QStringLiteral("runtime.json"))).isFile();
-        core::runtime::RuntimeInstallation packagedInstallation;
-        if (packaged)
-        {
-            packagedInstallation =
-                core::runtime::RuntimeManager::inspect_package(path);
-            if (!packagedInstallation.usable
-                || !packagedInstallation.manifest.graphics_backends.contains(
-                    QStringLiteral("wined3d-opengl"),
-                    Qt::CaseInsensitive))
-            {
-                const QString message = packagedInstallation.failure.isEmpty()
-                    ? QStringLiteral(
-                        "The runtime package does not declare the supported macOS graphics backend.")
-                    : packagedInstallation.failure;
-                if (error) *error = message;
-                install.path = path;
-                install.type = RuntimeType::Wine;
-                install.name = QStringLiteral("Story of Alicia Runtime");
-                install.issue = message;
-                return false;
-            }
-        }
-#endif
-
         bool identified = false;
         const RuntimeType type = identify(path, &identified);
         if (type == RuntimeType::Proton)
@@ -192,15 +126,12 @@ namespace core::wine
         }
 
 #if defined(Q_OS_MACOS)
-        const auto probe = macos::probe_runtime(
-            packaged ? packagedInstallation.wine_executable : path);
+        const auto probe = macos::probe_runtime(path);
         install.path = path;
         install.type = RuntimeType::Wine;
-        install.name = managed ? managedInstallation.manifest.display_name
-                     : packaged ? packagedInstallation.manifest.display_name
-                                : QFileInfo(path).completeBaseName();
+        install.name = QFileInfo(path).completeBaseName();
         if (install.name.isEmpty())
-            install.name = QStringLiteral("macOS Runtime");
+            install.name = QStringLiteral("Wine");
         install.version = probe.version;
         install.architectures = probe.architectures.join(QLatin1Char(' '));
         if (install.architectures.isEmpty() && QFileInfo(probe.executable).isFile())
@@ -222,16 +153,9 @@ namespace core::wine
         }
         install.path = path;
         install.type = RuntimeType::Wine;
-        install.name = managed ? managedInstallation.manifest.display_name
-                               : QFileInfo(path).completeBaseName();
-        install.version = managed
-            ? QStringLiteral("%1 · Wine %2")
-                  .arg(managedInstallation.manifest.runtime_version,
-                       managedInstallation.manifest.wine_version)
-            : QString();
-        install.architectures = managed
-            ? managedInstallation.manifest.host_arch
-            : QSysInfo::currentCpuArchitecture();
+        install.name = QFileInfo(path).completeBaseName();
+        install.version = QString();
+        install.architectures = QSysInfo::currentCpuArchitecture();
         install.usable = !executable.isEmpty();
         return install.usable;
 #endif
@@ -341,12 +265,7 @@ namespace core::wine
 #if defined(Q_OS_MACOS)
             QString inspectionError;
             (void)WineRegistry::inspect_path(path, wi, &inspectionError);
-            const bool managed =
-                core::runtime::RuntimeManager::is_managed_selector(path);
-            const bool packaged = !managed
-                && QFileInfo(QDir(path).filePath(
-                       QStringLiteral("runtime.json"))).isFile();
-            if (!managed && !packaged && !name.trimmed().isEmpty())
+            if (!name.trimmed().isEmpty())
                 wi.name = name;
             if (wi.issue.isEmpty())
                 wi.issue = inspectionError;
@@ -371,25 +290,6 @@ namespace core::wine
                 wi.version = probe_runtime_version(executable);
                 wi.architectures = runtime_architectures(executable);
                 wi.usable = !wi.version.isEmpty();
-                if (core::runtime::RuntimeManager::is_managed_selector(path))
-                {
-                    const core::runtime::RuntimeInstallation managed =
-                        core::runtime::RuntimeManager().active();
-                    if (managed.usable)
-                    {
-                        wi.version = QStringLiteral("%1 · %2")
-                            .arg(managed.manifest.runtime_version,
-                                 wi.version.isEmpty()
-                                     ? QStringLiteral("Wine %1")
-                                           .arg(managed.manifest.wine_version)
-                                     : wi.version);
-                        if (wi.architectures.isEmpty()
-                            || wi.architectures == QStringLiteral("script or unknown architecture"))
-                        {
-                            wi.architectures = managed.manifest.host_arch;
-                        }
-                    }
-                }
             }
             out.push_back(wi);
 #endif
@@ -472,10 +372,7 @@ namespace core::wine
             QStringList dirs;
 
 #if defined(Q_OS_MACOS)
-            dirs << macos::default_runtime_root()
-                 << QDir(QCoreApplication::applicationDirPath())
-                        .filePath(QStringLiteral("../Resources/runtimes"))
-                 << "/Applications"
+            dirs << "/Applications"
                  << home() + "/Applications"
                  << home() + "/Library/Application Support/com.isaacmarovitz.Whisky/Libraries"
                  << "/opt/homebrew/Caskroom"
@@ -564,23 +461,6 @@ namespace core::wine
     {
         QVector<WineInstall> out;
         QSet<QString> seen;
-
-        const core::runtime::RuntimeInstallation managed =
-            core::runtime::RuntimeManager().active();
-        if (managed.usable)
-        {
-            SPDLOG_INFO("managed runtime active: identity={} version={} wine={} platform={} host_arch={} graphics={}",
-                        managed.manifest.identity().toStdString(),
-                        managed.manifest.runtime_version.toStdString(),
-                        managed.manifest.wine_version.toStdString(),
-                        managed.manifest.platform.toStdString(),
-                        managed.manifest.host_arch.toStdString(),
-                        managed.manifest.graphics_backends.join(QLatin1Char(',')).toStdString());
-            add_install(out, seen,
-                        QString::fromLatin1(core::runtime::k_managed_active_selector),
-                        RuntimeType::Wine,
-                        managed.manifest.display_name);
-        }
 
         QString system_wine = QStandardPaths::findExecutable(QStringLiteral("wine"));
         if (system_wine.isEmpty())

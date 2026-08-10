@@ -152,15 +152,6 @@ public func soa_launcher_updater_cancel(_ pointer: UnsafeMutableRawPointer?)
     Unmanaged<LauncherUpdateService>.fromOpaque(pointer).takeUnretainedValue().cancel()
 }
 
-@_cdecl("soa_launcher_updater_select_version")
-public func soa_launcher_updater_select_version(_ pointer: UnsafeMutableRawPointer?,
-                                                _ version: UnsafePointer<CChar>?) -> Bool
-{
-    guard let pointer, let version else { return false }
-    return Unmanaged<LauncherUpdateService>.fromOpaque(pointer).takeUnretainedValue()
-        .selectVersion(String(cString: version))
-}
-
 @_cdecl("soa_discord_rpc_create")
 public func soa_discord_rpc_create(_ applicationID: UnsafePointer<CChar>?,
                                    _ processID: Int64,

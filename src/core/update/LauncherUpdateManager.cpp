@@ -8,17 +8,12 @@
 #include <QFileInfo>
 #include <QMetaObject>
 #include <QProcess>
-#include <QRegularExpression>
-#include <QJsonArray>
-#include <QJsonDocument>
-#include <QJsonObject>
 #include <QStandardPaths>
 #include <QTimer>
 
 #include <spdlog/spdlog.h>
 
 #include <limits>
-#include <algorithm>
 #include <utility>
 
 #ifndef SOA_LAUNCHER_VERSION
@@ -26,46 +21,67 @@
 #endif
 
 #ifndef SOA_LAUNCHER_UPDATE_MANIFEST_URL
-#define SOA_LAUNCHER_UPDATE_MANIFEST_URL "https://r2.storyofalicia.com/launcher/linux_launcher_version.json"
+#define SOA_LAUNCHER_UPDATE_MANIFEST_URL \
+    "https://r2.storyofalicia.com/launcher/linux_launcher_version.json"
+#endif
+
+#ifndef SOA_LAUNCHER_UPDATE_FALLBACK_MANIFEST_URL
+#define SOA_LAUNCHER_UPDATE_FALLBACK_MANIFEST_URL \
+    "https://github.com/Story-Of-Alicia/soa-launcher-qt/releases/latest/download/linux_launcher_version.json"
 #endif
 
 #ifndef SOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX
 #define SOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX ""
 #endif
 
-#ifndef SOA_LAUNCHER_UPDATE_FALLBACK_MANIFEST_URL
-#define SOA_LAUNCHER_UPDATE_FALLBACK_MANIFEST_URL "https://github.com/Story-Of-Alicia/soa-launcher-qt/releases/latest/download/linux_launcher_version.json"
-#endif
-
 namespace core::update
 {
+    namespace
+    {
+        bool is_valid_public_key(const QByteArray& key)
+        {
+            if (key.size() != 64)
+                return false;
+            for (const char character : key)
+            {
+                const bool decimal = character >= '0' && character <= '9';
+                const bool lower = character >= 'a' && character <= 'f';
+                const bool upper = character >= 'A' && character <= 'F';
+                if (!decimal && !lower && !upper)
+                    return false;
+            }
+            return true;
+        }
+    }
+
     LauncherUpdateManager::LauncherUpdateManager(QObject* parent)
         : QObject(parent)
     {
         QString manifest_url = qEnvironmentVariable("SOA_LAUNCHER_UPDATE_MANIFEST_URL").trimmed();
         if (manifest_url.isEmpty())
             manifest_url = QString::fromUtf8(SOA_LAUNCHER_UPDATE_MANIFEST_URL).trimmed();
-        const QString public_key = QString::fromUtf8(SOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX).trimmed();
-        const QString fallback_url = QString::fromUtf8(
-            SOA_LAUNCHER_UPDATE_FALLBACK_MANIFEST_URL).trimmed();
         const QByteArray manifest_url_bytes = manifest_url.toUtf8();
-        const QByteArray public_key_bytes = public_key.toUtf8();
-        const QByteArray fallback_url_bytes = fallback_url.toUtf8();
+        const QByteArray fallback_manifest_url_bytes =
+            QByteArray(SOA_LAUNCHER_UPDATE_FALLBACK_MANIFEST_URL).trimmed();
+        const QByteArray public_key_hex =
+            QByteArray(SOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX).trimmed();
         const QByteArray platform_bytes = detected_platform_key().toUtf8();
         const QByteArray directory_bytes = download_directory().toUtf8();
         const QByteArray user_agent = QByteArray("Story-Of-Alicia-Launcher/") + SOA_LAUNCHER_VERSION;
-        const bool signing_key_valid = QRegularExpression(
-            QStringLiteral("^[0-9a-fA-F]{64}$")).match(public_key).hasMatch();
-        if (detected_platform_key() == QStringLiteral("linux-x86_64") && !signing_key_valid)
+        if (platform_bytes != QByteArrayLiteral("linux-x86_64"))
         {
-            SPDLOG_DEBUG("launcher updates disabled: this build has no signing public key");
-            schedule_health_checkpoint();
-            return;
+            configuration_error = util::i18n::translate(
+                "Launcher self-updates are not available on this platform yet.");
+        }
+        else if (!is_valid_public_key(public_key_hex))
+        {
+            configuration_error = util::i18n::translate(
+                "This launcher build does not contain a valid update-signing public key.");
         }
         updater = soa_launcher_updater_create(
             manifest_url_bytes.constData(),
-            fallback_url_bytes.constData(),
-            public_key_bytes.constData(),
+            fallback_manifest_url_bytes.constData(),
+            public_key_hex.constData(),
             SOA_LAUNCHER_VERSION,
             platform_bytes.constData(),
             directory_bytes.constData(),
@@ -92,28 +108,19 @@ namespace core::update
     {
         if (downloading)
             return;
-        if (!updater)
+        if (!configuration_error.isEmpty())
         {
-            emit no_update_available();
+            reset_release();
+            emit check_failed(configuration_error);
             return;
         }
-        managing_versions = false;
-        reset_release();
-        emit check_started();
-        soa_launcher_updater_check(updater);
-    }
-
-    void LauncherUpdateManager::manage_versions()
-    {
-        if (downloading)
-            return;
         if (!updater)
         {
-            emit manual_check_failed(util::i18n::translate(
-                "This launcher build does not contain an update signing key."));
+            reset_release();
+            emit check_failed(util::i18n::translate(
+                "The launcher update service could not be initialized."));
             return;
         }
-        managing_versions = true;
         reset_release();
         emit check_started();
         soa_launcher_updater_check(updater);
@@ -167,7 +174,7 @@ namespace core::update
              package_file_name = QString::fromUtf8(package_file_name ? package_file_name : ""),
              package_url = QUrl(QString::fromUtf8(package_url ? package_url : "")),
              sha256 = QByteArray(sha256 ? sha256 : ""),
-             releases_json = QByteArray(releases_json ? releases_json : "[]"),
+             releases_json = QString::fromUtf8(releases_json ? releases_json : ""),
              expected_size,
              required]() mutable
             {
@@ -243,51 +250,23 @@ namespace core::update
                                              QByteArray sha256,
                                              const qulonglong size,
                                              const bool is_required,
-                                             QByteArray releases_json)
+                                             QString releases_json)
     {
-        const bool manual_check = managing_versions;
-        if (result != soa_launcher_check_no_update
-            && result != soa_launcher_check_update_available)
-        {
-            reset_release();
-            managing_versions = false;
-            const QString reason = error_message(error_code, http_status, error_detail);
-            SPDLOG_WARN("launcher update check failed: {}", reason.toStdString());
-            if (manual_check)
-                emit manual_check_failed(reason);
-            else
-                emit check_failed(reason);
-            return;
-        }
-        if (!parse_catalogue(releases_json))
-        {
-            reset_release();
-            managing_versions = false;
-            const QString reason = util::i18n::translate(
-                "No valid signed launcher releases could be found.");
-            SPDLOG_WARN("launcher update check failed: {}", reason.toStdString());
-            if (manual_check)
-                emit manual_check_failed(reason);
-            else
-                emit check_failed(reason);
-            return;
-        }
         if (result == soa_launcher_check_no_update)
         {
             reset_release();
-            if (managing_versions && !releases.isEmpty())
-            {
-                managing_versions = false;
-                const QString current = current_version();
-                if (!select_version(current))
-                    select_version(releases.constFirst().version);
-                emit catalogue_ready();
-                return;
-            }
-            managing_versions = false;
             emit no_update_available();
             return;
         }
+        if (result != soa_launcher_check_update_available)
+        {
+            reset_release();
+            const QString reason = error_message(error_code, http_status, error_detail);
+            SPDLOG_WARN("launcher update check failed: {}", reason.toStdString());
+            emit check_failed(reason);
+            return;
+        }
+
         release_version = std::move(version);
         minimum_version = std::move(minimum);
         message = std::move(release_message);
@@ -295,66 +274,10 @@ namespace core::update
         package_file_name = std::move(file_name);
         package_url = std::move(url);
         expected_sha256 = std::move(sha256);
+        release_catalogue_json = std::move(releases_json);
         expected_size = size;
         required = is_required;
-        const bool catalogue_requested = managing_versions;
-        managing_versions = false;
-        if (catalogue_requested)
-            emit catalogue_ready();
-        else
-            emit update_found();
-    }
-
-    bool LauncherUpdateManager::parse_catalogue(const QByteArray& releases_json)
-    {
-        releases.clear();
-        QJsonParseError error;
-        const QJsonDocument document = QJsonDocument::fromJson(releases_json, &error);
-        if (error.error != QJsonParseError::NoError || !document.isObject())
-            return false;
-        const QJsonArray entries = document.object().value(QStringLiteral("releases")).toArray();
-        for (const QJsonValue& value : entries)
-        {
-            const QJsonObject entry = value.toObject();
-            Release release;
-            release.version = entry.value(QStringLiteral("version")).toString();
-            release.message = entry.value(QStringLiteral("message")).toString();
-            release.package_kind = QStringLiteral("appimage");
-            release.file_name = entry.value(QStringLiteral("file_name")).toString();
-            release.url = QUrl(entry.value(QStringLiteral("url")).toString());
-            release.sha256 = entry.value(QStringLiteral("sha256")).toString().toLatin1();
-            release.size = entry.value(QStringLiteral("size")).toVariant().toULongLong();
-            if (release.version.isEmpty() || release.file_name.isEmpty() || !release.url.isValid()
-                || release.sha256.size() != 64 || release.size == 0)
-                return false;
-            releases.push_back(std::move(release));
-        }
-        return !releases.isEmpty();
-    }
-
-    bool LauncherUpdateManager::select_version(const QString& version)
-    {
-        if (!updater || downloading)
-            return false;
-        const auto found = std::find_if(releases.cbegin(), releases.cend(), [&version](const Release& release)
-        {
-            return release.version == version;
-        });
-        if (found == releases.cend())
-            return false;
-        const QByteArray version_bytes = found->version.toUtf8();
-        if (!soa_launcher_updater_select_version(updater, version_bytes.constData()))
-            return false;
-        release_version = found->version;
-        minimum_version.clear();
-        message = found->message;
-        package_kind = found->package_kind;
-        package_file_name = found->file_name;
-        package_url = found->url;
-        expected_sha256 = found->sha256;
-        expected_size = found->size;
-        required = false;
-        return true;
+        emit update_found();
     }
 
     void LauncherUpdateManager::handle_download(const soa_launcher_download_result result,
@@ -385,6 +308,7 @@ namespace core::update
         final_download_path.clear();
         package_url.clear();
         expected_sha256.clear();
+        release_catalogue_json.clear();
         expected_size = 0;
         required = false;
     }
@@ -404,7 +328,7 @@ namespace core::update
             case soa_launcher_error_response_too_large:
                 return util::i18n::translate("The launcher update response is unexpectedly large.");
             case soa_launcher_error_invalid_release:
-                return util::i18n::translate("The launcher update server returned invalid release information.");
+                return util::i18n::translate("The launcher update server returned an invalid manifest.");
             case soa_launcher_error_missing_asset:
                 return util::i18n::translate("No compatible launcher package was attached to the release.");
             case soa_launcher_error_unsafe_url:
@@ -426,7 +350,8 @@ namespace core::update
             case soa_launcher_error_cancelled:
                 return util::i18n::translate("The launcher update was cancelled.");
             case soa_launcher_error_invalid_signature:
-                return util::i18n::translate("The launcher update metadata has an invalid signature.");
+                return util::i18n::translate(
+                    "The launcher update signature is invalid or does not match this launcher.");
             case soa_launcher_error_network:
                 return detail.isEmpty()
                     ? util::i18n::translate("The launcher update network request failed.")
@@ -612,19 +537,5 @@ namespace core::update
     QString LauncherUpdateManager::downloaded_path() const
     {
         return final_download_path;
-    }
-
-    QStringList LauncherUpdateManager::available_versions() const
-    {
-        QStringList versions;
-        versions.reserve(releases.size());
-        for (const Release& release : releases)
-            versions.push_back(release.version);
-        return versions;
-    }
-
-    QString LauncherUpdateManager::current_version()
-    {
-        return QString::fromLatin1(SOA_LAUNCHER_VERSION);
     }
 }

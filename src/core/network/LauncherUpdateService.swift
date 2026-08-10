@@ -557,9 +557,9 @@ final class LauncherUpdateService: @unchecked Sendable
                         soa_launcher_error_unsafe_url,
                         "The launcher release contains an invalid mirror URL")
                 }
-				if !packageURLs.contains(mirrorURL) {
-					packageURLs.append(mirrorURL)
-				}
+                if !packageURLs.contains(mirrorURL) {
+                    packageURLs.append(mirrorURL)
+                }
             }
         }
 
