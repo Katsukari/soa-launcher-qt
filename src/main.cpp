@@ -208,15 +208,37 @@ int main(int argc, char* argv[])
 
     QLockFile instance_lock(lock_path());
     instance_lock.setStaleLockTime(0);
+
     if (!instance_lock.tryLock(0))
     {
-
         for (int attempt = 0; attempt < 20; ++attempt)
         {
             QThread::msleep(100);
             if (forward_to_existing(server_key, url, 250))
                 return 0;
         }
+
+        qint64 pid = -1;
+        QString hostname;
+        QString application;
+
+        if (instance_lock.getLockInfo(&pid, &hostname, &application))
+        {
+            SPDLOG_ERROR(
+                "single-instance lock is held but IPC failed: pid={} application=\"{}\" host=\"{}\" lock=\"{}\"",
+                pid,
+                application.toStdString(),
+                hostname.toStdString(),
+                instance_lock.fileName().toStdString());
+        }
+        else
+        {
+            SPDLOG_ERROR(
+                "single-instance lock failed and owner information is unavailable: error={} lock=\"{}\"",
+                static_cast<int>(instance_lock.error()),
+                instance_lock.fileName().toStdString());
+        }
+
         return 1;
     }
 

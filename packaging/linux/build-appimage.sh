@@ -204,14 +204,14 @@ DESTDIR="$APPDIR" cmake --install "$BUILD_DIR" --prefix /usr
 mkdir -p "$APPDIR/usr/share/soa-launcher/update"
 jq -n \
   --arg version "$LAUNCHER_VERSION" \
-  --arg manifest_url "https://r2.storyofalicia.com/launcher/linux_launcher_version.json" \
+  --arg manifest_url "https://r2.storyofalicia.com/launcher/linux/version.json" \
   --arg fallback_manifest_url \
-    "https://github.com/Story-Of-Alicia/soa-launcher-qt/releases/latest/download/linux_launcher_version.json" \
+    "https://r2.storyofalicia.com/launcher/linux/version.json" \
   --arg signing_public_key "$SOA_UPDATE_PUBLIC_KEY_HEX" \
   '{schema: 1, version: $version, platform: "linux-x86_64",
     manifest_url: $manifest_url, fallback_manifest_url: $fallback_manifest_url,
     signing_public_key: $signing_public_key}' \
-  >"$APPDIR/usr/share/soa-launcher/update/linux_launcher_version.json"
+  >"$APPDIR/usr/share/soa-launcher/update/version.json"
 
 cp soa-launcher.png "$APPDIR/soa-launcher.png"
 cp soa-launcher.desktop "$APPDIR/soa-launcher.desktop"
@@ -231,7 +231,29 @@ export NO_STRIP=1
 
 QT_PLUGIN_DIR="$("$QMAKE" -query QT_INSTALL_PLUGINS)"
 QT_TRANSLATIONS_DIR="$("$QMAKE" -query QT_INSTALL_TRANSLATIONS)"
+QT_LIB_DIR="$("$QMAKE" -query QT_INSTALL_LIBS)"
 QT_PLATFORM_DIR="$QT_PLUGIN_DIR/platforms"
+
+copy_qt_library_family() {
+  local stem="$1"
+  local required="${2:-1}"
+  local matches=()
+
+  shopt -s nullglob
+  matches=("$QT_LIB_DIR/$stem".so*)
+  shopt -u nullglob
+
+  if [ "${#matches[@]}" -eq 0 ]; then
+    if [ "$required" = "1" ]; then
+      echo "Required Qt library not found: $QT_LIB_DIR/$stem.so*" >&2
+      exit 1
+    fi
+    return 0
+  fi
+
+  mkdir -p "$APPDIR/usr/lib"
+  cp -a "${matches[@]}" "$APPDIR/usr/lib/"
+}
 
 copy_qt_plugin() {
   local category="$1"
@@ -298,6 +320,14 @@ copy_qt_plugin imageformats libqjpeg.so
 copy_qt_plugin imageformats libqsvg.so
 copy_qt_plugin imageformats libqwebp.so
 copy_qt_plugin iconengines libqsvgicon.so
+
+copy_qt_library_family libQt6Svg
+copy_qt_library_family libQt6OpenGL
+copy_qt_library_family libQt6XcbQpa
+copy_qt_library_family libQt6WaylandClient
+copy_qt_library_family libQt6WaylandEglClientHwIntegration
+copy_qt_library_family libQt6WlShellIntegration
+
 copy_qt_plugin_directory platforminputcontexts
 copy_qt_plugin_directory xcbglintegrations
 copy_qt_plugin_directory wayland-decoration-client
@@ -417,26 +447,19 @@ cleanup_smoke
 
 rm -rf "$SCRIPT_DIR/squashfs-root"
 
-VERSIONED_OUTPUT="$SCRIPT_DIR/Story_Of_Alicia_Launcher_${LAUNCHER_VERSION}_x86_64.AppImage"
-mv "$OUTPUT" "$VERSIONED_OUTPUT"
-OUTPUT="$VERSIONED_OUTPUT"
-
 if [ -z "${SOA_UPDATE_HISTORY_INPUT:-}" ]; then
   UPDATE_HISTORY_TEMP="$(mktemp -d)"
-  for history_base in \
-      "https://github.com/Story-Of-Alicia/soa-launcher-qt/releases/latest/download" \
-      "https://r2.storyofalicia.com/launcher"; do
-    if wget -q "$history_base/linux_launcher_versions.json" \
-        -O "$UPDATE_HISTORY_TEMP/linux_launcher_versions.json" \
-        && wget -q "$history_base/linux_launcher_versions.json.sig" \
-        -O "$UPDATE_HISTORY_TEMP/linux_launcher_versions.json.sig"; then
-      SOA_UPDATE_HISTORY_INPUT="$UPDATE_HISTORY_TEMP/linux_launcher_versions.json"
-      export SOA_UPDATE_HISTORY_INPUT
-      break
-    fi
-  done
+  if wget -q \
+      "https://r2.storyofalicia.com/launcher/linux/versions.json" \
+      -O "$UPDATE_HISTORY_TEMP/versions.json" \
+      && wget -q \
+      "https://r2.storyofalicia.com/launcher/linux/versions.json.sig" \
+      -O "$UPDATE_HISTORY_TEMP/versions.json.sig"; then
+    SOA_UPDATE_HISTORY_INPUT="$UPDATE_HISTORY_TEMP/versions.json"
+    export SOA_UPDATE_HISTORY_INPUT
+  fi
 fi
 
 "$SCRIPT_DIR/generate-linux-update-metadata.sh" "$LAUNCHER_VERSION" "$OUTPUT"
 
-echo "Done. The versioned AppImage and signed update metadata are in: $SCRIPT_DIR"
+echo "Done. The AppImage and signed update metadata are in: $SCRIPT_DIR"

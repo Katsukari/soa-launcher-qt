@@ -35,13 +35,13 @@ Download the newest package from the project's **Releases** page.
 2. Allow it to run:
 
    ```sh
-   chmod +x Story_Of_Alicia_Launcher_1.0.0_x86_64.AppImage
+   chmod +x Story_Of_Alicia-x86_64.AppImage
    ```
 
 3. Open it:
 
    ```sh
-   ./Story_Of_Alicia_Launcher_1.0.0_x86_64.AppImage
+   ./Story_Of_Alicia-x86_64.AppImage
    ```
 
 Linux users can choose between Wine and Proton through UMU.

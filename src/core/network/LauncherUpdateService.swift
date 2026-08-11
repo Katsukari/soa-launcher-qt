@@ -385,13 +385,12 @@ final class LauncherUpdateService: @unchecked Sendable
 
     private func performCheck() async
     {
-        if platform.hasPrefix("macos-") {
-            reportCheck(result: soa_launcher_check_no_update, failure: nil, selection: nil)
-            return
-        }
+        let supportedPlatform = platform == "linux-x86_64"
+            || platform == "macos-arm64"
+            || platform == "macos-x86_64"
 
         guard !currentVersion.isEmpty,
-              platform == "linux-x86_64",
+              supportedPlatform,
               publicKeyHex.range(of: #"^[0-9a-f]{64}$"#, options: .regularExpression) != nil,
               let primaryURL = secureURL(manifestURLText, allowInsecureHTTP: allowInsecureHTTP),
               let fallbackURL = secureURL(fallbackManifestURLText,
@@ -458,7 +457,7 @@ final class LauncherUpdateService: @unchecked Sendable
         let manifestData = try await fetchSignedJSON(manifestURL, maximumBytes: 64 * 1024)
         let selected = try parseManifest(manifestData)
         let historyURL = manifestURL.deletingLastPathComponent()
-            .appendingPathComponent("linux_launcher_versions.json")
+            .appendingPathComponent("versions.json")
         let historyData = try await fetchSignedJSON(historyURL, maximumBytes: 1024 * 1024)
         let parsedCatalogue = try parseCatalogue(historyData)
         guard parsedCatalogue.releases.contains(where: {
@@ -520,7 +519,7 @@ final class LauncherUpdateService: @unchecked Sendable
     {
         guard let manifest = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               (manifest["schema"] as? NSNumber)?.intValue == 1,
-              manifest["platform"] as? String == "linux-x86_64" else {
+              manifest["platform"] as? String == platform else {
             throw LauncherServiceFailure(
                 soa_launcher_error_invalid_release,
                 "The signed launcher release manifest is invalid")
@@ -594,7 +593,7 @@ final class LauncherUpdateService: @unchecked Sendable
             version: tag,
             minimumVersion: minimum,
             message: manifest["message"] as? String ?? "",
-            packageKind: "appimage",
+            packageKind: platform.hasPrefix("macos-") ? "dmg" : "appimage",
             fileName: name,
             packageURLs: packageURLs,
             sha256: digest,
@@ -607,9 +606,9 @@ final class LauncherUpdateService: @unchecked Sendable
     {
         guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               (root["schema"] as? NSNumber)?.intValue == 1,
-              root["platform"] as? String == "linux-x86_64",
+              root["platform"] as? String == platform,
               let entries = root["releases"] as? [[String: Any]],
-              !entries.isEmpty, entries.count <= 128 else {
+              !entries.isEmpty, entries.count <= 3 else {
             throw LauncherServiceFailure(
                 soa_launcher_error_invalid_release,
                 "The signed launcher release catalogue is invalid")

@@ -60,7 +60,7 @@ jobs:
           MACOS_INTEL_RESULT: ${{ needs.build-macos-intel.result }}
         run: |
           set -euo pipefail
-          mapfile -t appimages < <(find release-assets -type f -name '*.AppImage' -print | sort)
+          mapfile -t appimages < <(find release-assets -type f -name 'Story_Of_Alicia-x86_64.AppImage' -print | sort)
           mapfile -t disk_images < <(find release-assets -type f -name '*.dmg' -print | sort)
 
           if [ "${#appimages[@]}" -ne 1 ]; then
@@ -82,6 +82,16 @@ jobs:
             printf '%s\n' "${disk_images[@]}" >&2
             exit 1
           fi
+          if [ "$MACOS_ARM64_RESULT" = "success" ] \
+              && ! find release-assets -type f -name 'Story_Of_Alicia-arm64.dmg' -print -quit | grep -q .; then
+            echo "Expected Story_Of_Alicia-arm64.dmg from the Apple Silicon build." >&2
+            exit 1
+          fi
+          if [ "$MACOS_INTEL_RESULT" = "success" ] \
+              && ! find release-assets -type f -name 'Story_Of_Alicia-x86_64.dmg' -print -quit | grep -q .; then
+            echo "Expected Story_Of_Alicia-x86_64.dmg from the Intel macOS build." >&2
+            exit 1
+          fi
           if [ "$expected_dmgs" -lt 2 ]; then
             printf '::warning::Publishing without macOS builds (arm64=%s intel=%s)\n' \
               "$MACOS_ARM64_RESULT" "$MACOS_INTEL_RESULT"
@@ -90,10 +100,10 @@ jobs:
           packages=("${appimages[@]}" "${disk_images[@]}")
 
           mapfile -t metadata < <(find release-assets -type f \
-            \( -name 'linux_launcher_version.json' \
-               -o -name 'linux_launcher_version.json.sig' \
-               -o -name 'linux_launcher_versions.json' \
-               -o -name 'linux_launcher_versions.json.sig' \) -print | sort)
+            \( -name 'version.json' \
+               -o -name 'version.json.sig' \
+               -o -name 'versions.json' \
+               -o -name 'versions.json.sig' \) -print | sort)
           if [ "${#metadata[@]}" -ne 4 ]; then
             printf 'Expected four signed Linux metadata files, found %s:\n' "${#metadata[@]}" >&2
             printf '%s\n' "${metadata[@]}" >&2
@@ -112,10 +122,10 @@ jobs:
           mapfile -t packages < <(find release-assets -type f \
             \( -name '*.AppImage' -o -name '*.dmg' \) -print | sort)
           mapfile -t metadata < <(find release-assets -type f \
-            \( -name 'linux_launcher_version.json' \
-               -o -name 'linux_launcher_version.json.sig' \
-               -o -name 'linux_launcher_versions.json' \
-               -o -name 'linux_launcher_versions.json.sig' \) -print | sort)
+            \( -name 'version.json' \
+               -o -name 'version.json.sig' \
+               -o -name 'versions.json' \
+               -o -name 'versions.json.sig' \) -print | sort)
           assets=("${packages[@]}" "${metadata[@]}")
 
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then

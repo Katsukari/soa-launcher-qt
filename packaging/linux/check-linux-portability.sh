@@ -6,6 +6,10 @@ ROOT="${1:?Usage: check-linux-portability.sh APPDIR}"
 MAX_GLIBC="${SOA_MAX_GLIBC:-2.35}"
 MAX_GLIBCXX="${SOA_MAX_GLIBCXX:-3.4.30}"
 FAILED=0
+BUNDLE_LIBRARY_PATH="$ROOT/usr/lib"
+if [ -d "$ROOT/usr/lib64" ]; then
+  BUNDLE_LIBRARY_PATH="$BUNDLE_LIBRARY_PATH:$ROOT/usr/lib64"
+fi
 
 version_greater() {
   [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -n 1)" = "$1" ] && [ "$1" != "$2" ]
@@ -78,7 +82,7 @@ while IFS= read -r -d '' item; do
 
   # Never let the developer machine's Swift toolchain satisfy AppImage
   # dependencies while validating the bundle.
-  dependencies="$(env -u LD_LIBRARY_PATH -u LD_PRELOAD ldd "$item" 2>&1 || true)"
+  dependencies="$(env -u LD_PRELOAD LD_LIBRARY_PATH="$BUNDLE_LIBRARY_PATH" ldd "$item" 2>&1 || true)"
   while IFS= read -r dependency; do
     [ -n "$dependency" ] || continue
     printf 'Unresolved AppImage dependency: %s: %s\n' "$item" "$dependency" >&2

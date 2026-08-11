@@ -10,12 +10,12 @@ fi
 VERSION="$1"
 APPIMAGE="$2"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BASE_URL="${SOA_UPDATE_BASE_URL:-https://r2.storyofalicia.com/launcher}"
+BASE_URL="${SOA_UPDATE_BASE_URL:-https://r2.storyofalicia.com/launcher/linux}"
 GITHUB_REPOSITORY="${SOA_UPDATE_GITHUB_REPOSITORY:-Story-Of-Alicia/soa-launcher-qt}"
 SIGNING_KEY="${SOA_UPDATE_SIGNING_KEY:-}"
 HISTORY_INPUT="${SOA_UPDATE_HISTORY_INPUT:-}"
-MANIFEST="$SCRIPT_DIR/linux_launcher_version.json"
-HISTORY="$SCRIPT_DIR/linux_launcher_versions.json"
+MANIFEST="$SCRIPT_DIR/version.json"
+HISTORY="$SCRIPT_DIR/versions.json"
 
 for command_name in jq openssl sha256sum stat base64; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
@@ -74,10 +74,11 @@ if [ -n "$HISTORY_INPUT" ] && [ -f "$HISTORY_INPUT" ]; then
         sha256, size, released_at, required}
        | with_entries(select(.value != null));
      {schema: 1, platform: "linux-x86_64",
-      releases: ([.releases[] | release_fields
-                  | select(.version != $current[0].version)]
-                 + [($current[0] | release_fields)])
-                | sort_by(.version)}' "$HISTORY_INPUT" >"$HISTORY"
+      releases: (([.releases[] | release_fields
+                   | select(.version != $current[0].version)]
+                  + [($current[0] | release_fields)])
+                 | sort_by(.released_at)
+                 | if length > 3 then .[-3:] else . end)}' "$HISTORY_INPUT" >"$HISTORY"
 else
   jq -n --slurpfile current "$MANIFEST" \
     '{schema: 1, platform: "linux-x86_64", releases: $current}' >"$HISTORY"

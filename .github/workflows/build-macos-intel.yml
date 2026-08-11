@@ -181,7 +181,10 @@ jobs:
 
       - name: Package macOS DMG
         working-directory: ${{ github.workspace }}/build
-        run: cpack -G DragNDrop --verbose
+        run: |
+          set -euo pipefail
+          cpack -G DragNDrop --verbose
+          test -s "Story_Of_Alicia-x86_64.dmg"
 
       - name: Sign and notarize macOS DMG
         if: env.SOA_SIGNING_ENABLED == '1'
@@ -192,8 +195,8 @@ jobs:
           NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
         run: |
           set -euo pipefail
-          DMG="$(find . -maxdepth 1 -type f -name '*.dmg' -print -quit)"
-          test -n "$DMG"
+          DMG="Story_Of_Alicia-x86_64.dmg"
+          test -s "$DMG"
           codesign --force --timestamp --sign "$SIGNING_IDENTITY" "$DMG"
           codesign --verify --strict --verbose=4 "$DMG"
           MOUNT="$RUNNER_TEMP/soa-dmg-x86_64"
@@ -225,7 +228,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: soa-launcher-macos-x86_64-dmg
-          path: ${{ github.workspace }}/build/*.dmg
+          path: ${{ github.workspace }}/build/Story_Of_Alicia-x86_64.dmg
           if-no-files-found: error
           retention-days: 7
 

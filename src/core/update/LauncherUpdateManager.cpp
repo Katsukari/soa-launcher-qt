@@ -21,13 +21,23 @@
 #endif
 
 #ifndef SOA_LAUNCHER_UPDATE_MANIFEST_URL
+#if defined(Q_OS_MACOS)
 #define SOA_LAUNCHER_UPDATE_MANIFEST_URL \
-    "https://r2.storyofalicia.com/launcher/linux_launcher_version.json"
+    "https://r2.storyofalicia.com/launcher/macos/version.json"
+#else
+#define SOA_LAUNCHER_UPDATE_MANIFEST_URL \
+    "https://r2.storyofalicia.com/launcher/linux/version.json"
+#endif
 #endif
 
 #ifndef SOA_LAUNCHER_UPDATE_FALLBACK_MANIFEST_URL
+#if defined(Q_OS_MACOS)
 #define SOA_LAUNCHER_UPDATE_FALLBACK_MANIFEST_URL \
-    "https://github.com/Story-Of-Alicia/soa-launcher-qt/releases/latest/download/linux_launcher_version.json"
+    "https://r2.storyofalicia.com/launcher/macos/version.json"
+#else
+#define SOA_LAUNCHER_UPDATE_FALLBACK_MANIFEST_URL \
+    "https://r2.storyofalicia.com/launcher/linux/version.json"
+#endif
 #endif
 
 #ifndef SOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX
@@ -68,7 +78,11 @@ namespace core::update
         const QByteArray platform_bytes = detected_platform_key().toUtf8();
         const QByteArray directory_bytes = download_directory().toUtf8();
         const QByteArray user_agent = QByteArray("Story-Of-Alicia-Launcher/") + SOA_LAUNCHER_VERSION;
-        if (platform_bytes != QByteArrayLiteral("linux-x86_64"))
+        const bool supported_platform =
+            platform_bytes == QByteArrayLiteral("linux-x86_64")
+            || platform_bytes == QByteArrayLiteral("macos-arm64")
+            || platform_bytes == QByteArrayLiteral("macos-x86_64");
+        if (!supported_platform)
         {
             configuration_error = util::i18n::translate(
                 "Launcher self-updates are not available on this platform yet.");
