@@ -1,0 +1,198 @@
+import Foundation
+import Soa_Courier
+
+@_cdecl("soa_http_client_create")
+public func soa_http_client_create(_ httpDone: soa_http_done_cb?,
+                                   _ dnsDone: soa_dns_done_cb?,
+                                   _ context: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer?
+{
+    guard let httpDone, let dnsDone else { return nil }
+    return Unmanaged.passRetained(SwiftHttpClient(
+        httpDone: httpDone,
+        dnsDone: dnsDone,
+        context: context)).toOpaque()
+}
+
+@_cdecl("soa_http_client_shutdown")
+public func soa_http_client_shutdown(_ pointer: UnsafeMutableRawPointer?)
+{
+    guard let pointer else { return }
+    Unmanaged<SwiftHttpClient>.fromOpaque(pointer).takeUnretainedValue().shutdown()
+}
+
+@_cdecl("soa_http_client_destroy")
+public func soa_http_client_destroy(_ pointer: UnsafeMutableRawPointer?)
+{
+    guard let pointer else { return }
+    let client = Unmanaged<SwiftHttpClient>.fromOpaque(pointer).takeRetainedValue()
+    client.shutdown()
+}
+
+@_cdecl("soa_http_client_request")
+public func soa_http_client_request(_ pointer: UnsafeMutableRawPointer?,
+                                    _ url: UnsafePointer<CChar>?,
+                                    _ method: soa_http_method,
+                                    _ timeoutMilliseconds: UInt32,
+                                    _ maximumBytes: UInt64,
+                                    _ accept: UnsafePointer<CChar>?,
+                                    _ userAgent: UnsafePointer<CChar>?,
+                                    _ allowInsecureHTTP: Bool) -> UInt64
+{
+    guard let pointer, let url else { return 0 }
+    let client = Unmanaged<SwiftHttpClient>.fromOpaque(pointer).takeUnretainedValue()
+    return client.request(
+        urlText: String(cString: url),
+        method: method,
+        timeoutMilliseconds: timeoutMilliseconds,
+        maximumBytes: maximumBytes,
+        accept: cStringValue(accept),
+        userAgent: cStringValue(userAgent),
+        allowInsecureHTTP: allowInsecureHTTP)
+}
+
+@_cdecl("soa_http_client_resolve")
+public func soa_http_client_resolve(_ pointer: UnsafeMutableRawPointer?,
+                                    _ hostname: UnsafePointer<CChar>?,
+                                    _ timeoutMilliseconds: UInt32) -> UInt64
+{
+    guard let pointer, let hostname else { return 0 }
+    let client = Unmanaged<SwiftHttpClient>.fromOpaque(pointer).takeUnretainedValue()
+    return client.resolve(
+        hostname: String(cString: hostname),
+        timeoutMilliseconds: timeoutMilliseconds)
+}
+
+@_cdecl("soa_http_client_cancel")
+public func soa_http_client_cancel(_ pointer: UnsafeMutableRawPointer?, _ requestID: UInt64)
+{
+    guard let pointer else { return }
+    Unmanaged<SwiftHttpClient>.fromOpaque(pointer).takeUnretainedValue().cancel(requestID)
+}
+
+@_cdecl("soa_http_client_cancel_all")
+public func soa_http_client_cancel_all(_ pointer: UnsafeMutableRawPointer?)
+{
+    guard let pointer else { return }
+    Unmanaged<SwiftHttpClient>.fromOpaque(pointer).takeUnretainedValue().cancelAll()
+}
+
+@_cdecl("soa_launcher_updater_create")
+public func soa_launcher_updater_create(
+    _ manifestURL: UnsafePointer<CChar>?,
+    _ fallbackManifestURL: UnsafePointer<CChar>?,
+    _ publicKeyHex: UnsafePointer<CChar>?,
+    _ currentVersion: UnsafePointer<CChar>?,
+    _ platform: UnsafePointer<CChar>?,
+    _ downloadDirectory: UnsafePointer<CChar>?,
+    _ userAgent: UnsafePointer<CChar>?,
+    _ allowInsecureHTTP: Bool,
+    _ checkDone: soa_launcher_check_cb?,
+    _ progress: soa_launcher_progress_cb?,
+    _ downloadDone: soa_launcher_download_cb?,
+    _ context: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer?
+{
+    guard let manifestURL,
+          let fallbackManifestURL,
+          let publicKeyHex,
+          let currentVersion,
+          let platform,
+          let downloadDirectory,
+          let checkDone,
+          let progress,
+          let downloadDone else { return nil }
+    let updater = LauncherUpdateService(
+        manifestURL: String(cString: manifestURL),
+        fallbackManifestURL: String(cString: fallbackManifestURL),
+        publicKeyHex: String(cString: publicKeyHex),
+        currentVersion: String(cString: currentVersion),
+        platform: String(cString: platform),
+        downloadDirectory: String(cString: downloadDirectory),
+        userAgent: cStringValue(userAgent),
+        allowInsecureHTTP: allowInsecureHTTP,
+        checkDone: checkDone,
+        progress: progress,
+        downloadDone: downloadDone,
+        context: context)
+    return Unmanaged.passRetained(updater).toOpaque()
+}
+
+@_cdecl("soa_launcher_updater_shutdown")
+public func soa_launcher_updater_shutdown(_ pointer: UnsafeMutableRawPointer?)
+{
+    guard let pointer else { return }
+    Unmanaged<LauncherUpdateService>.fromOpaque(pointer).takeUnretainedValue().shutdown()
+}
+
+@_cdecl("soa_launcher_updater_destroy")
+public func soa_launcher_updater_destroy(_ pointer: UnsafeMutableRawPointer?)
+{
+    guard let pointer else { return }
+    let updater = Unmanaged<LauncherUpdateService>.fromOpaque(pointer).takeRetainedValue()
+    updater.shutdown()
+}
+
+@_cdecl("soa_launcher_updater_check")
+public func soa_launcher_updater_check(_ pointer: UnsafeMutableRawPointer?)
+{
+    guard let pointer else { return }
+    Unmanaged<LauncherUpdateService>.fromOpaque(pointer).takeUnretainedValue().check()
+}
+
+@_cdecl("soa_launcher_updater_download")
+public func soa_launcher_updater_download(_ pointer: UnsafeMutableRawPointer?)
+{
+    guard let pointer else { return }
+    Unmanaged<LauncherUpdateService>.fromOpaque(pointer).takeUnretainedValue().download()
+}
+
+@_cdecl("soa_launcher_updater_cancel")
+public func soa_launcher_updater_cancel(_ pointer: UnsafeMutableRawPointer?)
+{
+    guard let pointer else { return }
+    Unmanaged<LauncherUpdateService>.fromOpaque(pointer).takeUnretainedValue().cancel()
+}
+
+@_cdecl("soa_discord_rpc_create")
+public func soa_discord_rpc_create(_ applicationID: UnsafePointer<CChar>?,
+                                   _ processID: Int64,
+                                   _ proxyBaseURL: UnsafePointer<CChar>?) -> UnsafeMutableRawPointer?
+{
+    guard let applicationID else { return nil }
+    let proxy = cStringValue(proxyBaseURL)
+    let service = DiscordRpcService(
+        applicationID: String(cString: applicationID),
+        processID: processID,
+        proxyBaseURL: proxy.isEmpty ? "http://127.0.0.1:18080" : proxy)
+    return Unmanaged.passRetained(service).toOpaque()
+}
+
+@_cdecl("soa_discord_rpc_set_launcher_presence")
+public func soa_discord_rpc_set_launcher_presence(_ pointer: UnsafeMutableRawPointer?)
+{
+    guard let pointer else { return }
+    Unmanaged<DiscordRpcService>.fromOpaque(pointer).takeUnretainedValue().setLauncherPresence()
+}
+
+@_cdecl("soa_discord_rpc_set_game_presence")
+public func soa_discord_rpc_set_game_presence(_ pointer: UnsafeMutableRawPointer?,
+                                              _ username: UnsafePointer<CChar>?)
+{
+    guard let pointer else { return }
+    Unmanaged<DiscordRpcService>.fromOpaque(pointer).takeUnretainedValue()
+        .setGamePresence(username: cStringValue(username))
+}
+
+@_cdecl("soa_discord_rpc_shutdown")
+public func soa_discord_rpc_shutdown(_ pointer: UnsafeMutableRawPointer?)
+{
+    guard let pointer else { return }
+    Unmanaged<DiscordRpcService>.fromOpaque(pointer).takeUnretainedValue().shutdown()
+}
+
+@_cdecl("soa_discord_rpc_destroy")
+public func soa_discord_rpc_destroy(_ pointer: UnsafeMutableRawPointer?)
+{
+    guard let pointer else { return }
+    let service = Unmanaged<DiscordRpcService>.fromOpaque(pointer).takeRetainedValue()
+    service.shutdown()
+}

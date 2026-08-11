@@ -12,8 +12,7 @@ private final class LimitedDataDelegate: NSObject, URLSessionDataDelegate, URLSe
     private let allowedHost: String
     private let allowedPort: Int?
     private let queue: OperationQueue
-    private var session: URLSession?
-    private var task: URLSessionDataTask?
+    private let cancellation = URLSessionTaskCancellationGate()
     private var continuation: CheckedContinuation<Data, Error>?
     private var payload = Data()
     private var terminalError: Error?
@@ -38,13 +37,11 @@ private final class LimitedDataDelegate: NSObject, URLSessionDataDelegate, URLSe
             try await withCheckedThrowingContinuation { continuation in
                 self.continuation = continuation
                 let session = URLSession(configuration: configuration, delegate: self, delegateQueue: queue)
-                self.session = session
                 let task = session.dataTask(with: url)
-                self.task = task
-                task.resume()
+                self.cancellation.start(task)
             }
         }, onCancel: {
-            self.task?.cancel()
+            self.cancellation.cancel()
         })
     }
 
@@ -105,8 +102,7 @@ private final class LimitedDataDelegate: NSObject, URLSessionDataDelegate, URLSe
         guard !completed else { return }
         completed = true
         defer {
-            self.task = nil
-            self.session = nil
+            cancellation.clear()
             session.finishTasksAndInvalidate()
             continuation = nil
         }

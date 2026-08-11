@@ -5,19 +5,42 @@ if(CMAKE_HOST_APPLE AND NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
 endif()
 
 project(soa_launcher
-        LANGUAGES CXX
+        LANGUAGES C CXX
         DESCRIPTION "Story of Alicia Launcher"
         VERSION 1.0.0
 )
 
-if(DEFINED ENV{GITHUB_REPOSITORY} AND NOT "$ENV{GITHUB_REPOSITORY}" STREQUAL "")
-    set(SOA_LAUNCHER_GITHUB_REPOSITORY_DEFAULT "$ENV{GITHUB_REPOSITORY}")
+if(APPLE)
+    set(SOA_LAUNCHER_UPDATE_MANIFEST_URL
+        "https://r2.storyofalicia.com/launcher/macos/version.json"
+        CACHE STRING "HTTPS URL of the launcher update manifest")
+    set(SOA_LAUNCHER_UPDATE_FALLBACK_MANIFEST_URL
+        "https://r2.storyofalicia.com/launcher/macos/version.json"
+        CACHE STRING "Fallback HTTPS URL of the launcher update manifest")
 else()
-    set(SOA_LAUNCHER_GITHUB_REPOSITORY_DEFAULT "Story-Of-Alicia/soa-launcher-qt")
+    set(SOA_LAUNCHER_UPDATE_MANIFEST_URL
+        "https://r2.storyofalicia.com/launcher/linux/version.json"
+        CACHE STRING "HTTPS URL of the launcher update manifest")
+    set(SOA_LAUNCHER_UPDATE_FALLBACK_MANIFEST_URL
+        "https://r2.storyofalicia.com/launcher/linux/version.json"
+        CACHE STRING "Fallback HTTPS URL of the launcher update manifest")
 endif()
-set(SOA_LAUNCHER_GITHUB_REPOSITORY
-    "${SOA_LAUNCHER_GITHUB_REPOSITORY_DEFAULT}"
-    CACHE STRING "GitHub owner/repository used for launcher releases")
+set(SOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX
+    "f3c027a5393a7f839644d2181b3f51c859f8bf4978e1b7733b95d815352d6c3f"
+    CACHE STRING "Raw Ed25519 update-signing public key as 64 hexadecimal characters")
+
+string(LENGTH
+        "${SOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX}"
+        SOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX_LENGTH
+)
+
+if(SOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX)
+    if(NOT SOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX_LENGTH EQUAL 64
+            OR NOT SOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX MATCHES "^[0-9A-Fa-f]+$")
+        message(FATAL_ERROR
+                "SOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX must be exactly 64 hexadecimal characters")
+    endif()
+endif()
 set(SOA_RULES_DOCUMENT_URL
     "https://docs.google.com/document/d/1vry3ZuDtzdS_mX1P2udWlb8z2Q9Atr3p1THZdtZ2EHA/export?format=html"
     CACHE STRING "HTTPS URL of the authoritative rules document")
@@ -41,6 +64,8 @@ set(CMAKE_AUTORCC ON)
 
 include(CTest)
 option(SOA_ALLOW_FETCHCONTENT "Allow downloading missing dependencies during configure" ON)
+option(SOA_REQUIRE_ALICIA_LOG_HOOK
+       "Fail configuration unless the Windows x86 Alicia diagnostic hook can be built" OFF)
 
 set(SOA_PORTABLE_CXX_OPTIONS)
 
@@ -100,8 +125,23 @@ add_library(soa_network SHARED
         src/core/network/CourierTypes.swift
         src/core/network/CourierABI.swift
         src/core/network/CourierPing.swift
+        src/core/network/NetworkFoundation.swift
+        src/core/network/SwiftHttpClient.swift
+        src/core/network/LauncherUpdateService.swift
+        src/core/network/DiscordRpcService.swift
+        src/core/network/SwiftNetworkABI.swift
         src/core/network/MD5.swift
 )
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    find_package(OpenSSL 3.0 REQUIRED COMPONENTS Crypto)
+    target_sources(soa_network PRIVATE
+            src/core/network/UpdateSignature.c
+    )
+    target_link_libraries(soa_network PRIVATE
+            OpenSSL::Crypto
+    )
+endif()
 
 target_compile_options(soa_network PRIVATE
         "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xcc -fmodule-map-file=${CMAKE_CURRENT_SOURCE_DIR}/src/core/network/module.modulemap>"
@@ -142,16 +182,22 @@ set(LAUNCHER_SOURCES
         src/core/Log.cpp
         src/core/discord/DiscordRpc.cpp
         src/core/wine/Shell.cpp
+        src/core/wine/ProcessRunner.cpp
+        src/core/wine/RuntimeLocator.cpp
+        src/core/wine/RuntimeEnvironment.cpp
+        src/core/wine/PrefixSetupJob.cpp
+        src/core/wine/GameSession.cpp
+        src/core/wine/GamePhase.cpp
+        src/core/wine/AliciaLogHook.cpp
+        src/core/wine/MacLaunchDiagnostics.cpp
         src/core/wine/WineProcess.cpp
         src/core/wine/MacWineRuntime.cpp
-        src/core/runtime/RuntimeManifest.cpp
-        src/core/runtime/RuntimeManager.cpp
-        src/core/runtime/RuntimeProvider.cpp
         src/core/system/SystemProfile.cpp
         src/core/integrity/GameIntegrityWatcher.cpp
         src/core/update/LauncherUpdateManager.cpp
         src/core/wine/PrefixInspector.cpp
         src/core/network/Courier.cpp
+        src/core/network/SwiftHttpClient.cpp
         src/core/auth/AuthHandler.cpp
         src/util/Config.cpp
         src/util/CredentialStore.cpp
@@ -191,11 +237,14 @@ set(LAUNCHER_HEADERS
         include/widgets/LauncherLog.hpp
         include/widgets/AdvancedSettings.hpp
         include/core/wine/Shell.hpp
+        include/core/wine/ProcessRunner.hpp
+        include/core/wine/RuntimeLocator.hpp
+        include/core/wine/PrefixSetupJob.hpp
+        include/core/wine/GameSession.hpp
+        include/core/wine/AliciaLogHook.hpp
+        include/core/wine/MacLaunchDiagnostics.hpp
         include/core/wine/WineProcess.hpp
         include/core/wine/MacWineRuntime.hpp
-        include/core/runtime/RuntimeManifest.hpp
-        include/core/runtime/RuntimeManager.hpp
-        include/core/runtime/RuntimeProvider.hpp
         include/core/system/SystemProfile.hpp
         include/core/integrity/GameIntegrityWatcher.hpp
         include/core/update/LauncherUpdateManager.hpp
@@ -205,7 +254,9 @@ set(LAUNCHER_HEADERS
         include/core/discord/DiscordRpc.hpp
         include/util/Styles.hpp
         include/core/network/Courier.h
+        include/core/network/SwiftNetwork.h
         include/core/network/CourierBridge.hpp
+        include/core/network/SwiftHttpClient.hpp
         include/core/auth/AuthHandler.hpp
         include/util/Config.hpp
         include/util/CredentialStore.hpp
@@ -234,11 +285,6 @@ set(SOA_PLATFORM_RESOURCES)
 
 if(APPLE)
     set(SOA_MACOS_ICON "${CMAKE_CURRENT_SOURCE_DIR}/packaging/macos/soa-launcher.icns")
-    set(SOA_MACOS_RUNTIME_PACKAGE "" CACHE PATH
-        "Runtime package root containing runtime.json and payload/StoryOfAliciaRuntime.app")
-    option(SOA_REQUIRE_BUNDLED_RUNTIME
-        "Fail configuration when the launcher-owned macOS runtime package is unavailable"
-        OFF)
 
     set_source_files_properties(${SOA_MACOS_ICON} PROPERTIES
             MACOSX_PACKAGE_LOCATION "Resources"
@@ -248,65 +294,6 @@ if(APPLE)
             ${SOA_MACOS_ICON}
     )
 
-    set(SOA_RESOLVED_MACOS_RUNTIME_PACKAGE "")
-    if(SOA_MACOS_RUNTIME_PACKAGE)
-        get_filename_component(SOA_RESOLVED_MACOS_RUNTIME_PACKAGE
-            "${SOA_MACOS_RUNTIME_PACKAGE}" REALPATH)
-    else()
-        file(GLOB _SOA_RUNTIME_MANIFESTS
-            LIST_DIRECTORIES FALSE
-            "${CMAKE_CURRENT_SOURCE_DIR}/../soa_wine_runtime/runtime/out/packages/*/*/runtime.json")
-        if(_SOA_RUNTIME_MANIFESTS)
-            list(SORT _SOA_RUNTIME_MANIFESTS COMPARE NATURAL ORDER ASCENDING)
-            list(GET _SOA_RUNTIME_MANIFESTS -1 _SOA_RUNTIME_MANIFEST)
-            get_filename_component(SOA_RESOLVED_MACOS_RUNTIME_PACKAGE
-                "${_SOA_RUNTIME_MANIFEST}" DIRECTORY)
-        endif()
-        unset(_SOA_RUNTIME_MANIFESTS)
-        unset(_SOA_RUNTIME_MANIFEST)
-    endif()
-
-    if(SOA_RESOLVED_MACOS_RUNTIME_PACKAGE)
-        set(_SOA_RUNTIME_MANIFEST
-            "${SOA_RESOLVED_MACOS_RUNTIME_PACKAGE}/runtime.json")
-        set(_SOA_RUNTIME_APP
-            "${SOA_RESOLVED_MACOS_RUNTIME_PACKAGE}/payload/StoryOfAliciaRuntime.app")
-        set(_SOA_RUNTIME_WINE
-            "${_SOA_RUNTIME_APP}/Contents/Resources/wine/bin/wine")
-        set(_SOA_RUNTIME_SELF_TEST
-            "${_SOA_RUNTIME_APP}/Contents/Resources/tools/self-test-macos.sh")
-        if(NOT EXISTS "${_SOA_RUNTIME_MANIFEST}"
-            OR NOT IS_DIRECTORY "${_SOA_RUNTIME_APP}"
-            OR NOT EXISTS "${_SOA_RUNTIME_WINE}"
-            OR NOT EXISTS "${_SOA_RUNTIME_SELF_TEST}")
-            message(FATAL_ERROR
-                "SOA_MACOS_RUNTIME_PACKAGE is incomplete: ${SOA_RESOLVED_MACOS_RUNTIME_PACKAGE}")
-        endif()
-        find_package(Python3 REQUIRED COMPONENTS Interpreter)
-        execute_process(
-            COMMAND "${Python3_EXECUTABLE}"
-                    "${CMAKE_CURRENT_SOURCE_DIR}/packaging/macos/verify-runtime-package.py"
-                    "${SOA_RESOLVED_MACOS_RUNTIME_PACKAGE}"
-            RESULT_VARIABLE _SOA_RUNTIME_VERIFY_RESULT
-            OUTPUT_VARIABLE _SOA_RUNTIME_VERIFY_OUTPUT
-            ERROR_VARIABLE _SOA_RUNTIME_VERIFY_ERROR
-        )
-        if(NOT _SOA_RUNTIME_VERIFY_RESULT STREQUAL "0")
-            message(FATAL_ERROR
-                "SOA_MACOS_RUNTIME_PACKAGE failed immutable-payload verification:\n"
-                "${_SOA_RUNTIME_VERIFY_OUTPUT}${_SOA_RUNTIME_VERIFY_ERROR}")
-        endif()
-        message(STATUS
-            "Bundling Story of Alicia runtime package: ${SOA_RESOLVED_MACOS_RUNTIME_PACKAGE}")
-    elseif(SOA_REQUIRE_BUNDLED_RUNTIME)
-        message(FATAL_ERROR
-            "A macOS distribution build requires the launcher-owned runtime package. "
-            "Build soa_wine_runtime first or set -DSOA_MACOS_RUNTIME_PACKAGE=/path/to/package.")
-    else()
-        message(WARNING
-            "Building a developer-only macOS launcher without its runtime. "
-            "Distribution builds must set SOA_REQUIRE_BUNDLED_RUNTIME=ON.")
-    endif()
 endif()
 
 qt_add_executable(${PROJECT_NAME}
@@ -315,6 +302,77 @@ qt_add_executable(${PROJECT_NAME}
         src/res/resources.qrc
         ${SOA_PLATFORM_RESOURCES}
 )
+
+set(SOA_ALICIA_LOG_HOOK_SOURCE_DIR
+    "${CMAKE_CURRENT_SOURCE_DIR}/third_party/alicia-log-hook")
+set(SOA_ALICIA_LOG_HOOK_OUTPUT_DIR
+    "${CMAKE_CURRENT_BINARY_DIR}/alicia-log-hook")
+set(SOA_ALICIA_LOG_HOOK_INJECTOR
+    "${SOA_ALICIA_LOG_HOOK_OUTPUT_DIR}/SoaAliciaLogInjector.exe")
+set(SOA_ALICIA_LOG_HOOK_DLL
+    "${SOA_ALICIA_LOG_HOOK_OUTPUT_DIR}/SoaAliciaLogHook.dll")
+
+find_program(SOA_MINGW_C_COMPILER NAMES i686-w64-mingw32-gcc)
+find_program(SOA_MINGW_CXX_COMPILER NAMES i686-w64-mingw32-g++)
+
+if(SOA_MINGW_C_COMPILER AND SOA_MINGW_CXX_COMPILER)
+    file(GLOB_RECURSE SOA_ALICIA_LOG_HOOK_INPUTS CONFIGURE_DEPENDS
+            "${SOA_ALICIA_LOG_HOOK_SOURCE_DIR}/src/*"
+            "${SOA_ALICIA_LOG_HOOK_SOURCE_DIR}/minhook/include/*"
+            "${SOA_ALICIA_LOG_HOOK_SOURCE_DIR}/minhook/src/*"
+    )
+    find_program(SOA_ALICIA_LOG_HOOK_BASH bash)
+    if(NOT SOA_ALICIA_LOG_HOOK_BASH)
+        set(SOA_ALICIA_LOG_HOOK_BASH "/bin/bash")
+    endif()
+
+    add_custom_command(
+            OUTPUT
+            "${SOA_ALICIA_LOG_HOOK_INJECTOR}"
+            "${SOA_ALICIA_LOG_HOOK_DLL}"
+            COMMAND
+            # Invoked through bash rather than executed directly: zip archives
+            # do not always carry the executable bit, and a stripped +x here
+            # fails the whole build with a bare "Permission denied" (exit 126).
+            "${SOA_ALICIA_LOG_HOOK_BASH}"
+            "${SOA_ALICIA_LOG_HOOK_SOURCE_DIR}/build-x86.sh"
+            "${SOA_ALICIA_LOG_HOOK_OUTPUT_DIR}"
+            "${SOA_MINGW_C_COMPILER}"
+            "${SOA_MINGW_CXX_COMPILER}"
+            DEPENDS
+            ${SOA_ALICIA_LOG_HOOK_INPUTS}
+            "${SOA_ALICIA_LOG_HOOK_SOURCE_DIR}/build-x86.sh"
+            COMMENT "Building the Windows x86 Alicia injector and compatibility hook"
+            VERBATIM
+    )
+    if(APPLE)
+        add_executable(soa_audio_host
+            "${SOA_ALICIA_LOG_HOOK_SOURCE_DIR}/src/soa-audio-host.c")
+        set_target_properties(soa_audio_host PROPERTIES
+            OUTPUT_NAME "soa-audio-host"
+            RUNTIME_OUTPUT_DIRECTORY "${SOA_ALICIA_LOG_HOOK_OUTPUT_DIR}")
+        target_link_libraries(soa_audio_host PRIVATE
+            "-framework AudioToolbox" "-framework CoreFoundation")
+    endif()
+
+    add_custom_target(soa_alicia_log_hook ALL
+            DEPENDS
+            "${SOA_ALICIA_LOG_HOOK_INJECTOR}"
+            "${SOA_ALICIA_LOG_HOOK_DLL}"
+    )
+    add_dependencies(${PROJECT_NAME} soa_alicia_log_hook)
+    set(SOA_ALICIA_LOG_HOOK_AVAILABLE ON)
+else()
+    set(SOA_ALICIA_LOG_HOOK_AVAILABLE OFF)
+    if(SOA_REQUIRE_ALICIA_LOG_HOOK)
+        message(FATAL_ERROR
+                "The Alicia diagnostic hook requires i686-w64-mingw32-gcc and "
+                "i686-w64-mingw32-g++")
+    endif()
+    message(WARNING
+            "Windows x86 MinGW was not found; this developer build will not include "
+            "the optional Alicia diagnostic log hook")
+endif()
 
 set(SOA_TRANSLATION_FILES
         translations/soa_launcher_nb.ts
@@ -332,17 +390,6 @@ else()
             TS_FILES ${SOA_TRANSLATION_FILES}
             RESOURCE_PREFIX "/i18n"
     )
-endif()
-
-if(APPLE AND SOA_RESOLVED_MACOS_RUNTIME_PACKAGE)
-    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-        COMMAND "${CMAKE_COMMAND}" -E remove_directory
-                "$<TARGET_BUNDLE_CONTENT_DIR:${PROJECT_NAME}>/Resources/Story of Alicia Runtime"
-        COMMAND /usr/bin/ditto
-                "${SOA_RESOLVED_MACOS_RUNTIME_PACKAGE}"
-                "$<TARGET_BUNDLE_CONTENT_DIR:${PROJECT_NAME}>/Resources/Story of Alicia Runtime"
-        VERBATIM
-        COMMENT "Bundling the verified Story of Alicia runtime package")
 endif()
 
 target_include_directories(${PROJECT_NAME} PRIVATE
@@ -368,7 +415,9 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 target_compile_definitions(${PROJECT_NAME} PRIVATE
         SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE
         SOA_LAUNCHER_VERSION="${PROJECT_VERSION}"
-        SOA_LAUNCHER_GITHUB_REPOSITORY="${SOA_LAUNCHER_GITHUB_REPOSITORY}"
+        SOA_LAUNCHER_UPDATE_MANIFEST_URL="${SOA_LAUNCHER_UPDATE_MANIFEST_URL}"
+        SOA_LAUNCHER_UPDATE_FALLBACK_MANIFEST_URL="${SOA_LAUNCHER_UPDATE_FALLBACK_MANIFEST_URL}"
+        SOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX="${SOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX}"
         SOA_RULES_DOCUMENT_URL="${SOA_RULES_DOCUMENT_URL}"
 )
 
@@ -407,7 +456,36 @@ if(APPLE)
             "$<TARGET_BUNDLE_DIR:${PROJECT_NAME}>/Contents/Frameworks/$<TARGET_FILE_NAME:soa_network>"
             VERBATIM
     )
+    if(SOA_ALICIA_LOG_HOOK_AVAILABLE)
+        if(TARGET soa_audio_host)
+            add_dependencies(${PROJECT_NAME} soa_audio_host)
+        endif()
+        add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E make_directory
+                "$<TARGET_BUNDLE_DIR:${PROJECT_NAME}>/Contents/Resources/alicia-log-hook"
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${SOA_ALICIA_LOG_HOOK_INJECTOR}"
+                "$<TARGET_BUNDLE_DIR:${PROJECT_NAME}>/Contents/Resources/alicia-log-hook/SoaAliciaLogInjector.exe"
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${SOA_ALICIA_LOG_HOOK_DLL}"
+                "$<TARGET_BUNDLE_DIR:${PROJECT_NAME}>/Contents/Resources/alicia-log-hook/SoaAliciaLogHook.dll"
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${SOA_ALICIA_LOG_HOOK_OUTPUT_DIR}/soa-audio-host"
+                "$<TARGET_BUNDLE_DIR:${PROJECT_NAME}>/Contents/Resources/alicia-log-hook/soa-audio-host"
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${CMAKE_CURRENT_SOURCE_DIR}/third_party/alicia-log-hook/README.md"
+                "$<TARGET_BUNDLE_DIR:${PROJECT_NAME}>/Contents/Resources/alicia-log-hook/README.md"
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${SOA_ALICIA_LOG_HOOK_SOURCE_DIR}/minhook/LICENSE.txt"
+                "$<TARGET_BUNDLE_DIR:${PROJECT_NAME}>/Contents/Resources/alicia-log-hook/MINHOOK_LICENSE.txt"
+                VERBATIM
+        )
+    endif()
 else()
+    set_target_properties(soa_network PROPERTIES
+            INSTALL_RPATH "$ORIGIN"
+    )
+
     set_target_properties(${PROJECT_NAME} PROPERTIES
             INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}"
     )
@@ -423,13 +501,26 @@ if(NOT APPLE)
             LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
 
-    install(FILES packaging/soa-launcher.desktop
+    install(FILES packaging/linux/soa-launcher.desktop
             DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
     )
 
-    install(FILES packaging/soa-launcher.png
+    install(FILES packaging/linux/soa-launcher.png
             DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps
     )
+    if(SOA_ALICIA_LOG_HOOK_AVAILABLE)
+        install(PROGRAMS "${SOA_ALICIA_LOG_HOOK_INJECTOR}"
+                DESTINATION ${CMAKE_INSTALL_LIBEXECDIR}/soa-launcher/alicia-log-hook
+        )
+        install(FILES "${SOA_ALICIA_LOG_HOOK_DLL}"
+                DESTINATION ${CMAKE_INSTALL_LIBEXECDIR}/soa-launcher/alicia-log-hook
+        )
+        install(FILES
+                third_party/alicia-log-hook/README.md
+                "${SOA_ALICIA_LOG_HOOK_SOURCE_DIR}/minhook/LICENSE.txt"
+                DESTINATION ${CMAKE_INSTALL_DATADIR}/doc/soa-launcher/alicia-log-hook
+        )
+    endif()
 endif()
 
 set(CPACK_PACKAGE_NAME "Story Of Alicia Launcher")
@@ -449,52 +540,72 @@ if(BUILD_TESTING)
 
     find_package(Qt6 REQUIRED COMPONENTS Test)
 
-    qt_add_executable(launcher_tests
-            tests/main.cpp
+    set(SOA_LAUNCHER_TEST_SOURCES
             src/util/LaunchArguments.cpp
             src/util/DesktopEntry.cpp
             src/core/wine/PrefixInspector.cpp
             src/core/wine/WineProcess.cpp
             src/core/wine/MacWineRuntime.cpp
-            src/core/runtime/RuntimeManifest.cpp
-            src/core/runtime/RuntimeManager.cpp
-            src/core/runtime/RuntimeProvider.cpp
+            src/core/wine/ProcessRunner.cpp
+            src/core/wine/RuntimeEnvironment.cpp
+            src/core/wine/GamePhase.cpp
     )
 
-    target_include_directories(launcher_tests PRIVATE
-            ${SOA_INCLUDE_DIRS}
+    set(SOA_LAUNCHER_TEST_TARGETS
+            environment_tests
+            launch_argument_tests
+            prefix_path_tests
+            process_detection_tests
+            prefix_inspector_tests
+            runtime_locator_tests
+            game_profile_tests
     )
 
-    if(SOA_PORTABLE_CXX_OPTIONS)
-        target_compile_options(launcher_tests PRIVATE
-                ${SOA_PORTABLE_CXX_OPTIONS}
+    foreach(soa_test IN LISTS SOA_LAUNCHER_TEST_TARGETS)
+        qt_add_executable(${soa_test}
+                tests/${soa_test}.cpp
+                ${SOA_LAUNCHER_TEST_SOURCES}
         )
-    endif()
 
-    target_link_libraries(launcher_tests PRIVATE
-            Qt6::Core
-            Qt6::Gui
-            Qt6::Widgets
-            Qt6::Test
-            spdlog::spdlog
-    )
+        target_include_directories(${soa_test} PRIVATE
+                ${SOA_INCLUDE_DIRS}
+        )
 
-    set_target_properties(launcher_tests PROPERTIES
-            LINKER_LANGUAGE CXX
-    )
+        if(SOA_PORTABLE_CXX_OPTIONS)
+            target_compile_options(${soa_test} PRIVATE
+                    ${SOA_PORTABLE_CXX_OPTIONS}
+            )
+        endif()
 
-    target_compile_definitions(launcher_tests PRIVATE
-            SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE
-    )
+        target_link_libraries(${soa_test} PRIVATE
+                Qt6::Core
+                Qt6::Gui
+                Qt6::Widgets
+                Qt6::Test
+                spdlog::spdlog
+        )
 
-    add_test(
-            NAME launcher_tests
-            COMMAND launcher_tests
-    )
+        set_target_properties(${soa_test} PROPERTIES
+                LINKER_LANGUAGE CXX
+        )
+
+        target_compile_definitions(${soa_test} PRIVATE
+                SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE
+        )
+
+        add_test(
+                NAME ${soa_test}
+                COMMAND ${soa_test}
+        )
+    endforeach()
 
     add_executable(courier_path_tests
             tests/courier_paths_tests.swift
             src/core/network/CourierPaths.swift
+    )
+
+    target_compile_options(courier_path_tests PRIVATE
+            "$<$<COMPILE_LANGUAGE:Swift>:-parse-as-library>"
     )
 
     set_target_properties(courier_path_tests PROPERTIES
@@ -509,13 +620,13 @@ if(BUILD_TESTING)
             COMMAND courier_path_tests
     )
 
-
     add_executable(courier_cancel_tests
             tests/courier_cancel_tests.swift
             src/core/network/Courier.swift
     )
 
     target_compile_options(courier_cancel_tests PRIVATE
+            "$<$<COMPILE_LANGUAGE:Swift>:-parse-as-library>"
             "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xcc -fmodule-map-file=${CMAKE_CURRENT_SOURCE_DIR}/src/core/network/module.modulemap>"
     )
 
@@ -535,9 +646,42 @@ if(BUILD_TESTING)
             COMMAND courier_cancel_tests
     )
 
+    add_executable(swift_network_abi_tests
+            tests/swift_network_abi_tests.swift
+    )
+
+    target_compile_options(swift_network_abi_tests PRIVATE
+            "$<$<COMPILE_LANGUAGE:Swift>:-parse-as-library>"
+            "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xcc -fmodule-map-file=${CMAKE_CURRENT_SOURCE_DIR}/src/core/network/module.modulemap>"
+    )
+
+    target_include_directories(swift_network_abi_tests PRIVATE
+            include
+    )
+
+    target_link_libraries(swift_network_abi_tests PRIVATE
+            soa_network
+    )
+
+    set_target_properties(swift_network_abi_tests PROPERTIES
+            AUTOMOC OFF
+            AUTORCC OFF
+            AUTOUIC OFF
+            Swift_MODULE_NAME SoaSwiftNetworkABITests
+    )
+
+    add_test(
+            NAME swift_network_abi_tests
+            COMMAND swift_network_abi_tests
+    )
+
     add_executable(courier_hash_tests
             tests/courier_hash_tests.swift
             src/core/network/MD5.swift
+    )
+
+    target_compile_options(courier_hash_tests PRIVATE
+            "$<$<COMPILE_LANGUAGE:Swift>:-parse-as-library>"
     )
 
     set_target_properties(courier_hash_tests PROPERTIES
@@ -551,5 +695,31 @@ if(BUILD_TESTING)
             NAME courier_hash_tests
             COMMAND courier_hash_tests
     )
+
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        add_executable(update_signature_tests
+                tests/update_signature_tests.c
+                src/core/network/UpdateSignature.c
+        )
+
+        target_include_directories(update_signature_tests PRIVATE
+                ${SOA_INCLUDE_DIRS}
+        )
+
+        target_link_libraries(update_signature_tests PRIVATE
+                OpenSSL::Crypto
+        )
+
+        set_target_properties(update_signature_tests PROPERTIES
+                AUTOMOC OFF
+                AUTORCC OFF
+                AUTOUIC OFF
+        )
+
+        add_test(
+                NAME update_signature_tests
+                COMMAND update_signature_tests
+        )
+    endif()
 
 endif()

@@ -1,4 +1,5 @@
 #include "widgets/LauncherSettings.hpp"
+#include "core/network/SwiftHttpClient.hpp"
 #include "widgets/LauncherDialog.hpp"
 
 #include "widgets/ImageDropdown.hpp"
@@ -9,7 +10,6 @@
 #include "util/SimpleUtils.hpp"
 #include "util/DesktopEntry.hpp"
 
-#include <QAbstractSocket>
 #include <QApplication>
 #include <QByteArray>
 #include <QClipboard>
@@ -18,12 +18,7 @@
 #include <QElapsedTimer>
 #include <QFile>
 #include <QFrame>
-#include <QHostAddress>
-#include <QHostInfo>
 #include <QLabel>
-#include <QNetworkAccessManager>
-#include <QNetworkReply>
-#include <QNetworkRequest>
 #include <QProcess>
 #include <QPushButton>
 #include <QSaveFile>
@@ -339,7 +334,7 @@ void LauncherSettings::setup_run_connectivity_test_option()
         });
     });
 
-    network_manager = new QNetworkAccessManager(this);
+    network_manager = new core::network::SwiftHttpClient(this);
     connect(connectivity_button, &QPushButton::clicked,
             this, &LauncherSettings::run_connectivity_check);
 }
@@ -380,31 +375,21 @@ void LauncherSettings::run_connectivity_check()
 
 void LauncherSettings::start_dns_check()
 {
-    const auto timer = QSharedPointer<QElapsedTimer>::create();
-    timer->start();
-    QHostInfo::lookupHost(QStringLiteral("r2.storyofalicia.com"), this,
-                          [this, timer](const QHostInfo& info)
-    {
-        const bool ok = info.error() == QHostInfo::NoError && !info.addresses().isEmpty();
-        QHostAddress address;
-        if (ok)
+    const qulonglong request_id = network_manager->resolve(
+        QStringLiteral("r2.storyofalicia.com"),
+        5000,
+        [this](const core::network::DnsResponse& response)
         {
-            for (const QHostAddress& candidate : info.addresses())
-            {
-                if (candidate.protocol() == QAbstractSocket::IPv4Protocol)
-                {
-                    address = candidate;
-                    break;
-                }
-            }
-            if (address.isNull())
-                address = info.addresses().first();
-        }
-        const QString detail = ok
-            ? QStringLiteral("%1 (%2 ms)").arg(address.toString()).arg(timer->elapsed())
-            : info.errorString();
-        record_connectivity_result(QStringLiteral("DNS"), ok, detail);
-    });
+            const bool ok = response.result == soa_http_result_completed
+                && !response.address.isEmpty();
+            const QString detail = ok
+                ? QStringLiteral("%1 (%2 ms)").arg(response.address).arg(response.elapsed_ms)
+                : response.error;
+            record_connectivity_result(QStringLiteral("DNS"), ok, detail);
+        });
+    if (request_id == 0)
+        record_connectivity_result(QStringLiteral("DNS"), false,
+                                   QStringLiteral("could not start DNS lookup"));
 }
 
 void LauncherSettings::start_ping_check()
@@ -465,32 +450,29 @@ void LauncherSettings::start_ping_check()
 
 void LauncherSettings::start_http_check(const QString& label, const QUrl& url)
 {
-    QNetworkRequest request(url);
-    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
-                         QNetworkRequest::NoLessSafeRedirectPolicy);
-    request.setTransferTimeout(7000);
-    request.setRawHeader(
-        "User-Agent",
-        QByteArray("Story-Of-Alicia-Launcher/") + SOA_LAUNCHER_VERSION);
-
-    const auto timer = QSharedPointer<QElapsedTimer>::create();
-    timer->start();
-    QNetworkReply* reply = network_manager->get(request);
-    connect(reply, &QNetworkReply::finished, this, [this, reply, label, timer]()
-    {
-        const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-        const bool reached = status >= 200 && status < 500;
-        const bool ok = reached && reply->error() != QNetworkReply::SslHandshakeFailedError;
-        QString detail;
-        if (ok)
-            detail = QStringLiteral("reachable (%1 ms)").arg(timer->elapsed());
-        else if (status > 0)
-            detail = QStringLiteral("HTTP %1 (%2 ms)").arg(status).arg(timer->elapsed());
-        else
-            detail = reply->errorString();
-        record_connectivity_result(label, ok, detail);
-        reply->deleteLater();
-    });
+    const QByteArray user_agent = QByteArray("Story-Of-Alicia-Launcher/") + SOA_LAUNCHER_VERSION;
+    const qulonglong request_id = network_manager->get(
+        url,
+        7000,
+        256 * 1024,
+        QByteArray("*/*"),
+        user_agent,
+        false,
+        [this, label](const core::network::HttpResponse& response)
+        {
+            const bool reached = response.status >= 200 && response.status < 500;
+            const bool ok = reached;
+            QString detail;
+            if (ok)
+                detail = QStringLiteral("reachable (%1 ms)").arg(response.elapsed_ms);
+            else if (response.status > 0)
+                detail = QStringLiteral("HTTP %1 (%2 ms)").arg(response.status).arg(response.elapsed_ms);
+            else
+                detail = response.error;
+            record_connectivity_result(label, ok, detail);
+        });
+    if (request_id == 0)
+        record_connectivity_result(label, false, QStringLiteral("could not start request"));
 }
 
 void LauncherSettings::record_connectivity_result(const QString& label, const bool ok,

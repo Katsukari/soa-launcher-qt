@@ -230,16 +230,14 @@ namespace core::wine
             if (!command.contains(wanted, Qt::CaseInsensitive))
                 continue;
 
-
-
-
-
-
             if ((command.contains(QStringLiteral("/desktop="), Qt::CaseInsensitive)
                  && command.contains(QStringLiteral("explorer"), Qt::CaseInsensitive))
                 || command.contains(QStringLiteral("tasklist.exe"), Qt::CaseInsensitive)
                 || command.contains(QStringLiteral("winedbg"), Qt::CaseInsensitive)
-                || command.contains(QStringLiteral("wineconsole"), Qt::CaseInsensitive))
+                || command.contains(QStringLiteral("wineconsole"), Qt::CaseInsensitive)
+                || command.contains(QStringLiteral("SoaAliciaLogInjector.exe"),
+                                    Qt::CaseInsensitive)
+                || command.contains(QStringLiteral("umu-run"), Qt::CaseInsensitive))
             {
                 continue;
             }

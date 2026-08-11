@@ -1,0 +1,80 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-22.04
+    permissions:
+      actions: read
+      contents: write
+
+    steps:
+      - name: Download build artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          mkdir -p release-assets
+          for workflow in build-linux.yml build-macos-arm64.yml build-macos-intel.yml; do
+            run_id="$(gh run list --workflow "$workflow" --commit "$GITHUB_SHA" \
+              --status success --limit 1 --json databaseId --jq '.[0].databaseId')"
+            if [ -z "$run_id" ] || [ "$run_id" = "null" ]; then
+              echo "No successful $workflow run for $GITHUB_SHA" >&2
+              exit 1
+            fi
+            gh run download "$run_id" --dir release-assets
+          done
+
+      - name: Verify release packages
+        run: |
+          set -euo pipefail
+          mapfile -t packages < <(find release-assets -type f \
+            \( -name '*.AppImage' -o -name '*.dmg' \) -print | sort)
+          if [ "${#packages[@]}" -ne 3 ]; then
+            printf 'Expected one AppImage and two DMGs, found %s:\n' "${#packages[@]}" >&2
+            printf '%s\n' "${packages[@]}" >&2
+            exit 1
+          fi
+          mapfile -t metadata < <(find release-assets -type f \
+            \( -name 'version.json' \
+               -o -name 'version.json.sig' \
+               -o -name 'versions.json' \
+               -o -name 'versions.json.sig' \) -print | sort)
+          if [ "${#metadata[@]}" -ne 4 ]; then
+            printf 'Expected four signed Linux metadata files, found %s:\n' "${#metadata[@]}" >&2
+            printf '%s\n' "${metadata[@]}" >&2
+            exit 1
+          fi
+          printf '%s\n' "${packages[@]}"
+          printf '%s\n' "${metadata[@]}"
+
+      - name: Publish release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mapfile -t packages < <(find release-assets -type f \
+            \( -name '*.AppImage' -o -name '*.dmg' \) -print | sort)
+          mapfile -t metadata < <(find release-assets -type f \
+            \( -name 'version.json' \
+               -o -name 'version.json.sig' \
+               -o -name 'versions.json' \
+               -o -name 'versions.json.sig' \) -print | sort)
+          assets=("${packages[@]}" "${metadata[@]}")
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            gh release upload "${GITHUB_REF_NAME}" "${assets[@]}" --clobber
+          else
+            gh release create "${GITHUB_REF_NAME}" "${assets[@]}" \
+              --title "${GITHUB_REF_NAME}" \
+              --generate-notes \
+              --verify-tag
+          fi

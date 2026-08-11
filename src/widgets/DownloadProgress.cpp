@@ -84,13 +84,8 @@ DownloadProgress::DownloadProgress(const Mode mode_, QWidget* parent)
 
             SPDLOG_WARN("{}: cancelling because the active prefix or game path changed",
                         mode == Mode::Repair ? "repair" : "download");
-#if defined(Q_OS_MACOS)
-            const QString reason = QStringLiteral(
-                "Cancelled because the runtime prefix or game install settings changed.");
-#else
             const QString reason = QStringLiteral(
                 "Cancelled because the Wine prefix or game install settings changed.");
-#endif
             cancel_active_operation(reason);
             hide();
             emit closed();
@@ -245,13 +240,8 @@ void DownloadProgress::start_download()
 
     if (!config.path_inside_prefix(install))
     {
-#if defined(Q_OS_MACOS)
-        const QString error = QStringLiteral(
-            "The selected game folder is outside the runtime prefix. Choose a safe install folder first.");
-#else
         const QString error = QStringLiteral(
             "The selected game folder is outside the Wine prefix. Choose a safe install folder first.");
-#endif
         set_terminal_error(error);
         return;
     }

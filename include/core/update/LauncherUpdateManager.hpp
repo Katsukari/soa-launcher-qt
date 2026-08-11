@@ -1,16 +1,11 @@
 #pragma once
 
+#include "core/network/SwiftNetwork.h"
+
 #include <QByteArray>
-#include <QFile>
 #include <QObject>
-#include <QPointer>
 #include <QString>
 #include <QUrl>
-
-class QCryptographicHash;
-class QNetworkAccessManager;
-class QNetworkReply;
-class QTimer;
 
 namespace core::update
 {
@@ -44,44 +39,71 @@ namespace core::update
         void update_failed(const QString& reason);
 
     private:
+        static void check_callback(soa_launcher_check_result result,
+                                   soa_launcher_error error_code,
+                                   int http_status,
+                                   const char* error_detail,
+                                   const char* version,
+                                   const char* minimum_version,
+                                   const char* message,
+                                   const char* package_kind,
+                                   const char* package_file_name,
+                                   const char* package_url,
+                                   const char* sha256,
+                                   uint64_t expected_size,
+                                   bool required,
+                                   const char* releases_json,
+                                   void* ctx);
+        static void progress_callback(uint64_t received, uint64_t total, void* ctx);
+        static void download_callback(soa_launcher_download_result result,
+                                      soa_launcher_error error_code,
+                                      int http_status,
+                                      const char* error_detail,
+                                      const char* final_path,
+                                      void* ctx);
+        void handle_check(soa_launcher_check_result result,
+                          soa_launcher_error error_code,
+                          int http_status,
+                          QString error_detail,
+                          QString version,
+                          QString minimum_version,
+                          QString release_message,
+                          QString package_kind,
+                          QString package_file_name,
+                          QUrl package_url,
+                          QByteArray sha256,
+                          qulonglong expected_size,
+                          bool required,
+                          QString releases_json);
+        void handle_download(soa_launcher_download_result result,
+                             soa_launcher_error error_code,
+                             int http_status,
+                             QString error_detail,
+                             QString final_path);
         void reset_release();
-        void finish_check(QNetworkReply* reply);
-        void begin_download();
-        void consume_download_data();
-        void finish_download();
-        void fail_download(const QString& reason);
         void install_downloaded_package();
         void install_linux_appimage();
         void open_macos_installer();
-        [[nodiscard]] QString github_api_url() const;
-        [[nodiscard]] QString choose_download_path() const;
-        [[nodiscard]] bool insecure_urls_allowed() const;
-        [[nodiscard]] bool validate_package_url(const QUrl& url) const;
-        [[nodiscard]] static int compare_versions(const QString& left, const QString& right);
+        void schedule_health_checkpoint();
+        [[nodiscard]] QString error_message(soa_launcher_error error_code,
+                                            int http_status,
+                                            const QString& detail) const;
         [[nodiscard]] static QString detected_platform_key();
-        [[nodiscard]] static QString safe_file_name(const QString& value);
-        static void cleanup_previous_linux_package();
+        [[nodiscard]] static QString download_directory();
 
-        QNetworkAccessManager* network {};
-        QPointer<QNetworkReply> check_reply;
-        QPointer<QNetworkReply> download_reply;
-        QTimer* check_timeout {};
-        QTimer* download_timeout {};
-        QFile download_file;
-        QCryptographicHash* download_hash {};
+        soa_launcher_updater* updater {};
         QString release_version;
         QString minimum_version;
         QString message;
         QString package_kind;
         QString package_file_name;
         QString final_download_path;
-        QString partial_download_path;
         QUrl package_url;
         QByteArray expected_sha256;
-        qint64 expected_size {-1};
-        qint64 downloaded_size {};
+        QString release_catalogue_json;
+        qulonglong expected_size {};
         bool required {};
         bool downloading {};
-        bool download_write_failed {};
+        QString configuration_error;
     };
 }

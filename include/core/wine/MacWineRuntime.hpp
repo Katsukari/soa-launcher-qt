@@ -24,7 +24,6 @@ namespace core::wine::macos
 
     [[nodiscard]] QString application_support_root();
     [[nodiscard]] QString default_prefix_root();
-    [[nodiscard]] QString default_runtime_root();
     [[nodiscard]] QString default_log_root();
 
     [[nodiscard]] QString resolve_wine_executable(const QString& selected_path);

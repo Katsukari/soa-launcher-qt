@@ -16,7 +16,7 @@ private:
     void setup_game_path_option();
     void setup_umu_runner_option();
     void setup_macos_compatibility_option();
-    void setup_macos_deep_diagnostics_option();
+    void setup_diagnostics_option();
 
     QLineEdit* game_path_field {};
     QLineEdit* umu_path_field {};

@@ -17,8 +17,11 @@
 #include <QPalette>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QShowEvent>
 #include <QVBoxLayout>
 #include <QtConcurrent/QtConcurrentRun>
+
+#include <algorithm>
 
 #include "core/Log.hpp"
 #include "core/wine/MacWineRuntime.hpp"
@@ -309,7 +312,6 @@ WineSelectMenu::WineSelectMenu(QWidget* parent) : ModalOverlay(parent)
     detector = new QFutureWatcher<QVector<cw::WineInstall>>(this);
     connect(detector, &QFutureWatcher<QVector<cw::WineInstall>>::finished,
             this, &WineSelectMenu::finish_scan);
-    start_scan();
     relayout();
     connect(&util::i18n::LanguageManager::instance(),
             &util::i18n::LanguageManager::language_changed, this,
@@ -343,8 +345,13 @@ void WineSelectMenu::build_ui()
 
     rescan_button = make_asset_button(
         util::assets::Button::Cancel, QStringLiteral("Rescan"));
+#if defined(Q_OS_MACOS)
+    const QString add_runtime_text = QStringLiteral("Add Wine…");
+#else
+    const QString add_runtime_text = QStringLiteral("Add Runtime…");
+#endif
     browse_button = make_asset_button(
-        util::assets::Button::Cancel, QStringLiteral("Add Runtime…"));
+        util::assets::Button::Cancel, add_runtime_text);
     continue_button = make_asset_button(
         util::assets::Button::Install, QStringLiteral("Continue"));
     rescan_button->setAccessibleName(QStringLiteral("Rescan runtimes"));
@@ -386,7 +393,7 @@ void WineSelectMenu::populate()
     {
         const cw::WineInstall& wi = runtimes[i];
 #if defined(Q_OS_MACOS)
-        const QString type = util::i18n::translate("Runtime");
+        const QString type = util::i18n::translate("Wine");
 #else
         const QString type = wi.type == cw::RuntimeType::Proton
             ? util::i18n::translate("Proton") : util::i18n::translate("Wine");
@@ -416,14 +423,14 @@ void WineSelectMenu::populate()
     {
 #if defined(Q_OS_MACOS)
         const QString missingText = QStringLiteral(
-            "No usable macOS runtime was found. Restore the bundled runtime or add a compatible app, executable, or runtime folder.");
+            "No usable Wine installation was found. Install Wine or add a Wine app, executable, or folder.");
 #else
         const QString missingText = QStringLiteral(
             "No usable Wine or Proton runtimes were found on this system.");
 #endif
 #if defined(Q_OS_MACOS)
         const QString emptyText =
-            scanning ? util::i18n::translate("Scanning macOS runtimes…")
+            scanning ? util::i18n::translate("Scanning Wine installations…")
                      : util::i18n::translate(missingText);
 #else
         const QString emptyText =
@@ -446,9 +453,12 @@ void WineSelectMenu::populate()
 
 #if defined(Q_OS_MACOS)
     const bool rosetta = cw::macos::rosetta_is_available();
+    const bool tricks = cw::winetricks_available();
     runtime_status->setText(
-        util::i18n::translate("Graphics: built-in · Prefix: 64-bit · Rosetta: %1")
-            .arg(rosetta ? util::i18n::translate("ready")
+        util::i18n::translate("winetricks: %1 · Rosetta: %2")
+            .arg(tricks ? util::i18n::translate("ready")
+                        : util::i18n::translate("not found"),
+                 rosetta ? util::i18n::translate("ready")
                          : util::i18n::translate("not detected")));
     if (rosetta_button) rosetta_button->setVisible(!rosetta);
 #else
@@ -470,7 +480,19 @@ void WineSelectMenu::start_scan()
     browse_button->setEnabled(false);
     continue_button->setEnabled(false);
     populate();
-    detector->setFuture(QtConcurrent::run([]() { return cw::WineRegistry::scan(); }));
+    detector->setFuture(QtConcurrent::run([]()
+    {
+        QVector<cw::WineInstall> found = cw::WineRegistry::scan();
+#if defined(Q_OS_MACOS)
+        found.erase(std::remove_if(found.begin(), found.end(),
+                                   [](const cw::WineInstall& runtime)
+                                   {
+                                       return runtime.type == cw::RuntimeType::Proton;
+                                   }),
+                    found.end());
+#endif
+        return found;
+    }));
 }
 
 void WineSelectMenu::finish_scan()
@@ -493,27 +515,29 @@ void WineSelectMenu::browse_runtime()
     const int selection = LauncherDialog::choose(
         this,
         LauncherDialog::Tone::Question,
-        QStringLiteral("Add macOS Runtime"),
-        QStringLiteral("Select a compatible runtime application, executable, or folder."),
+        QStringLiteral("Add Wine"),
+        QStringLiteral("Select a Wine application, executable, or installation folder."),
         {
             {QStringLiteral("Cancel"), LauncherDialog::Cancelled,
              LauncherDialog::ActionStyle::Neutral, true},
-            {QStringLiteral("Select Runtime Folder"), LauncherDialog::Primary,
+            {QStringLiteral("Select Wine Folder"), LauncherDialog::Primary,
              LauncherDialog::ActionStyle::Primary, false},
-            {QStringLiteral("Select Runtime App or Executable"), LauncherDialog::Secondary,
+            {QStringLiteral("Select Wine App or Executable"), LauncherDialog::Secondary,
              LauncherDialog::ActionStyle::Primary, false}
         });
 
     QString path;
     if (selection == LauncherDialog::Primary)
         path = QFileDialog::getExistingDirectory(
-            this, util::i18n::translate("Select Runtime Folder"));
+            this, util::i18n::translate("Select Wine Folder"));
     else if (selection == LauncherDialog::Secondary)
         path = QFileDialog::getOpenFileName(
             this,
-            util::i18n::translate("Select Runtime App or Executable"),
+            util::i18n::translate("Select Wine App or Executable"),
             QStringLiteral("/Applications"),
-            util::i18n::translate("Applications (*.app);;All Files (*)"));
+            QStringLiteral("%1 (*.app);;%2 (*)")
+                .arg(util::i18n::translate("Applications"),
+                     util::i18n::translate("All Files")));
     else
         return;
 #else
@@ -526,8 +550,8 @@ void WineSelectMenu::browse_runtime()
     QString error;
     if (!cw::WineRegistry::inspect_path(path, install, &error))
     {
-        LauncherDialog::warning(this, QStringLiteral("Runtime Not Usable"),
-                                error.isEmpty() ? QStringLiteral("The selected runtime could not be used.") : error);
+        LauncherDialog::warning(this, QStringLiteral("Wine Not Usable"),
+                                error.isEmpty() ? QStringLiteral("The selected Wine installation could not be used.") : error);
         return;
     }
     runtimes.append(install);
@@ -542,7 +566,7 @@ void WineSelectMenu::request_rosetta()
         this,
         LauncherDialog::Tone::Question,
         QStringLiteral("Install Rosetta"),
-        QStringLiteral("Some macOS runtimes are Intel applications. macOS may now show its system Rosetta installation prompt. Continue?"),
+        QStringLiteral("Some Wine applications are built for Intel Macs. macOS may now show its Rosetta installation prompt. Continue?"),
         QStringLiteral("Continue"),
         QStringLiteral("Cancel"));
     if (!confirmed) return;
@@ -579,10 +603,14 @@ void WineSelectMenu::confirm()
     const cw::WineInstall& wi = runtimes[selected];
     Config::instance().set_wine_binary(wi.path);
     Config::instance().set_runtime_selected(true);
-    Config::instance().set_setup_runtime_preference(QStringLiteral("wine"));
 #if defined(Q_OS_MACOS)
+    Config::instance().set_setup_runtime_preference(QStringLiteral("wine"));
     Config::instance().set_use_dxvk(false);
     Config::instance().set_wine_arch(QStringLiteral("win64"));
+#else
+    Config::instance().set_setup_runtime_preference(
+        wi.type == cw::RuntimeType::Proton
+            ? QStringLiteral("proton") : QStringLiteral("wine"));
 #endif
     SPDLOG_INFO("runtime selected: {} ({})", wi.name.toStdString(), wi.path.toStdString());
     emit runtime_chosen();
@@ -608,13 +636,20 @@ void WineSelectMenu::paint_content(QPainter& painter)
     painter.setFont(body_font);
     painter.setPen(util::colors::k_text_body);
 #if defined(Q_OS_MACOS)
-    const QString text = QStringLiteral("The bundled macOS runtime is used by default. Choose an override only for development or compatibility testing.");
+    const QString text = QStringLiteral("Choose the Wine installation used to run the game.");
 #else
     const QString text = QStringLiteral("Choose the Wine or Proton version used to run the game.");
 #endif
     painter.drawText(runtime_local_rect(w, {68, 88, 564, 46}),
                      Qt::AlignHCenter | Qt::AlignVCenter | Qt::TextWordWrap,
                      util::i18n::translate(text));
+}
+
+void WineSelectMenu::showEvent(QShowEvent* event)
+{
+    if (!scanning && runtimes.isEmpty())
+        start_scan();
+    ModalOverlay::showEvent(event);
 }
 
 void WineSelectMenu::relayout()
@@ -658,5 +693,3 @@ void WineSelectMenu::relayout()
                                  buttons.height());
 
 }
-
-

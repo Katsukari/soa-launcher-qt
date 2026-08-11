@@ -1,5 +1,6 @@
 #include "widgets/RulesAgreement.hpp"
 
+#include "core/network/SwiftHttpClient.hpp"
 #include "util/Assets.hpp"
 #include "util/LanguageManager.hpp"
 #include "util/Layout.hpp"
@@ -13,9 +14,6 @@
 #include <QFontMetrics>
 #include <QIcon>
 #include <QLabel>
-#include <QNetworkAccessManager>
-#include <QNetworkReply>
-#include <QNetworkRequest>
 #include <QPainter>
 #include <QPushButton>
 #include <QRegularExpression>
@@ -85,9 +83,7 @@ void RulesAgreement::setup_controls()
 {
     const QSize w = window()->size();
 
-    network = new QNetworkAccessManager(this);
-    request_timeout = new QTimer(this);
-    request_timeout->setSingleShot(true);
+    network = new core::network::SwiftHttpClient(this);
     cooldown_timer = new QTimer(this);
     cooldown_timer->setInterval(1000);
 
@@ -154,11 +150,6 @@ void RulesAgreement::setup_controls()
             cooldown_timer->stop();
         update_agree_button();
     });
-    connect(request_timeout, &QTimer::timeout, this, [this]()
-    {
-        if (reply && reply->isRunning())
-            reply->abort();
-    });
     connect(agree_button, &QPushButton::clicked, this, [this]()
     {
         if (!document_ready)
@@ -212,13 +203,13 @@ bool RulesAgreement::load_cached_document()
 
 void RulesAgreement::load_rules()
 {
-    if (reply)
+    if (request_id != 0)
         return;
 
     const QUrl url(rules_url());
+    const bool allow_insecure = qEnvironmentVariableIntValue("SOA_ALLOW_INSECURE_RULES_URL") == 1;
     if (!url.isValid()
-        || (url.scheme() != QStringLiteral("https")
-            && qEnvironmentVariableIntValue("SOA_ALLOW_INSECURE_RULES_URL") != 1))
+        || (url.scheme() != QStringLiteral("https") && !allow_insecure))
     {
         show_load_failure(util::i18n::translate("The rules document URL is invalid or insecure."));
         return;
@@ -235,34 +226,34 @@ void RulesAgreement::load_rules()
     }
     update_agree_button();
 
-    QNetworkRequest request(url);
-    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
-                         QNetworkRequest::NoLessSafeRedirectPolicy);
-    request.setAttribute(QNetworkRequest::CacheLoadControlAttribute,
-                         QNetworkRequest::AlwaysNetwork);
-    request.setRawHeader("Accept", "text/html,application/xhtml+xml");
-    QNetworkReply* request_reply = network->get(request);
-    reply = request_reply;
-    request_timeout->start(15000);
-    connect(request_reply, &QNetworkReply::finished, this, [this, request_reply]()
+    request_id = network->get(
+        url,
+        15000,
+        4 * 1024 * 1024,
+        QByteArray("text/html,application/xhtml+xml"),
+        QByteArray("Story-Of-Alicia-Launcher"),
+        allow_insecure,
+        [this](const core::network::HttpResponse& response)
+        {
+            request_id = 0;
+            finish_rules_request(response);
+        });
+    if (request_id == 0)
     {
-        finish_rules_request(request_reply);
-    });
+        loading = false;
+        show_load_failure(util::i18n::translate("Failed to start the rules request."));
+    }
 }
 
-void RulesAgreement::finish_rules_request(QNetworkReply* request_reply)
+void RulesAgreement::finish_rules_request(const core::network::HttpResponse& response)
 {
-    request_timeout->stop();
-    reply = nullptr;
     loading = false;
-    const int status = request_reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-    const QNetworkReply::NetworkError network_error = request_reply->error();
-    const QString network_message = request_reply->errorString();
-    const QString final_host = request_reply->url().host().toLower();
-    const QByteArray source = request_reply->readAll();
-    request_reply->deleteLater();
+    const int status = response.status;
+    const QString network_message = response.error;
+    const QString final_host = response.final_url.host().toLower();
+    const QByteArray source = response.data;
 
-    if (network_error != QNetworkReply::NoError || status < 200 || status >= 300)
+    if (response.result != soa_http_result_completed || status < 200 || status >= 300)
     {
         if (!document_ready && !load_cached_document())
         {
@@ -490,7 +481,7 @@ void RulesAgreement::showEvent(QShowEvent* event)
     rules_text->verticalScrollBar()->setValue(0);
     if (document_html.isEmpty())
         load_cached_document();
-    if (!reply)
+    if (request_id == 0)
         load_rules();
     update_agree_button();
     ModalOverlay::showEvent(event);

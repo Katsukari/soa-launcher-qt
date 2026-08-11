@@ -3,17 +3,20 @@
 #include <QByteArray>
 #include <QEvent>
 #include <QString>
-#include <QPointer>
 
 #include "util/ModalOverlay.hpp"
 
 class QLabel;
-class QNetworkAccessManager;
-class QNetworkReply;
 class QPushButton;
 class QShowEvent;
 class QTextBrowser;
 class QTimer;
+
+namespace core::network
+{
+    class SwiftHttpClient;
+    struct HttpResponse;
+}
 class QUrl;
 
 class RulesAgreement final : public util::modal_overlay::ModalOverlay
@@ -34,7 +37,7 @@ protected:
 private:
     void setup_controls();
     void load_rules();
-    void finish_rules_request(QNetworkReply* reply);
+    void finish_rules_request(const core::network::HttpResponse& response);
     void show_document(const QByteArray& source, bool save_cache);
     void show_load_failure(const QString& reason);
     void start_cooldown();
@@ -51,9 +54,8 @@ private:
     QTextBrowser* rules_text {};
     QPushButton* agree_button {};
     QLabel* agree_button_label {};
-    QNetworkAccessManager* network {};
-    QPointer<QNetworkReply> reply;
-    QTimer* request_timeout {};
+    core::network::SwiftHttpClient* network {};
+    qulonglong request_id {};
     QTimer* cooldown_timer {};
     QString document_html;
     QString load_error;

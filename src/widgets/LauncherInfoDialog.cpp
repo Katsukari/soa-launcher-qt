@@ -238,7 +238,7 @@ void LauncherInfoDialog::retranslate()
             .arg(translate("Everything in one place"),
                  translate("Install, update, verify, repair, and launch both supported Story of Alicia game profiles."),
                  translate("Linux and macOS"),
-                 translate("Linux uses Wine or Proton. macOS uses the bundled Story of Alicia runtime.")));
+                 translate("Linux supports Wine and Proton. macOS supports Wine.")));
         footer_label->setText(translate(
             "Game and artwork remain owned by their respective copyright holders."));
     }

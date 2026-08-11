@@ -64,10 +64,6 @@ See launcher.log for the complete command output.</translation>
             <translation>  ALICIA START…</translation>
         </message>
         <message>
-            <source> %u</source>
-            <translation> %u</translation>
-        </message>
-        <message>
             <source> after a crash</source>
             <translation> na een crash</translation>
         </message>
@@ -95,146 +91,8 @@ See launcher.log for the complete command output.</translation>
             <translation> · Rosetta vereist</translation>
         </message>
         <message>
-            <source>"%1"=dword:00000001
-</source>
-            <translation>"%1"=dword:00000001
-</translation>
-        </message>
-        <message>
-            <source>"AllowSetGamma"="n"
-</source>
-            <translation>"AllowSetGamma"="n"
-</translation>
-        </message>
-        <message>
-            <source>"AllowSetGamma"=-
-</source>
-            <translation>"AllowSetGamma"=-
-</translation>
-        </message>
-        <message>
-            <source>"CaptureDisplaysForFullscreen"="n"
-</source>
-            <translation>"CaptureDisplaysForFullscreen"="n"
-</translation>
-        </message>
-        <message>
-            <source>"CaptureDisplaysForFullscreen"=-
-</source>
-            <translation>"CaptureDisplaysForFullscreen"=-
-</translation>
-        </message>
-        <message>
-            <source>"Height"="0"
-
-</source>
-            <translation>"Height"="0"
-
-</translation>
-        </message>
-        <message>
-            <source>"MacCompatibilityProfile"="%1"
-</source>
-            <translation>"MacCompatibilityProfile"="%1"
-</translation>
-        </message>
-        <message>
-            <source>"OffscreenRenderingMode"</source>
-            <translation>"OffscreenRenderingMode"</translation>
-        </message>
-        <message>
-            <source>"OpenGLSurfaceMode"</source>
-            <translation>"OpenGLSurfaceMode"</translation>
-        </message>
-        <message>
-            <source>"OpenGLSurfaceMode"="%1"
-
-</source>
-            <translation>"OpenGLSurfaceMode"="%1"
-
-</translation>
-        </message>
-        <message>
-            <source>"OpenGLSurfaceMode"=-
-
-</source>
-            <translation>"OpenGLSurfaceMode"=-
-
-</translation>
-        </message>
-        <message>
-            <source>"renderer"</source>
-            <translation>"renderer"</translation>
-        </message>
-        <message>
-            <source>"renderer"=-
-
-</source>
-            <translation>"renderer"=-
-
-</translation>
-        </message>
-        <message>
-            <source>"RetinaMode"</source>
-            <translation>"RetinaMode"</translation>
-        </message>
-        <message>
-            <source>"RetinaMode"="n"
-
-</source>
-            <translation>"RetinaMode"="n"
-
-</translation>
-        </message>
-        <message>
-            <source>"screenResolutionID"="0"
-</source>
-            <translation>"screenResolutionID"="0"
-</translation>
-        </message>
-        <message>
-            <source>"screenWindowType"="1"
-</source>
-            <translation>"screenWindowType"="1"
-</translation>
-        </message>
-        <message>
-            <source>"VideoMemorySize"</source>
-            <translation>"VideoMemorySize"</translation>
-        </message>
-        <message>
-            <source>"VolBGM"="30"
-</source>
-            <translation>"VolBGM"="30"
-</translation>
-        </message>
-        <message>
-            <source>"VolSFX"="30"
-
-</source>
-            <translation>"VolSFX"="30"
-
-</translation>
-        </message>
-        <message>
-            <source>"Width"="0"
-</source>
-            <translation>"Width"="0"
-</translation>
-        </message>
-        <message>
-            <location filename="../src/widgets/LauncherSettings.cpp" line="397" />
-            <source>%1 (%2 ms)</source>
-            <translation>%1 (%2 ms)</translation>
-        </message>
-        <message>
             <source>%1 (%2, exit %3).</source>
             <translation>%1 (%2, exit %3).</translation>
-        </message>
-        <message>
-            <location filename="../src/widgets/DownloadProgress.cpp" line="303" />
-            <source>%1 B</source>
-            <translation>%1 B</translation>
         </message>
         <message>
             <source>%1 could not be started. See launcher.log for details.</source>
@@ -246,11 +104,6 @@ See launcher.log for the complete command output.</translation>
             <translation>%1 BESTANDEN (%2/%3)</translation>
         </message>
         <message>
-            <location filename="../src/widgets/DownloadProgress.cpp" line="298" />
-            <source>%1 GB</source>
-            <translation>%1 GB</translation>
-        </message>
-        <message>
             <location filename="../src/widgets/PrerequisitesIntro.cpp" line="422" />
             <source>%1 is the recommended setup for this computer. Alicia will use compatibility graphics by default.
 
@@ -258,21 +111,6 @@ DXVK stays optional and can be enabled later in Settings. Nothing will be instal
             <translation>%1 is de aanbevolen installatie voor deze computer. Alicia gebruikt standaard compatibiliteitsgraphics.
 
 DXVK blijft optioneel en kan later in Instellingen worden ingeschakeld. Er wordt niets automatisch geïnstalleerd.</translation>
-        </message>
-        <message>
-            <location filename="../src/widgets/DownloadProgress.cpp" line="302" />
-            <source>%1 KB</source>
-            <translation>%1 KB</translation>
-        </message>
-        <message>
-            <location filename="../src/widgets/DownloadProgress.cpp" line="300" />
-            <source>%1 MB</source>
-            <translation>%1 MB</translation>
-        </message>
-        <message>
-            <location filename="../src/widgets/LauncherSettings.cpp" line="431" />
-            <source>%1 ms</source>
-            <translation>%1 ms</translation>
         </message>
         <message>
             <location filename="../src/widgets/PrerequisitesIntro.cpp" line="397" />
@@ -303,150 +141,13 @@ DXVK blijft optioneel en kan later in Instellingen worden ingeschakeld. Er wordt
             <translation>%1 · Wine %2</translation>
         </message>
         <message>
-            <source>%1/%2/manifest.json</source>
-            <translation>%1/%2/manifest.json</translation>
-        </message>
-        <message>
-            <location filename="../src/widgets/DownloadProgress.cpp" line="309" />
-            <source>%1/s</source>
-            <translation>%1/s</translation>
-        </message>
-        <message>
-            <location filename="../src/widgets/DownloadProgress.cpp" line="324" />
-            <source>%1h</source>
-            <translation>%1 u</translation>
-        </message>
-        <message>
-            <location filename="../src/widgets/DownloadProgress.cpp" line="323" />
-            <source>%1h %2m</source>
-            <translation>%1 u %2 min</translation>
-        </message>
-        <message>
-            <location filename="../src/widgets/DownloadProgress.cpp" line="328" />
-            <source>%1m</source>
-            <translation>%1 min</translation>
-        </message>
-        <message>
-            <location filename="../src/widgets/DownloadProgress.cpp" line="327" />
-            <source>%1m %2s</source>
-            <translation>%1 min %2 s</translation>
-        </message>
-        <message>
-            <location filename="../src/widgets/DownloadProgress.cpp" line="329" />
-            <source>%1s</source>
-            <translation>%1 s</translation>
-        </message>
-        <message>
-            <source>%1x%2</source>
-            <translation>%1x%2</translation>
-        </message>
-        <message>
             <location filename="../src/widgets/PrerequisitesIntro.cpp" line="109" />
             <source>, and </source>
             <translation>, en </translation>
         </message>
         <message>
-            <source>--label=Story of Alicia Launcher</source>
-            <translation>--label=Story of Alicia Launcher</translation>
-        </message>
-        <message>
-            <source>--start-address=0x%1</source>
-            <translation>--start-address=0x%1</translation>
-        </message>
-        <message>
-            <source>--stop-address=0x%1</source>
-            <translation>--stop-address=0x%1</translation>
-        </message>
-        <message>
-            <source>-detailLevel</source>
-            <translation>-detailLevel</translation>
-        </message>
-        <message>
-            <source>-GameID</source>
-            <translation>-GameID</translation>
-        </message>
-        <message>
-            <source>-ID</source>
-            <translation>-ID</translation>
-        </message>
-        <message>
-            <source>-OP</source>
-            <translation>-OP</translation>
-        </message>
-        <message>
             <source>-OP, -ID, and -GameID are managed by the launcher and cannot be overridden.</source>
             <translation>-OP, -ID en -GameID worden door het startprogramma beheerd en kunnen niet worden overschreven.</translation>
-        </message>
-        <message>
-            <location filename="../src/widgets/LauncherSettings.cpp" line="442" />
-            <location filename="../src/widgets/LauncherSettings.cpp" line="446" />
-            <source>-W</source>
-            <translation>-W</translation>
-        </message>
-        <message>
-            <source>../../../../soa_wine_runtime/runtime/out/Story of Alicia Runtime.app</source>
-            <translation>../../../../soa_wine_runtime/runtime/out/Story of Alicia Runtime.app</translation>
-        </message>
-        <message>
-            <source>../../../soa_wine_runtime/runtime/out/Story of Alicia Runtime.app</source>
-            <translation>../../../soa_wine_runtime/runtime/out/Story of Alicia Runtime.app</translation>
-        </message>
-        <message>
-            <source>../../runtime/Story of Alicia Runtime.app</source>
-            <translation>../../runtime/Story of Alicia Runtime.app</translation>
-        </message>
-        <message>
-            <source>../Resources/runtime</source>
-            <translation>../Resources/runtime</translation>
-        </message>
-        <message>
-            <source>../Resources/runtimes</source>
-            <translation>../Resources/runtimes</translation>
-        </message>
-        <message>
-            <source>../Resources/Story of Alicia Runtime</source>
-            <translation>../Resources/Story of Alicia Runtime</translation>
-        </message>
-        <message>
-            <source>../Resources/Story of Alicia Runtime.app</source>
-            <translation>../Resources/Story of Alicia Runtime.app</translation>
-        </message>
-        <message>
-            <source>../SharedSupport/runtime</source>
-            <translation>../SharedSupport/runtime</translation>
-        </message>
-        <message>
-            <location filename="../src/widgets/LauncherSettings.cpp" line="118" />
-            <source>.app/Contents/MacOS/</source>
-            <translation>.app/Contents/MacOS/</translation>
-        </message>
-        <message>
-            <source>.local/share/Story of Alicia</source>
-            <translation>.local/share/Story of Alicia</translation>
-        </message>
-        <message>
-            <source>/.local/share/Steam</source>
-            <translation>/.local/share/Steam</translation>
-        </message>
-        <message>
-            <source>/FO</source>
-            <translation>/FO</translation>
-        </message>
-        <message>
-            <source>/NH</source>
-            <translation>/NH</translation>
-        </message>
-        <message>
-            <source>/S</source>
-            <translation>/S</translation>
-        </message>
-        <message>
-            <source>/wine </source>
-            <translation>/wine </translation>
-        </message>
-        <message>
-            <source>/wine64 </source>
-            <translation>/wine64 </translation>
         </message>
         <message>
             <location filename="../src/widgets/LauncherSettings.cpp" line="349" />
@@ -463,70 +164,6 @@ DXVK blijft optioneel en kan later in Instellingen worden ingeschakeld. Er wordt
             <translation>2.0-bestanden</translation>
         </message>
         <message>
-            <source>3d controller</source>
-            <translation>3d controller</translation>
-        </message>
-        <message>
-            <location filename="../src/widgets/LauncherSettings.cpp" line="538" />
-            <source>&lt;/table&gt;</source>
-            <translation>&lt;/table&gt;</translation>
-        </message>
-        <message>
-            <location filename="../src/widgets/LauncherSettings.cpp" line="163" />
-            <source>&lt;?xml version="1.0" encoding="UTF-8"?&gt;&lt;!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"&gt;&lt;plist version="1.0"&gt;&lt;dict&gt;&lt;key&gt;Label&lt;/key&gt;&lt;string&gt;com.storyofalicia.launcher&lt;/string&gt;&lt;key&gt;ProgramArguments&lt;/key&gt;&lt;array&gt;%1&lt;/array&gt;&lt;key&gt;RunAtLoad&lt;/key&gt;&lt;true/&gt;&lt;/dict&gt;&lt;/plist&gt;</source>
-            <translation>&lt;?xml version="1.0" encoding="UTF-8"?&gt;&lt;!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"&gt;&lt;plist version="1.0"&gt;&lt;dict&gt;&lt;key&gt;Label&lt;/key&gt;&lt;string&gt;com.storyofalicia.launcher&lt;/string&gt;&lt;key&gt;ProgramArguments&lt;/key&gt;&lt;array&gt;%1&lt;/array&gt;&lt;key&gt;RunAtLoad&lt;/key&gt;&lt;true/&gt;&lt;/dict&gt;&lt;/plist&gt;</translation>
-        </message>
-        <message>
-            <source>&lt;a href="https://storyofalicia.com"&gt;%1&lt;/a&gt;&lt;br&gt;&lt;a href="https://github.com/Story-Of-Alicia"&gt;%2&lt;/a&gt;&lt;br&gt;&lt;a href="mailto:dev@storyofalicia.com"&gt;%3&lt;/a&gt;&lt;br&gt;&lt;br&gt;%4</source>
-            <translation>&lt;a href="https://storyofalicia.com"&gt;%1&lt;/a&gt;&lt;br&gt;&lt;a href="https://github.com/Story-Of-Alicia"&gt;%2&lt;/a&gt;&lt;br&gt;&lt;a href="mailto:dev@storyofalicia.com"&gt;%3&lt;/a&gt;&lt;br&gt;&lt;br&gt;%4</translation>
-        </message>
-        <message>
-            <source>&lt;b&gt;%1&lt;/b&gt;&lt;br&gt;%2 %3</source>
-            <translation>&lt;b&gt;%1&lt;/b&gt;&lt;br&gt;%2 %3</translation>
-        </message>
-        <message>
-            <source>&lt;b&gt;1.&lt;/b&gt;&amp;nbsp; Open the exact copied sign-in link in the browser you want to use.&lt;br&gt;</source>
-            <translation>&lt;b&gt;1.&lt;/b&gt;&amp;nbsp; Open de exact gekopieerde aanmeldlink in de browser die je wilt gebruiken.&lt;br&gt;</translation>
-        </message>
-        <message>
-            <location filename="../src/widgets/AliciaChooser.cpp" line="395" />
-            <source>&lt;b&gt;1.&lt;/b&gt;&amp;nbsp; Open the exact copied sign-in link in the browser you want to use.&lt;br&gt;&lt;b&gt;2.&lt;/b&gt;&amp;nbsp; Sign in with Discord and authorize the launcher.&lt;br&gt;&lt;b&gt;3.&lt;/b&gt;&amp;nbsp; Click &lt;b&gt;“Open Story of Alicia Launcher”&lt;/b&gt; when prompted.&lt;br&gt;&lt;b&gt;4.&lt;/b&gt;&amp;nbsp; If login did not work, cancel and try again.</source>
-            <translation>&lt;b&gt;1.&lt;/b&gt;&amp;nbsp; Open de gekopieerde aanmeldlink in de browser die je wilt gebruiken.&lt;br&gt;&lt;b&gt;2.&lt;/b&gt;&amp;nbsp; Meld je aan met Discord en autoriseer de launcher.&lt;br&gt;&lt;b&gt;3.&lt;/b&gt;&amp;nbsp; Klik op &lt;b&gt;“Story of Alicia Launcher openen”&lt;/b&gt; wanneer daarom wordt gevraagd.&lt;br&gt;&lt;b&gt;4.&lt;/b&gt;&amp;nbsp; Annuleer en probeer opnieuw wanneer aanmelden niet lukte.</translation>
-        </message>
-        <message>
-            <location filename="../src/widgets/LauncherSettings.cpp" line="206" />
-            <source>&lt;br&gt;</source>
-            <translation>&lt;br&gt;</translation>
-        </message>
-        <message>
-            <source>&lt;h2 style='color:#4F1717; margin-top:0;'&gt;Before entering the playtest&lt;/h2&gt;</source>
-            <translation>&lt;h2 style='color:#4F1717; margin-top:0;'&gt;Voordat je de playtest opent&lt;/h2&gt;</translation>
-        </message>
-        <message>
-            <location filename="../src/widgets/LauncherSettings.cpp" line="153" />
-            <source>&lt;string&gt;%1&lt;/string&gt;</source>
-            <translation>&lt;string&gt;%1&lt;/string&gt;</translation>
-        </message>
-        <message>
-            <location filename="../src/widgets/LauncherSettings.cpp" line="533" />
-            <source>&lt;table width="100%" cellspacing="0" cellpadding="0"&gt;</source>
-            <translation>&lt;table width="100%" cellspacing="0" cellpadding="0"&gt;</translation>
-        </message>
-        <message>
-            <location filename="../src/widgets/LauncherSettings.cpp" line="526" />
-            <source>&lt;td width="50%" style="padding:1px 10px 2px 0;"&gt;&lt;b&gt;%1:&lt;/b&gt; &lt;span style="color:%2"&gt;%3&lt;/span&gt;&lt;/td&gt;</source>
-            <translation>&lt;td width="50%" style="padding:1px 10px 2px 0;"&gt;&lt;b&gt;%1:&lt;/b&gt; &lt;span style="color:%2"&gt;%3&lt;/span&gt;&lt;/td&gt;</translation>
-        </message>
-        <message>
-            <location filename="../src/widgets/LauncherSettings.cpp" line="535" />
-            <source>&lt;tr&gt;%1%2&lt;/tr&gt;</source>
-            <translation>&lt;tr&gt;%1%2&lt;/tr&gt;</translation>
-        </message>
-        <message>
-            <source>[\x00-\x1F\x7F]</source>
-            <translation>[\x00-\x1F\x7F]</translation>
-        </message>
-        <message>
             <source>[earlier command output omitted]</source>
             <translation>[earlier command output omitted]</translation>
         </message>
@@ -537,54 +174,8 @@ DXVK blijft optioneel en kan later in Instellingen worden ingeschakeld. Er wordt
 </translation>
         </message>
         <message>
-            <source>[HKEY_CURRENT_USER\%1]
-</source>
-            <translation>[HKEY_CURRENT_USER\%1]
-</translation>
-        </message>
-        <message>
-            <source>[HKEY_CURRENT_USER\Software\Story of Alicia\Launcher]
-</source>
-            <translation>[HKEY_CURRENT_USER\Software\Story of Alicia\Launcher]
-</translation>
-        </message>
-        <message>
-            <source>[HKEY_CURRENT_USER\Software\Wine\AppDefaults\Alicia.exe\Mac Driver]
-</source>
-            <translation>[HKEY_CURRENT_USER\Software\Wine\AppDefaults\Alicia.exe\Mac Driver]
-</translation>
-        </message>
-        <message>
-            <source>[HKEY_CURRENT_USER\Software\Wine\Direct3D]
-</source>
-            <translation>[HKEY_CURRENT_USER\Software\Wine\Direct3D]
-</translation>
-        </message>
-        <message>
-            <source>[HKEY_CURRENT_USER\Software\Wine\Mac Driver]
-</source>
-            <translation>[HKEY_CURRENT_USER\Software\Wine\Mac Driver]
-</translation>
-        </message>
-        <message>
-            <source>[REDACTED]</source>
-            <translation>[REDACTED]</translation>
-        </message>
-        <message>
             <source>\1[REDACTED]</source>
             <translation>\1[REDACTED]</translation>
-        </message>
-        <message>
-            <source>\n</source>
-            <translation>\n</translation>
-        </message>
-        <message>
-            <source>\r</source>
-            <translation>\r</translation>
-        </message>
-        <message>
-            <source>\t</source>
-            <translation>\t</translation>
         </message>
         <message>
             <source>A game launch argument is invalid or too long.</source>
@@ -637,10 +228,6 @@ DXVK blijft optioneel en kan later in Instellingen worden ingeschakeld. Er wordt
             <location filename="../src/widgets/Settings.cpp" line="188" />
             <source>ADVANCED</source>
             <translation>GEAVANCEERD</translation>
-        </message>
-        <message>
-            <source>advanced micro devices</source>
-            <translation>advanced micro devices</translation>
         </message>
         <message>
             <location filename="../src/widgets/Settings.cpp" line="166" />
@@ -704,26 +291,6 @@ DXVK blijft optioneel en kan later in Instellingen worden ingeschakeld. Er wordt
             <translation>Alicia of een andere runtimebewerking is actief. Voltooi deze voordat je spelbestanden wijzigt.</translation>
         </message>
         <message>
-            <source>alicia-%1.log</source>
-            <translation>alicia-%1.log</translation>
-        </message>
-        <message>
-            <source>alicia-*.log</source>
-            <translation>alicia-*.log</translation>
-        </message>
-        <message>
-            <source>alicia-*.log.sample.txt</source>
-            <translation>alicia-*.log.sample.txt</translation>
-        </message>
-        <message>
-            <source>alicia-*.timeline.jsonl</source>
-            <translation>alicia-*.timeline.jsonl</translation>
-        </message>
-        <message>
-            <source>Alicia.exe</source>
-            <translation>Alicia.exe</translation>
-        </message>
-        <message>
             <location filename="../src/widgets/AdvancedSettings.cpp" line="122" />
             <source>Alicia.exe (default)</source>
             <translation>Alicia.exe (standaard)</translation>
@@ -754,16 +321,6 @@ DXVK blijft optioneel en kan later in Instellingen worden ingeschakeld. Er wordt
             <translation>Er is al een ander Wine- of spelproces actief.</translation>
         </message>
         <message>
-            <source>Apple GPU</source>
-            <translation>Apple GPU</translation>
-        </message>
-        <message>
-            <location filename="../src/widgets/WineSelectMenu.cpp" line="241" />
-            <location filename="../src/widgets/WineSettings.cpp" line="295" />
-            <source>Applications (*.app);;All Files (*)</source>
-            <translation>Programma’s (*.app);;Alle bestanden (*)</translation>
-        </message>
-        <message>
             <source>Applied the conservative macOS graphics profile and saved alice.cfg.soa-macos-backup.</source>
             <translation>Het conservatieve macOS-grafische profiel is toegepast en alice.cfg.soa-macos-backup is opgeslagen.</translation>
         </message>
@@ -790,10 +347,6 @@ DXVK blijft optioneel en kan later in Instellingen worden ingeschakeld. Er wordt
         <message>
             <source>Autoscroll: On</source>
             <translation>Automatisch scrollen: Aan</translation>
-        </message>
-        <message>
-            <source>Backtrace</source>
-            <translation>Backtrace</translation>
         </message>
         <message>
             <location filename="../src/widgets/RulesAgreement.cpp" line="102" />
@@ -825,10 +378,6 @@ DXVK blijft optioneel en kan later in Instellingen worden ingeschakeld. Er wordt
         <message>
             <source>By clicking the “Proceed with Discord” button, you acknowledge that your </source>
             <translation>Door op “Doorgaan met Discord” te klikken, bevestig je dat je </translation>
-        </message>
-        <message>
-            <source>By clicking the “Proceed with Discord” button, you acknowledge that your Discord ID will be stored on our database servers indefinitely for identification and service purposes. This data can be removed upon request by emailing &lt;a href="mailto:dev@storyofalicia.com" style="color:#2FB4E0;"&gt;dev@storyofalicia.com&lt;/a&gt;.</source>
-            <translation>Door op “Doorgaan met Discord” te klikken, ga je toestemming om je Discord-ID voor identificatie en dienstverlening op onze databaseservers op te slaan. Je kunt verwijdering aanvragen via &lt;a href="mailto:dev@storyofalicia.com" style="color:#2FB4E0;"&gt;dev@storyofalicia.com&lt;/a&gt;.</translation>
         </message>
         <message>
             <location filename="../src/widgets/GameInstall.cpp" line="76" />
@@ -958,10 +507,6 @@ DXVK blijft optioneel en kan later in Instellingen worden ingeschakeld. Er wordt
             <translation>controleren…</translation>
         </message>
         <message>
-            <source>Chipset Model:</source>
-            <translation>Chipset Model:</translation>
-        </message>
-        <message>
             <location filename="../src/widgets/WineSettings.cpp" line="141" />
             <location filename="../src/widgets/WineSettings.cpp" line="263" />
             <source>Choose</source>
@@ -1057,10 +602,6 @@ Met Aanmeldlink kopiëren kun je de exacte link in elke browser plakken.</transl
             <translation>Wanneer je de launcher sluit, stoppen live diagnostiek en procesbewaking. Alicia kan actief blijven en wordt opnieuw gedetecteerd wanneer de launcher opnieuw start.</translation>
         </message>
         <message>
-            <source>cmd_force_simpleShadow</source>
-            <translation>cmd_force_simpleShadow</translation>
-        </message>
-        <message>
             <location filename="../src/widgets/AdvancedSettings.cpp" line="150" />
             <source>COMPATIBILITY PROFILE</source>
             <translation>COMPATIBILITEITSPROFIEL</translation>
@@ -1095,14 +636,6 @@ Met Aanmeldlink kopiëren kun je de exacte link in elke browser plakken.</transl
         <message>
             <source>Contact the launcher team</source>
             <translation>Contact opnemen met het launcherteam</translation>
-        </message>
-        <message>
-            <source>Contents/Resources/wine/lib</source>
-            <translation>Contents/Resources/wine/lib</translation>
-        </message>
-        <message>
-            <source>Contents/Resources/wine/lib64</source>
-            <translation>Contents/Resources/wine/lib64</translation>
         </message>
         <message>
             <location filename="../src/widgets/WineSelectMenu.cpp" line="82" />
@@ -1172,10 +705,6 @@ Met Aanmeldlink kopiëren kun je de exacte link in elke browser plakken.</transl
             <translation>Er kon niet naar het tijdelijke downloadbestand worden geschreven: %1</translation>
         </message>
         <message>
-            <source>CreateDevice</source>
-            <translation>CreateDevice</translation>
-        </message>
-        <message>
             <source>Creating Proton prefix...</source>
             <translation>Proton-prefix maken…</translation>
         </message>
@@ -1186,10 +715,6 @@ Met Aanmeldlink kopiëren kun je de exacte link in elke browser plakken.</transl
         <message>
             <source>Creating Wine prefix...</source>
             <translation>Wine-prefix maken…</translation>
-        </message>
-        <message>
-            <source>CSV</source>
-            <translation>CSV</translation>
         </message>
         <message>
             <source>Custom Runtime</source>
@@ -1204,39 +729,6 @@ Met Aanmeldlink kopiëren kun je de exacte link in elke browser plakken.</transl
             <location filename="../src/widgets/WineSettings.cpp" line="186" />
             <source>CUSTOM WINE / PROTON</source>
             <translation>AANGEPASTE WINE / PROTON</translation>
-        </message>
-        <message>
-            <location filename="../src/widgets/WineSettings.cpp" line="384" />
-            <source>CUSTOM_OPTION=1</source>
-            <translation>CUSTOM_OPTION=1</translation>
-        </message>
-        <message>
-            <source>CX_</source>
-            <translation>CX_</translation>
-        </message>
-        <message>
-            <source>CX_ROOT</source>
-            <translation>CX_ROOT</translation>
-        </message>
-        <message>
-            <source>d3d9,d3d10core,d3d11,dxgi=b</source>
-            <translation>d3d9,d3d10core,d3d11,dxgi=b</translation>
-        </message>
-        <message>
-            <source>d3d9,d3d10core,d3d11,dxgi=n</source>
-            <translation>d3d9,d3d10core,d3d11,dxgi=n</translation>
-        </message>
-        <message>
-            <source>D3DCompiler_42.dll</source>
-            <translation>D3DCompiler_42.dll</translation>
-        </message>
-        <message>
-            <source>D3DCompiler_47.dll</source>
-            <translation>D3DCompiler_47.dll</translation>
-        </message>
-        <message>
-            <source>deep=%1 WINEDEBUG=%2 registry=%3</source>
-            <translation>deep=%1 WINEDEBUG=%2 registry=%3</translation>
         </message>
         <message>
             <location filename="../src/widgets/LauncherSettings.cpp" line="591" />
@@ -1263,17 +755,9 @@ Met Aanmeldlink kopiëren kun je de exacte link in elke browser plakken.</transl
             <translation>Story of Alicia-ontwikkelruntime</translation>
         </message>
         <message>
-            <source>device name</source>
-            <translation>device name</translation>
-        </message>
-        <message>
             <location filename="../src/widgets/LauncherSettings.cpp" line="293" />
             <source>Diagnose issues connecting to the game and related servers.</source>
             <translation>Onderzoek problemen met de verbinding met het spel en gerelateerde servers.</translation>
-        </message>
-        <message>
-            <source>Direct3DCreate9</source>
-            <translation>Direct3DCreate9</translation>
         </message>
         <message>
             <location filename="../src/widgets/AliciaChooser.cpp" line="521" />
@@ -1323,21 +807,6 @@ Met Aanmeldlink kopiëren kun je de exacte link in elke browser plakken.</transl
         <message>
             <source>Discord RPC sent an oversized frame.</source>
             <translation>Discord RPC sent an oversized frame.</translation>
-        </message>
-        <message>
-            <source>discord-ipc-%1</source>
-            <translation>discord-ipc-%1</translation>
-        </message>
-        <message>
-            <source>display controller</source>
-            <translation>display controller</translation>
-        </message>
-        <message>
-            <location filename="../src/widgets/LauncherSettings.cpp" line="347" />
-            <location filename="../src/widgets/LauncherSettings.cpp" line="399" />
-            <location filename="../src/widgets/LauncherSettings.cpp" line="505" />
-            <source>DNS</source>
-            <translation>DNS</translation>
         </message>
         <message>
             <source>Done!</source>
@@ -1429,14 +898,6 @@ Met Aanmeldlink kopiëren kun je de exacte link in elke browser plakken.</transl
             <translation>DXVK is aangevraagd maar niet geïnstalleerd. Voor deze start wordt WineD3D gebruikt.</translation>
         </message>
         <message>
-            <source>DYLD_</source>
-            <translation>DYLD_</translation>
-        </message>
-        <message>
-            <source>DYLD_FALLBACK_LIBRARY_PATH</source>
-            <translation>DYLD_FALLBACK_LIBRARY_PATH</translation>
-        </message>
-        <message>
             <location filename="../src/widgets/PrerequisitesIntro.cpp" line="479" />
             <source>EASY SETUP</source>
             <translation>EENVOUDIGE INSTALLATIE</translation>
@@ -1473,14 +934,6 @@ Met Aanmeldlink kopiëren kun je de exacte link in elke browser plakken.</transl
             <location filename="../src/widgets/DownloadProgress.cpp" line="314" />
             <source>Estimating...</source>
             <translation>Schatten…</translation>
-        </message>
-        <message>
-            <source>Exception frame is not in stack limits</source>
-            <translation>Exception frame is not in stack limits</translation>
-        </message>
-        <message>
-            <source>exit_code=%1 crashed=%2 game_confirmed=%3</source>
-            <translation>exit_code=%1 crashed=%2 game_confirmed=%3</translation>
         </message>
         <message>
             <location filename="../src/widgets/LauncherSettings.cpp" line="593" />
@@ -1579,42 +1032,17 @@ Met Aanmeldlink kopiëren kun je de exacte link in elke browser plakken.</transl
             <translation>Lokale DirectX-, Visual C++- en PhysX-onderdelen van het spel worden vóór elke start gecontroleerd.</translation>
         </message>
         <message>
-            <source>GAMEID</source>
-            <translation>GAMEID</translation>
-        </message>
-        <message>
-            <source>grace_ms=%1 attempts=%2 wrapper_exit=%3 crashed=%4</source>
-            <translation>grace_ms=%1 attempts=%2 wrapper_exit=%3 crashed=%4</translation>
-        </message>
-        <message>
             <location filename="../src/widgets/WineSelectMenu.cpp" line="181" />
             <source>Graphics: built-in · Prefix: 64-bit · Rosetta: %1</source>
             <translation>Graphics: ingebouwd · Prefix: 64-bits · Rosetta: %1</translation>
-        </message>
-        <message>
-            <location filename="../src/widgets/LauncherSettings.cpp" line="129" />
-            <source>gui/%1</source>
-            <translation>gui/%1</translation>
         </message>
         <message>
             <source>Help</source>
             <translation>Help</translation>
         </message>
         <message>
-            <source>HOME</source>
-            <translation>HOME</translation>
-        </message>
-        <message>
             <source>Homebrew Wine</source>
             <translation>Homebrew Wine</translation>
-        </message>
-        <message>
-            <source>host_pid=%1</source>
-            <translation>host_pid=%1</translation>
-        </message>
-        <message>
-            <source>host_pid=%1 windows_pid=%2</source>
-            <translation>host_pid=%1 windows_pid=%2</translation>
         </message>
         <message>
             <location filename="../src/widgets/LauncherSettings.cpp" line="481" />
@@ -1651,10 +1079,6 @@ Met Aanmeldlink kopiëren kun je de exacte link in elke browser plakken.</transl
         <message>
             <source>Incompatible Runtime</source>
             <translation>Incompatibele runtime</translation>
-        </message>
-        <message>
-            <source>initial_delay_ms=%1 interval_ms=%2</source>
-            <translation>initial_delay_ms=%1 interval_ms=%2</translation>
         </message>
         <message>
             <location filename="../src/widgets/GameInstall.cpp" line="92" />
@@ -1839,19 +1263,6 @@ Met Aanmeldlink kopiëren kun je de exacte link in elke browser plakken.</transl
             <translation>Variabelen die door de launcher worden beheerd voor runtime, vertaling, graphics en prefix kunnen niet worden overschreven.</translation>
         </message>
         <message>
-            <source>LD_PRELOAD</source>
-            <translation>LD_PRELOAD</translation>
-        </message>
-        <message>
-            <source>Library/Application Support</source>
-            <translation>Library/Application Support</translation>
-        </message>
-        <message>
-            <location filename="../src/widgets/LauncherSettings.cpp" line="126" />
-            <source>Library/LaunchAgents</source>
-            <translation>Library/LaunchAgents</translation>
-        </message>
-        <message>
             <location filename="../src/widgets/PrerequisitesIntro.cpp" line="177" />
             <source>LOCATE RUNTIME</source>
             <translation>RUNTIME ZOEKEN</translation>
@@ -1875,10 +1286,6 @@ Met Aanmeldlink kopiëren kun je de exacte link in elke browser plakken.</transl
             <location filename="../src/widgets/AdvancedSettings.cpp" line="157" />
             <source>Mac GL fallback</source>
             <translation>Mac GL-terugval</translation>
-        </message>
-        <message>
-            <source>MacCompatibilityProfile</source>
-            <translation>MacCompatibilityProfile</translation>
         </message>
         <message>
             <location filename="../src/widgets/AdvancedSettings.cpp" line="167" />
@@ -1942,10 +1349,6 @@ Met Aanmeldlink kopiëren kun je de exacte link in elke browser plakken.</transl
             <translation>MENU</translation>
         </message>
         <message>
-            <source>milestone_seconds=%1 game_confirmed=%2 wrapper_running=%3</source>
-            <translation>milestone_seconds=%1 game_confirmed=%2 wrapper_running=%3</translation>
-        </message>
-        <message>
             <source>Minimize Launcher</source>
             <translation>Launcher minimaliseren</translation>
         </message>
@@ -1965,14 +1368,6 @@ Met Aanmeldlink kopiëren kun je de exacte link in elke browser plakken.</transl
             <translation>umu-run ontbreekt. Proton heeft UMU nodig om zonder Steam te werken.</translation>
         </message>
         <message>
-            <source>Model:</source>
-            <translation>Model:</translation>
-        </message>
-        <message>
-            <source>native,</source>
-            <translation>native,</translation>
-        </message>
-        <message>
             <source>Nederlands</source>
             <translation>Nederlands</translation>
         </message>
@@ -1987,10 +1382,6 @@ Met Aanmeldlink kopiëren kun je de exacte link in elke browser plakken.</transl
             <location filename="../src/widgets/LauncherSettings.cpp" line="506" />
             <source>Network ping</source>
             <translation>Netwerkping</translation>
-        </message>
-        <message>
-            <source>No</source>
-            <translation>Nee</translation>
         </message>
         <message>
             <source>No executable runtime entry point was found in the selected app or folder.</source>
@@ -2062,14 +1453,6 @@ Met Aanmeldlink kopiëren kun je de exacte link in elke browser plakken.</transl
             <translation>Officiële website</translation>
         </message>
         <message>
-            <source>OffscreenRenderingMode</source>
-            <translation>OffscreenRenderingMode</translation>
-        </message>
-        <message>
-            <source>OK</source>
-            <translation>OK</translation>
-        </message>
-        <message>
             <source>Open</source>
             <translation>Openen</translation>
         </message>
@@ -2127,46 +1510,14 @@ Met Aanmeldlink kopiëren kun je de exacte link in elke browser plakken.</transl
             <translation>Optioneel. Laat dit leeg om de runtime te gebruiken die bij de launcher is inbegrepen.</translation>
         </message>
         <message>
-            <source>outcome=%1 exit_code=%2 crashed=%3 duration_ms=%4 %5</source>
-            <translation>outcome=%1 exit_code=%2 crashed=%3 duration_ms=%4 %5</translation>
-        </message>
-        <message>
             <location filename="../src/widgets/AdvancedSettings.cpp" line="120" />
             <source>Passed to Alicia.exe. Optional for most players.</source>
             <translation>Wordt doorgegeven aan Alicia.exe. Optioneel voor de meeste spelers.</translation>
         </message>
         <message>
-            <source>PASSWORD</source>
-            <translation>PASSWORD</translation>
-        </message>
-        <message>
-            <source>PATH</source>
-            <translation>PAD</translation>
-        </message>
-        <message>
             <location filename="../src/widgets/WineSettings.cpp" line="312" />
             <source>Path to Winetricks. Blank uses the one on PATH.</source>
             <translation>Pad naar Winetricks. Leeg gebruikt de versie in PATH.</translation>
-        </message>
-        <message>
-            <source>PhysXCooking.dll</source>
-            <translation>PhysXCooking.dll</translation>
-        </message>
-        <message>
-            <source>PhysXCore.dll</source>
-            <translation>PhysXCore.dll</translation>
-        </message>
-        <message>
-            <source>PhysXDevice.dll</source>
-            <translation>PhysXDevice.dll</translation>
-        </message>
-        <message>
-            <source>PhysXLoader.dll</source>
-            <translation>PhysXLoader.dll</translation>
-        </message>
-        <message>
-            <source>pid=,command=</source>
-            <translation>pid=,command=</translation>
         </message>
         <message>
             <location filename="../src/widgets/LauncherSettings.cpp" line="409" />
@@ -2240,19 +1591,6 @@ Met Aanmeldlink kopiëren kun je de exacte link in elke browser plakken.</transl
             <translation>Doorgaan met Discord</translation>
         </message>
         <message>
-            <source>profile=%1 game_version=%2 prefix=%3 executable=%4</source>
-            <translation>profile=%1 game_version=%2 prefix=%3 executable=%4</translation>
-        </message>
-        <message>
-            <source>program=/usr/bin/caffeinate flags=-dimsu</source>
-            <translation>program=/usr/bin/caffeinate flags=-dimsu</translation>
-        </message>
-        <message>
-            <location filename="../src/widgets/PrerequisitesIntro.cpp" line="390" />
-            <source>PROTON</source>
-            <translation>PROTON</translation>
-        </message>
-        <message>
             <location filename="../src/widgets/PrerequisitesIntro.cpp" line="299" />
             <location filename="../src/widgets/WineSelectMenu.cpp" line="127" />
             <source>Proton</source>
@@ -2276,18 +1614,6 @@ Ontbreekt: %1. %2 en start daarna de launcher opnieuw.</translation>
             <translation>Proton niet beschikbaar</translation>
         </message>
         <message>
-            <source>PROTON_</source>
-            <translation>PROTON_</translation>
-        </message>
-        <message>
-            <source>PROTON_USE_WINED3D</source>
-            <translation>PROTON_USE_WINED3D</translation>
-        </message>
-        <message>
-            <source>PROTONPATH</source>
-            <translation>PROTONPATH</translation>
-        </message>
-        <message>
             <location filename="../src/widgets/PrerequisitesIntro.cpp" line="374" />
             <source>Pure Wine needs both Wine and Winetricks.
 
@@ -2299,14 +1625,6 @@ Ontbreekt: %1. %2 en start daarna de launcher opnieuw.</translation>
         <message>
             <source>Quit Launcher</source>
             <translation>Launcher afsluiten</translation>
-        </message>
-        <message>
-            <source>r_motionBlur</source>
-            <translation>r_motionBlur</translation>
-        </message>
-        <message>
-            <source>r_radialBlur</source>
-            <translation>r_radialBlur</translation>
         </message>
         <message>
             <location filename="../src/widgets/LauncherSettings.cpp" line="479" />
@@ -2326,26 +1644,6 @@ Ontbreekt: %1. %2 en start daarna de launcher opnieuw.</translation>
             <location filename="../src/widgets/PrerequisitesIntro.cpp" line="488" />
             <source>Recommended setup for this computer</source>
             <translation>Aanbevolen configuratie voor deze computer</translation>
-        </message>
-        <message>
-            <source>reg.exe delete "%1" /v renderer /f &gt;nul 2&gt;&amp;1 &amp; exit /b 0</source>
-            <translation>reg.exe delete "%1" /v renderer /f &gt;nul 2&gt;&amp;1 &amp; exit /b 0</translation>
-        </message>
-        <message>
-            <source>REG_SZ</source>
-            <translation>REG_SZ</translation>
-        </message>
-        <message>
-            <source>REGEDIT4
-
-</source>
-            <translation>REGEDIT4
-
-</translation>
-        </message>
-        <message>
-            <source>Register dump</source>
-            <translation>Register dump</translation>
         </message>
         <message>
             <source>Remote returned HTTP %1 while retrieving %2</source>
@@ -2675,10 +1973,6 @@ Ontbreekt: %1. %2 en start daarna de launcher opnieuw.</translation>
             <translation>script or unknown architecture</translation>
         </message>
         <message>
-            <source>SECRET</source>
-            <translation>SECRET</translation>
-        </message>
-        <message>
             <location filename="../src/widgets/WineSelectMenu.cpp" line="225" />
             <source>Select a compatible runtime application, executable, or folder.</source>
             <translation>Selecteer een compatibele runtime-app, uitvoerbaar bestand of map.</translation>
@@ -2774,10 +2068,6 @@ Ontbreekt: %1. %2 en start daarna de launcher opnieuw.</translation>
             <translation>Selectiemenu</translation>
         </message>
         <message>
-            <source>SET_ACTIVITY</source>
-            <translation>SET_ACTIVITY</translation>
-        </message>
-        <message>
             <location filename="../src/widgets/Settings.cpp" line="44" />
             <source>Settings are editable</source>
             <translation>Instellingen kunnen worden bewerkt</translation>
@@ -2832,14 +2122,6 @@ Ontbreekt: %1. %2 en start daarna de launcher opnieuw.</translation>
             <translation>Door spaties gescheiden KEY=VALUE-items, bijvoorbeeld WINEDEBUG=-all.</translation>
         </message>
         <message>
-            <source>SPDisplaysDataType</source>
-            <translation>SPDisplaysDataType</translation>
-        </message>
-        <message>
-            <source>Stack dump</source>
-            <translation>Stack dump</translation>
-        </message>
-        <message>
             <location filename="../src/widgets/AliciaChooser.cpp" line="535" />
             <source>Start the selected Alicia playtest</source>
             <translation>De geselecteerde Alicia-playtest starten</translation>
@@ -2856,29 +2138,9 @@ Ontbreekt: %1. %2 en start daarna de launcher opnieuw.</translation>
             <translation>Opstartinstelling mislukt</translation>
         </message>
         <message>
-            <source>STEAM_COMPAT_</source>
-            <translation>STEAM_COMPAT_</translation>
-        </message>
-        <message>
-            <source>STEAM_COMPAT_CLIENT_INSTALL_PATH</source>
-            <translation>STEAM_COMPAT_CLIENT_INSTALL_PATH</translation>
-        </message>
-        <message>
-            <source>STEAM_COMPAT_DATA_PATH</source>
-            <translation>STEAM_COMPAT_DATA_PATH</translation>
-        </message>
-        <message>
-            <source>STEAM_COMPAT_LIBRARY_PATHS</source>
-            <translation>STEAM_COMPAT_LIBRARY_PATHS</translation>
-        </message>
-        <message>
             <location filename="../src/widgets/PrefixProgress.cpp" line="167" />
             <source>Step %1 of 3</source>
             <translation>Stap %1 van 3</translation>
-        </message>
-        <message>
-            <source>STORE</source>
-            <translation>STORE</translation>
         </message>
         <message>
             <source>Story Of Alicia</source>
@@ -2923,10 +2185,6 @@ Ontbreekt: %1. %2 en start daarna de launcher opnieuw.</translation>
         <message>
             <source>Story of Alicia Runtime</source>
             <translation>Story of Alicia Runtime</translation>
-        </message>
-        <message>
-            <source>Story of Alicia/runtimes</source>
-            <translation>Story of Alicia/runtimes</translation>
         </message>
         <message>
             <source>System Wine</source>
@@ -3493,14 +2751,6 @@ Ontbreekt: %1.</translation>
             <translation>time-out</translation>
         </message>
         <message>
-            <source>timeout_ms=%1 attempts=%2 wrapper_finished=%3 wrapper_exit=%4</source>
-            <translation>timeout_ms=%1 attempts=%2 wrapper_finished=%3 wrapper_exit=%4</translation>
-        </message>
-        <message>
-            <source>TOKEN</source>
-            <translation>TOKEN</translation>
-        </message>
-        <message>
             <source>Too many game launch arguments were provided.</source>
             <translation>Er zijn te veel startargumenten voor het spel opgegeven.</translation>
         </message>
@@ -3508,11 +2758,6 @@ Ontbreekt: %1.</translation>
             <location filename="../src/widgets/WineSettings.cpp" line="84" />
             <source>Translate Direct3D to Vulkan for better performance.</source>
             <translation>Vertaal Direct3D naar Vulkan voor betere prestaties.</translation>
-        </message>
-        <message>
-            <location filename="../src/widgets/PrerequisitesIntro.cpp" line="305" />
-            <source>UMU</source>
-            <translation>UMU</translation>
         </message>
         <message>
             <source>umu-run could not be started.</source>
@@ -3532,10 +2777,6 @@ Ontbreekt: %1.</translation>
             <location filename="../src/widgets/WineSettings.cpp" line="67" />
             <source>Unavailable in the current macOS runtime. The launcher keeps this off.</source>
             <translation>Niet beschikbaar in de huidige macOS-runtime. De launcher houdt dit uitgeschakeld.</translation>
-        </message>
-        <message>
-            <source>Unhandled exception</source>
-            <translation>Unhandled exception</translation>
         </message>
         <message>
             <location filename="../src/widgets/WineSelectMenu.cpp" line="138" />
@@ -3642,14 +2883,6 @@ Ontbreekt: %1.</translation>
             <translation>Versie</translation>
         </message>
         <message>
-            <source>vga compatible controller</source>
-            <translation>vga compatible controller</translation>
-        </message>
-        <message>
-            <source>VideoMemorySize</source>
-            <translation>VideoMemorySize</translation>
-        </message>
-        <message>
             <source>Wait for the current runtime operation to finish.</source>
             <translation>Wacht tot de huidige runtimebewerking is voltooid.</translation>
         </message>
@@ -3667,20 +2900,6 @@ Ontbreekt: %1.</translation>
             <location filename="../src/widgets/AdvancedSettings.cpp" line="43" />
             <source>Where the game is installed. Leave blank to use the default location.</source>
             <translation>Waar het spel is geïnstalleerd. Laat dit leeg om de standaardlocatie te gebruiken.</translation>
-        </message>
-        <message>
-            <source>windows_pid=%1 host_pid=%2 wrapper_exit=%3 fatal_trace=%4 present_seen=%5 draw_seen=%6</source>
-            <translation>windows_pid=%1 host_pid=%2 wrapper_exit=%3 fatal_trace=%4 present_seen=%5 draw_seen=%6</translation>
-        </message>
-        <message>
-            <source>windows_pid=%1 restored=%2</source>
-            <translation>windows_pid=%1 restored=%2</translation>
-        </message>
-        <message>
-            <location filename="../src/widgets/PrerequisitesIntro.cpp" line="391" />
-            <location filename="../src/widgets/Settings.cpp" line="186" />
-            <source>WINE</source>
-            <translation>WINE</translation>
         </message>
         <message>
             <location filename="../src/widgets/PrerequisitesIntro.cpp" line="300" />
@@ -3737,40 +2956,6 @@ Ontbreekt: %1.</translation>
         <message>
             <source>Wine Setup Failed</source>
             <translation>Wine-installatie mislukt</translation>
-        </message>
-        <message>
-            <source>WINE_FULLSCREEN_FSR</source>
-            <translation>WINE_FULLSCREEN_FSR</translation>
-        </message>
-        <message>
-            <source>WINEARCH</source>
-            <translation>WINEARCH</translation>
-        </message>
-        <message>
-            <source>WINEDEBUG</source>
-            <translation>WINEDEBUG</translation>
-        </message>
-        <message>
-            <source>WINEDLLOVERRIDES</source>
-            <translation>WINEDLLOVERRIDES</translation>
-        </message>
-        <message>
-            <location filename="../src/widgets/WineSettings.cpp" line="386" />
-            <source>WINEESYNC=1</source>
-            <translation>WINEESYNC=1</translation>
-        </message>
-        <message>
-            <source>WINEPREFIX</source>
-            <translation>WINEPREFIX</translation>
-        </message>
-        <message>
-            <source>WINESERVER</source>
-            <translation>WINESERVER</translation>
-        </message>
-        <message>
-            <location filename="../src/widgets/WineSettings.cpp" line="312" />
-            <source>WINETRICKS</source>
-            <translation>WINETRICKS</translation>
         </message>
         <message>
             <location filename="../src/widgets/PrerequisitesIntro.cpp" line="307" />
@@ -3838,14 +3023,6 @@ Ontbreekt: %1.</translation>
             <location filename="../src/widgets/RulesAgreement.cpp" line="108" />
             <source>Your playtest acknowledgement</source>
             <translation>Jouw bevestiging voor de playtest</translation>
-        </message>
-        <message>
-            <source>yyyyMMdd-HHmmss-zzz</source>
-            <translation>yyyyMMdd-HHmmss-zzz</translation>
-        </message>
-        <message>
-            <source>|unavailable</source>
-            <translation>|unavailable</translation>
         </message>
         <message>
             <location filename="../src/widgets/GameInstall.cpp" line="248" />
@@ -4225,10 +3402,6 @@ Ontbreekt: %1.</translation>
             <translation>Installatieprogramma starten…</translation>
         </message>
         <message>
-            <source>%1 MB of %2 MB</source>
-            <translation>%1 MB van %2 MB</translation>
-        </message>
-        <message>
             <source>%1 MB downloaded</source>
             <translation>%1 MB gedownload</translation>
         </message>
@@ -4424,7 +3597,75 @@ Ontbreekt: %1.</translation>
             <source>Select an existing executable umu-run file.</source>
             <translation>Selecteer een bestaand uitvoerbaar umu-run-bestand.</translation>
         </message>
-    </context>
+        <message>
+            <source>Check for Updates</source>
+            <translation>Controleren op updates</translation>
+        </message>
+        <message>
+            <source>Launcher Up to Date</source>
+            <translation>Launcher is bijgewerkt</translation>
+        </message>
+        <message>
+            <source>You already have the newest available launcher version.</source>
+            <translation>Je hebt al de nieuwste beschikbare launcherversie.</translation>
+        </message>
+        <message>
+            <source>Launcher Update Check Failed</source>
+            <translation>Controleren op launcherupdate mislukt</translation>
+        </message>
+        <message>
+            <source>No launcher files were changed.</source>
+            <translation>Er zijn geen launcherbestanden gewijzigd.</translation>
+        </message>
+        <message>
+            <source>Launcher self-updates are not available on this platform yet.</source>
+            <translation>Zelfupdates van de launcher zijn nog niet beschikbaar op dit platform.</translation>
+        </message>
+        <message>
+            <source>This launcher build does not contain a valid update-signing public key.</source>
+            <translation>Deze launcherbuild bevat geen geldige openbare sleutel voor het ondertekenen van updates.</translation>
+        </message>
+        <message>
+            <source>The launcher update service could not be initialized.</source>
+            <translation>De launcherupdateservice kon niet worden geïnitialiseerd.</translation>
+        </message>
+        <message>
+        <source>Open the exact copied sign-in link in the browser you want to use.</source>
+        <translation>Open the exact copied sign-in link in the browser you want to use.</translation>
+    </message>
+    <message>
+        <source>Sign in with Discord and authorize the launcher.</source>
+        <translation>Sign in with Discord and authorize the launcher.</translation>
+    </message>
+    <message>
+        <source>If login did not work, cancel and try again.</source>
+        <translation>If login did not work, cancel and try again.</translation>
+    </message>
+    <message>
+        <source>%1 (default)</source>
+        <translation>%1 (default)</translation>
+    </message>
+    <message>
+        <source>from %1</source>
+        <translation>from %1</translation>
+    </message>
+    <message>
+        <source>Click %1 when prompted.</source>
+        <translation>Click %1 when prompted.</translation>
+    </message>
+    <message>
+        <source>By clicking the “Proceed with Discord” button, you acknowledge that your Discord ID will be stored on our database servers indefinitely for identification and service purposes. This data can be removed upon request by emailing %1.</source>
+        <translation>By clicking the “Proceed with Discord” button, you acknowledge that your Discord ID will be stored on our database servers indefinitely for identification and service purposes. This data can be removed upon request by emailing %1.</translation>
+    </message>
+    <message>
+        <source>Applications</source>
+        <translation>Programma’s</translation>
+    </message>
+    <message>
+        <source>All Files</source>
+        <translation>Alle bestanden</translation>
+    </message>
+</context>
     <context>
         <name>QPlatformTheme</name>
         <message>
@@ -4458,14 +3699,6 @@ Ontbreekt: %1.</translation>
         <message>
             <source>Ignore</source>
             <translation>Negeren</translation>
-        </message>
-        <message>
-            <source>No</source>
-            <translation>Nee</translation>
-        </message>
-        <message>
-            <source>OK</source>
-            <translation>OK</translation>
         </message>
         <message>
             <source>Open</source>
@@ -4527,14 +3760,6 @@ Ontbreekt: %1.</translation>
             <translation>&amp;Negeren</translation>
         </message>
         <message>
-            <source>&amp;No</source>
-            <translation>&amp;Nee</translation>
-        </message>
-        <message>
-            <source>&amp;OK</source>
-            <translation>&amp;OK</translation>
-        </message>
-        <message>
             <source>&amp;Open</source>
             <translation>&amp;Openen</translation>
         </message>
@@ -4585,14 +3810,6 @@ Ontbreekt: %1.</translation>
         <message>
             <source>Ignore</source>
             <translation>Negeren</translation>
-        </message>
-        <message>
-            <source>No</source>
-            <translation>Nee</translation>
-        </message>
-        <message>
-            <source>OK</source>
-            <translation>OK</translation>
         </message>
         <message>
             <source>Open</source>

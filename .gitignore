@@ -70,9 +70,15 @@ Testing/
 
 
 .idea/
-/packaging/AppDir/
-/packaging/build-appimage/
-/packaging/linuxdeploy-x86_64.AppImage
-/packaging/linuxdeploy-plugin-qt-x86_64.AppImage
-/packaging/Story_Of_Alicia-*.AppImage
+/packaging/soa-update-key.pem
+/packaging/linux/AppDir/
+/packaging/linux/build-appimage/
+/packaging/linux/squashfs-root/
+/packaging/linux/linuxdeploy-x86_64.AppImage
+/packaging/linux/linuxdeploy-plugin-qt-x86_64.AppImage
+/packaging/linux/Story_Of_Alicia-x86_64.AppImage
+/packaging/linux/version.json
+/packaging/linux/version.json.sig
+/packaging/linux/versions.json
+/packaging/linux/versions.json.sig
 .DS_Store
