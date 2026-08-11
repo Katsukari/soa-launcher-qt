@@ -129,6 +129,7 @@ if [ -z "${SOA_UPDATE_SIGNING_KEY:-}" ]; then
   chmod 600 "$TEMPORARY_UPDATE_KEY"
   SOA_UPDATE_SIGNING_KEY="$TEMPORARY_UPDATE_KEY"
 fi
+export SOA_UPDATE_SIGNING_KEY
 
 cleanup_update_key() {
   if [ -n "$TEMPORARY_UPDATE_KEY" ]; then
