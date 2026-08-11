@@ -23,12 +23,7 @@ jobs:
 
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - name: Linux GCC / AppImage
-            cpp_compiler: g++
-          - name: Linux Clang
-            cpp_compiler: clang++
+      matrix: ${{ fromJSON((github.event_name == 'workflow_dispatch' || vars.SOA_LINUX_CLANG_ENABLED != 'false') && '{"include":[{"name":"Linux GCC / AppImage","cpp_compiler":"g++"},{"name":"Linux Clang","cpp_compiler":"clang++"}]}' || '{"include":[{"name":"Linux GCC / AppImage","cpp_compiler":"g++"}]}') }}
 
     steps:
       - name: Check out repository
@@ -183,6 +178,23 @@ jobs:
             -v "$extract_root/squashfs-root:/app:ro" \
             ubuntu:22.04 bash -s <<'CHECK_APPIMAGE'
           set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update >/dev/null
+          apt-get install --yes --no-install-recommends \
+            libegl1 \
+            libfontconfig1 \
+            libfreetype6 \
+            libgl1 \
+            libglib2.0-0 \
+            libglx0 \
+            libopengl0 \
+            libwayland-client0 \
+            libwayland-cursor0 \
+            libwayland-egl1 \
+            libx11-6 \
+            libx11-xcb1 \
+            libxcb-glx0 \
+            libxcb1 >/dev/null
           swift_core="$(find /app -name 'libswiftCore.so*' -print -quit)"
           if [ -z "$swift_core" ]; then
             echo "libswiftCore.so is not bundled in the AppImage." >&2
