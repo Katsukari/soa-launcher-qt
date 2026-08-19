@@ -7,52 +7,75 @@
 
 namespace util::progress_bar
 {
-    void draw(QPainter& painter, const QRect& bar, const double fraction)
+    namespace
     {
-        const QPixmap& track = assets::images[assets::Image::ProgressBarTrack];
-        painter.drawPixmap(bar, track);
-
-        if (fraction <= 0.0 || bar.isEmpty()) return;
-
-
-
-
-        const int inset_x = qMax(1, qRound(9.0 * bar.width() / 430.0));
-        const int inset_y = qMax(1, qRound(1.0 * bar.height() / 19.0));
-        const QRect fill_area = bar.adjusted(inset_x, inset_y, -inset_x, -inset_y);
-        if (fill_area.isEmpty()) return;
-
-        const QPixmap& start_px = assets::images[assets::Image::ProgressBarStart];
-        const QPixmap& mid_px   = assets::images[assets::Image::ProgressBarMiddle];
-        const QPixmap& end_px   = assets::images[assets::Image::ProgressBarEnd];
-
-        const int h  = fill_area.height();
-        const int sw = start_px.height() > 0 ? qRound(start_px.width() * h / double(start_px.height())) : h;
-        const int ew = end_px.height() > 0 ? qRound(end_px.width() * h / double(end_px.height())) : h;
-        const int fill_w = qRound(fill_area.width() * qBound(0.0, fraction, 1.0));
-        if (fill_w <= 0) return;
-
-        painter.save();
-        painter.setClipRect(QRect(fill_area.left(), fill_area.top(), fill_w, h));
-
-        painter.drawPixmap(
-            QRect(fill_area.left(), fill_area.top(), sw, h),
-            start_px);
-
-        const int mid_left = fill_area.left() + sw;
-        const int mid_right = fill_area.left() + fill_w - ew;
-        const int mid_w = qMax(0, mid_right - mid_left);
-        if (mid_w > 0)
-            painter.drawPixmap(QRect(mid_left, fill_area.top(), mid_w, h), mid_px);
-
-        if (fill_w > sw)
+        QRect fill_area(const QRect& bar)
         {
-            const int end_w = qMin(ew, fill_w);
-            painter.drawPixmap(
-                QRect(fill_area.left() + fill_w - end_w, fill_area.top(), end_w, h),
-                end_px);
+            const int inset_x = qMax(1, qRound(9.0 * bar.width() / 430.0));
+            const int inset_y = qMax(1, qRound(1.0 * bar.height() / 19.0));
+            return bar.adjusted(inset_x, inset_y, -inset_x, -inset_y);
         }
 
-        painter.restore();
+        void draw_segment(QPainter& painter, const QRect& area,
+                          const int left, const int width)
+        {
+            if (area.isEmpty() || width <= 0)
+                return;
+
+            const QPixmap& start_px = assets::images[assets::Image::ProgressBarStart];
+            const QPixmap& mid_px = assets::images[assets::Image::ProgressBarMiddle];
+            const QPixmap& end_px = assets::images[assets::Image::ProgressBarEnd];
+            const int height = area.height();
+            const int start_width = start_px.height() > 0
+                ? qRound(start_px.width() * height / double(start_px.height()))
+                : height;
+            const int end_width = end_px.height() > 0
+                ? qRound(end_px.width() * height / double(end_px.height()))
+                : height;
+
+            painter.save();
+            painter.setClipRect(area.intersected(QRect(left, area.top(), width, height)));
+            painter.drawPixmap(QRect(left, area.top(), start_width, height), start_px);
+
+            const int middle_left = left + start_width;
+            const int middle_right = left + width - end_width;
+            const int middle_width = qMax(0, middle_right - middle_left);
+            if (middle_width > 0)
+                painter.drawPixmap(
+                    QRect(middle_left, area.top(), middle_width, height), mid_px);
+
+            if (width > start_width)
+            {
+                const int visible_end_width = qMin(end_width, width);
+                painter.drawPixmap(
+                    QRect(left + width - visible_end_width, area.top(),
+                          visible_end_width, height),
+                    end_px);
+            }
+            painter.restore();
+        }
+    }
+
+    void draw(QPainter& painter, const QRect& bar, const double fraction)
+    {
+        painter.drawPixmap(bar, assets::images[assets::Image::ProgressBarTrack]);
+        if (fraction <= 0.0 || bar.isEmpty())
+            return;
+        const QRect area = fill_area(bar);
+        draw_segment(painter, area, area.left(),
+                     qRound(area.width() * qBound(0.0, fraction, 1.0)));
+    }
+
+    void draw_indeterminate(QPainter& painter, const QRect& bar, const double phase)
+    {
+        painter.drawPixmap(bar, assets::images[assets::Image::ProgressBarTrack]);
+        if (bar.isEmpty())
+            return;
+        const QRect area = fill_area(bar);
+        const int segment_width = qMax(1, qRound(area.width() * 0.28));
+        const int travel = area.width() + segment_width;
+        const int left = area.left() - segment_width
+            + qRound(travel * qBound(0.0, phase, 1.0));
+        draw_segment(painter, area, left, segment_width);
     }
 }

@@ -7,6 +7,7 @@ them sweeps up registry fragments, environment variable names, command-line
 flags and paths along with the real UI text. This decides which is which.
 
     filter-translatable.py --check translations/*.ts     # CI: fail on machine tokens
+    filter-translatable.py --missing translations/*.ts   # CI: fail on missing UI literals
     filter-translatable.py --prune translations/*.ts     # remove them, keep files in sync
     filter-translatable.py --list  translations/soa_launcher_en.ts
 
@@ -17,9 +18,11 @@ apart. It refuses to run unless all of them contain the same source strings.
 from __future__ import annotations
 
 import argparse
+import ast
 import html
 import re
 import sys
+import xml.etree.ElementTree as ET
 from collections import Counter, defaultdict
 from pathlib import Path
 
@@ -53,13 +56,21 @@ KEEP = {
     "ABOUT", "ADVANCED", "CANCEL", "CHECKING", "CONFIRMATION", "COPIED",
     "CREDITS", "DOWNLOADING", "ERROR", "FAILED", "HOME", "INFORMATION",
     "INSTALL", "LAUNCHER", "MENU", "PLAYER", "PLAYTEST", "PREPARING",
-    "READY", "REPAIRING", "RESUMING", "RETRY", "RUNTIME", "STORE",
+    "PROTON", "READY", "REPAIRING", "RESUMING", "RETRY", "RUNTIME", "STORE",
+    "UMU", "WINE", "%1 B", "%1 GB", "%1 KB", "%1 MB", "%1 MB of %2 MB", "%1/s",
+    "%1h", "%1h %2m", "%1m", "%1m %2s", "%1s",
     "VERSION", "WARNING", "Normal", "English", "Norsk", "Nederlands",
 }
 
 WORD = re.compile(r"[A-Za-z]{3,}")
 PLACEHOLDER = re.compile(r"%\d+|%[a-z]")
 TAG = re.compile(r"<[^>]+>")
+CPP_STRING_PATTERN = r'(?:u8|u|U|L)?"(?:\\.|[^"\\])*"'
+TRANSLATE_LITERAL = re.compile(
+    rf'\b(?:util::)?i18n::translate\s*\(\s*((?:{CPP_STRING_PATTERN}\s*)+)\)',
+    re.S,
+)
+CPP_STRING = re.compile(CPP_STRING_PATTERN)
 
 
 def classify(source: str) -> str | None:
@@ -125,6 +136,37 @@ def sources(text: str) -> list[str]:
     return [html.unescape(m) for m in re.findall(r"<source>(.*?)</source>", text, re.S)]
 
 
+def context_sources(text: str, context_name: str) -> set[str]:
+    root = ET.fromstring(text)
+    for context in root.findall("context"):
+        if context.findtext("name") == context_name:
+            return {
+                message.findtext("source") or ""
+                for message in context.findall("message")
+            }
+    return set()
+
+
+def literal_translation_sources(source_root: Path) -> dict[str, list[tuple[Path, int]]]:
+    found: dict[str, list[tuple[Path, int]]] = defaultdict(list)
+    suffixes = {".cpp", ".h", ".hpp", ".m", ".mm"}
+    for path in sorted(source_root.rglob("*")):
+        if path.suffix not in suffixes:
+            continue
+        text = path.read_text(encoding="utf-8")
+        for match in TRANSLATE_LITERAL.finditer(text):
+            parts: list[str] = []
+            for token_match in CPP_STRING.finditer(match.group(1)):
+                token = re.sub(r"^(?:u8|u|U|L)", "", token_match.group(0))
+                value = ast.literal_eval(token)
+                if not isinstance(value, str):
+                    raise ValueError(f"unexpected non-string literal in {path}")
+                parts.append(value)
+            line = text.count("\n", 0, match.start()) + 1
+            found["".join(parts)].append((path, line))
+    return found
+
+
 def prune(text: str, doomed: set[str]) -> tuple[str, int]:
     kept, removed = [], 0
     for chunk in re.split(r"(<message>.*?</message>\s*)", text, flags=re.S):
@@ -142,10 +184,14 @@ def main() -> int:
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--check", action="store_true",
                       help="exit 1 if any machine token is present")
+    mode.add_argument("--missing", action="store_true",
+                      help="exit 1 if a literal translate() source is missing")
     mode.add_argument("--prune", action="store_true",
                       help="remove machine tokens from every file given")
     mode.add_argument("--list", action="store_true",
                       help="show what would be removed, grouped by reason")
+    parser.add_argument("--source-root", type=Path, default=Path("src"),
+                        help="source tree scanned by --missing (default: src)")
     parser.add_argument("files", nargs="+", type=Path)
     args = parser.parse_args()
 
@@ -160,6 +206,37 @@ def main() -> int:
             print(f"error: {path.name} does not contain the same sources as the others "
                   f"({len(only)} differ); fix that before pruning", file=sys.stderr)
             return 2
+
+    if args.missing:
+        launcher_sets = {
+            path: context_sources(text, "Launcher")
+            for path, text in catalogues.items()
+        }
+        launcher_reference = next(iter(launcher_sets.values()))
+        for path, entries in launcher_sets.items():
+            if entries != launcher_reference:
+                only = entries ^ launcher_reference
+                print(
+                    f"error: {path.name} does not contain the same Launcher-context "
+                    f"sources as the others ({len(only)} differ)",
+                    file=sys.stderr,
+                )
+                return 2
+        locations = literal_translation_sources(args.source_root)
+        missing = {source: refs for source, refs in locations.items()
+                   if source not in launcher_reference}
+        if not missing:
+            print(
+                f"complete: {len(locations)} literal translation sources are "
+                "catalogued in the Launcher context"
+            )
+            return 0
+        print(f"{len(missing)} literal translation sources are missing:", file=sys.stderr)
+        for source, refs in sorted(missing.items(), key=lambda item: item[1][0]):
+            path, line = refs[0]
+            shown = source.replace("\n", r"\n")
+            print(f"  {path}:{line}: {shown!r}", file=sys.stderr)
+        return 1
 
     reasons: dict[str, str] = {}
     for source in reference:

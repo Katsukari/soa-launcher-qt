@@ -118,7 +118,6 @@ private:
     bool minimized_for_game {};
     bool force_quit_requested {};
     bool launcher_update_check_complete {};
-    bool manual_launcher_update_check {};
     QSystemTrayIcon* tray_icon {};
     QMenu* tray_menu {};
     QAction* open_launcher_action {};

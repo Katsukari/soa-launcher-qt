@@ -242,9 +242,6 @@ void MainWindow::setup_discord_rpc()
 
 void MainWindow::setup_system_tray()
 {
-    if (!QSystemTrayIcon::isSystemTrayAvailable())
-        return;
-
     tray_menu = new QMenu(this);
     open_launcher_action = tray_menu->addAction(QStringLiteral("Open Launcher"));
     run_alicia_action = tray_menu->addAction(QStringLiteral("Run Alicia Directly"));
@@ -257,7 +254,7 @@ void MainWindow::setup_system_tray()
     connect(tray_menu, &QMenu::aboutToShow, this, &MainWindow::refresh_tray_actions);
 
     tray_icon = new QSystemTrayIcon(QIcon(QStringLiteral(":/assets/soa-logo.png")), this);
-    tray_icon->setToolTip(QStringLiteral("Story Of Alicia Launcher"));
+    tray_icon->setToolTip(util::i18n::translate("Story Of Alicia Launcher"));
     tray_icon->setContextMenu(tray_menu);
     connect(tray_icon, &QSystemTrayIcon::activated, this,
             [this](const QSystemTrayIcon::ActivationReason reason)
@@ -404,9 +401,9 @@ void MainWindow::setup_launcher_menu()
 
     language_button = make_menu_button(QStringLiteral("Language"), 0);
     show_log_button = make_menu_button(QStringLiteral("Show Launcher Log"), 1);
-    check_updates_button = make_menu_button(QStringLiteral("Check for Updates"), 2);
-    about_button = make_menu_button(QStringLiteral("About"), 3);
-    credits_button = make_menu_button(QStringLiteral("Credits"), 4);
+    check_updates_button = make_menu_button(QStringLiteral("Manage Launcher Versions"), 2);
+    credits_button = make_menu_button(QStringLiteral("Credits"), 3);
+    about_button = make_menu_button(QStringLiteral("About"), 4);
 
     language_menu = new QMenu(this);
     language_menu->setStyleSheet(QStringLiteral(
@@ -452,9 +449,8 @@ void MainWindow::setup_launcher_menu()
         set_launcher_menu_visible(false);
         if (!launcher_update_manager)
             return;
-        manual_launcher_update_check = true;
         check_updates_button->setEnabled(false);
-        launcher_update_manager->check_for_updates();
+        launcher_update_manager->manage_versions();
     });
     connect(about_button, &QPushButton::clicked, this, [this]()
     {
@@ -522,14 +518,16 @@ void MainWindow::raise_persistent_controls()
 
 void MainWindow::show_about()
 {
-    LauncherInfoDialog dialog(LauncherInfoDialog::Page::About, this);
-    dialog.exec();
+    auto* dialog = new LauncherInfoDialog(LauncherInfoDialog::Page::About, this);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->open();
 }
 
 void MainWindow::show_credits()
 {
-    LauncherInfoDialog dialog(LauncherInfoDialog::Page::Credits, this);
-    dialog.exec();
+    auto* dialog = new LauncherInfoDialog(LauncherInfoDialog::Page::Credits, this);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->open();
 }
 
 void MainWindow::request_quit()
@@ -554,7 +552,7 @@ void MainWindow::retranslate_dynamic_text()
     if (show_log_button)
         show_log_button->setText(util::i18n::translate("Show Launcher Log"));
     if (check_updates_button)
-        check_updates_button->setText(util::i18n::translate("Check for Updates"));
+        check_updates_button->setText(util::i18n::translate("Manage Launcher Versions"));
     if (about_button)
         about_button->setText(util::i18n::translate("About"));
     if (credits_button)
@@ -565,6 +563,8 @@ void MainWindow::retranslate_dynamic_text()
         run_alicia_action->setText(util::i18n::translate("Run Alicia Directly"));
     if (tray_quit_action)
         tray_quit_action->setText(util::i18n::translate("Quit Launcher"));
+    if (tray_icon)
+        tray_icon->setToolTip(util::i18n::translate("Story Of Alicia Launcher"));
     if (launcher_menu_button)
     {
         launcher_menu_button->setText(QStringLiteral("☰"));
@@ -794,7 +794,10 @@ void MainWindow::setup_game_selector()
 
     playtest_button = util::simple_utils::make_flat_button(this);
     playtest_button->setCursor(Qt::PointingHandCursor);
-    playtest_button->setAccessibleName("Story of Alicia Playtest");
+    playtest_button->setAccessibleName(
+        util::i18n::translate("Story Of Alicia Playtest"));
+    playtest_button->setProperty(
+        "soa_i18n_accessible_name_source", QStringLiteral("Story Of Alicia Playtest"));
     playtest_button->setGeometry(util::layout::chrome::playtest_button(window_size));
     connect(playtest_button, &QPushButton::clicked, this, [this]()
     {
@@ -803,7 +806,10 @@ void MainWindow::setup_game_selector()
 
     alicia_2_button = util::simple_utils::make_flat_button(this);
     alicia_2_button->setCursor(Qt::PointingHandCursor);
-    alicia_2_button->setAccessibleName("Story of Alicia 2.0");
+    alicia_2_button->setAccessibleName(
+        util::i18n::translate("Story Of Alicia 2.0 Playtest"));
+    alicia_2_button->setProperty(
+        "soa_i18n_accessible_name_source", QStringLiteral("Story Of Alicia 2.0 Playtest"));
     alicia_2_button->setGeometry(util::layout::chrome::alicia_2_button(window_size));
     connect(alicia_2_button, &QPushButton::clicked, this, [this]()
     {
@@ -872,32 +878,27 @@ void MainWindow::setup_launcher_updates()
     {
         if (check_updates_button)
             check_updates_button->setEnabled(true);
-        if (manual_launcher_update_check)
-        {
-            LauncherDialog::information(
-                this,
-                QStringLiteral("Launcher Up to Date"),
-                QStringLiteral("You already have the newest available launcher version."));
-        }
-        manual_launcher_update_check = false;
         continue_after_launcher_update_check();
     });
     connect(launcher_update_manager,
             &core::update::LauncherUpdateManager::check_failed,
+            this, [this](const QString&)
+    {
+        if (check_updates_button)
+            check_updates_button->setEnabled(true);
+        continue_after_launcher_update_check();
+    });
+    connect(launcher_update_manager,
+            &core::update::LauncherUpdateManager::manual_check_failed,
             this, [this](const QString& reason)
     {
         if (check_updates_button)
             check_updates_button->setEnabled(true);
-        if (manual_launcher_update_check)
-        {
-            LauncherDialog::warning(
-                this,
-                QStringLiteral("Launcher Update Check Failed"),
-                reason,
-                QStringLiteral("No launcher files were changed."));
-        }
-        manual_launcher_update_check = false;
-        continue_after_launcher_update_check();
+        LauncherDialog::warning(
+            this,
+            QStringLiteral("Launcher Update Check Failed"),
+            reason,
+            QStringLiteral("No launcher files were changed."));
     });
     connect(launcher_update_manager,
             &core::update::LauncherUpdateManager::update_found,
@@ -905,21 +906,47 @@ void MainWindow::setup_launcher_updates()
     {
         if (check_updates_button)
             check_updates_button->setEnabled(true);
-        manual_launcher_update_check = false;
         launcher_update->set_release(
             launcher_update_manager->available_version(),
             launcher_update_manager->update_required(),
             launcher_update_manager->release_message());
+        launcher_update->set_versions(
+            core::update::LauncherUpdateManager::current_version(),
+            launcher_update_manager->available_versions(), false);
+        open_overlay(launcher_update);
+    });
+    connect(launcher_update_manager,
+            &core::update::LauncherUpdateManager::catalogue_ready,
+            this, [this]()
+    {
+        if (check_updates_button)
+            check_updates_button->setEnabled(true);
+        launcher_update->set_release(
+            launcher_update_manager->available_version(), false,
+            launcher_update_manager->release_message());
+        launcher_update->set_versions(
+            core::update::LauncherUpdateManager::current_version(),
+            launcher_update_manager->available_versions(), true);
         open_overlay(launcher_update);
     });
     connect(launcher_update, &LauncherUpdate::postponed, this, [this]()
     {
+        launcher_update_manager->cancel_download();
+        launcher_update->set_downloading(false);
         close_overlay(launcher_update);
         continue_after_launcher_update_check();
     });
     connect(launcher_update, &LauncherUpdate::update_requested,
             launcher_update_manager,
             &core::update::LauncherUpdateManager::download_and_install);
+    connect(launcher_update, &LauncherUpdate::version_selected,
+            this, [this](const QString& version)
+    {
+        launcher_update_manager->select_version(version);
+        launcher_update->set_release(
+            launcher_update_manager->available_version(), false,
+            launcher_update_manager->release_message());
+    });
     connect(launcher_update_manager,
             &core::update::LauncherUpdateManager::download_started,
             this, [this]()
@@ -1251,6 +1278,16 @@ void MainWindow::closeEvent(QCloseEvent* event)
     if (force_quit_requested)
     {
         event->accept();
+        QTimer::singleShot(0, qApp, []() { QCoreApplication::exit(0); });
+        return;
+    }
+
+    if (tray_icon && tray_icon->isVisible()
+        && QSystemTrayIcon::isSystemTrayAvailable())
+    {
+        set_launcher_menu_visible(false);
+        hide();
+        event->ignore();
         return;
     }
 
@@ -1269,6 +1306,7 @@ void MainWindow::closeEvent(QCloseEvent* event)
     if (!operationActive)
     {
         event->accept();
+        QTimer::singleShot(0, qApp, []() { QCoreApplication::exit(0); });
         return;
     }
 
@@ -1307,6 +1345,7 @@ void MainWindow::closeEvent(QCloseEvent* event)
     else if (result == LauncherDialog::Secondary)
     {
         event->accept();
+        QTimer::singleShot(0, qApp, []() { QCoreApplication::exit(0); });
     }
     else
     {

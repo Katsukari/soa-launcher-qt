@@ -12,21 +12,27 @@ project(soa_launcher
 
 if(APPLE)
     set(SOA_LAUNCHER_UPDATE_MANIFEST_URL
-        "https://r2.storyofalicia.com/launcher/macos/version.json"
+        "https://r2.storyofalicia.com/launcher/macos/macos-version.json"
         CACHE STRING "HTTPS URL of the launcher update manifest")
     set(SOA_LAUNCHER_UPDATE_FALLBACK_MANIFEST_URL
-        "https://r2.storyofalicia.com/launcher/macos/version.json"
+        "https://github.com/Story-Of-Alicia/soa-launcher-qt/releases/latest/download/macos-version.json"
         CACHE STRING "Fallback HTTPS URL of the launcher update manifest")
 else()
     set(SOA_LAUNCHER_UPDATE_MANIFEST_URL
         "https://r2.storyofalicia.com/launcher/linux/version.json"
         CACHE STRING "HTTPS URL of the launcher update manifest")
     set(SOA_LAUNCHER_UPDATE_FALLBACK_MANIFEST_URL
-        "https://r2.storyofalicia.com/launcher/linux/version.json"
+        "https://github.com/Story-Of-Alicia/soa-launcher-qt/releases/latest/download/version.json"
         CACHE STRING "Fallback HTTPS URL of the launcher update manifest")
 endif()
+file(READ
+    "${CMAKE_CURRENT_SOURCE_DIR}/packaging/update-public-key.hex"
+    SOA_DEFAULT_UPDATE_PUBLIC_KEY_HEX)
+string(STRIP
+    "${SOA_DEFAULT_UPDATE_PUBLIC_KEY_HEX}"
+    SOA_DEFAULT_UPDATE_PUBLIC_KEY_HEX)
 set(SOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX
-    "f3c027a5393a7f839644d2181b3f51c859f8bf4978e1b7733b95d815352d6c3f"
+    "${SOA_DEFAULT_UPDATE_PUBLIC_KEY_HEX}"
     CACHE STRING "Raw Ed25519 update-signing public key as 64 hexadecimal characters")
 
 string(LENGTH
@@ -195,6 +201,7 @@ set(LAUNCHER_SOURCES
         src/core/system/SystemProfile.cpp
         src/core/integrity/GameIntegrityWatcher.cpp
         src/core/update/LauncherUpdateManager.cpp
+        src/core/update/LauncherReleaseCatalogue.cpp
         src/core/wine/PrefixInspector.cpp
         src/core/network/Courier.cpp
         src/core/network/SwiftHttpClient.cpp
@@ -218,6 +225,7 @@ set(LAUNCHER_SOURCES
 
 set(LAUNCHER_HEADERS
         include/MainWindow.hpp
+        include/core/update/LauncherReleaseCatalogue.hpp
         include/util/Assets.hpp
         include/util/LanguageManager.hpp
         include/widgets/AliciaChooser.hpp
@@ -470,7 +478,7 @@ if(APPLE)
                 "${SOA_ALICIA_LOG_HOOK_DLL}"
                 "$<TARGET_BUNDLE_DIR:${PROJECT_NAME}>/Contents/Resources/alicia-log-hook/SoaAliciaLogHook.dll"
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${SOA_ALICIA_LOG_HOOK_OUTPUT_DIR}/soa-audio-host"
+                "$<TARGET_FILE:soa_audio_host>"
                 "$<TARGET_BUNDLE_DIR:${PROJECT_NAME}>/Contents/Resources/alicia-log-hook/soa-audio-host"
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 "${CMAKE_CURRENT_SOURCE_DIR}/third_party/alicia-log-hook/README.md"
@@ -531,7 +539,7 @@ set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "${PROJECT_DESCRIPTION}")
 if(APPLE)
     set(CPACK_GENERATOR "DragNDrop")
     set(CPACK_DMG_VOLUME_NAME "Story Of Alicia Launcher")
-    set(CPACK_PACKAGE_FILE_NAME "Story_Of_Alicia-${CMAKE_SYSTEM_PROCESSOR}")
+    set(CPACK_PACKAGE_FILE_NAME "Story_Of_Alicia-macos")
     include(CPack)
 endif()
 
@@ -696,30 +704,54 @@ if(BUILD_TESTING)
             COMMAND courier_hash_tests
     )
 
+    qt_add_executable(launcher_release_catalogue_tests
+            tests/launcher_release_catalogue_tests.cpp
+            src/core/update/LauncherReleaseCatalogue.cpp
+    )
+
+    target_include_directories(launcher_release_catalogue_tests PRIVATE
+            ${SOA_INCLUDE_DIRS}
+    )
+
+    target_link_libraries(launcher_release_catalogue_tests PRIVATE
+            Qt6::Core
+    )
+
+    add_test(
+            NAME launcher_release_catalogue_tests
+            COMMAND launcher_release_catalogue_tests
+    )
+
+    add_executable(update_signature_tests
+            tests/update_signature_tests.c
+    )
+
+    target_include_directories(update_signature_tests PRIVATE
+            ${SOA_INCLUDE_DIRS}
+    )
+
     if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-        add_executable(update_signature_tests
-                tests/update_signature_tests.c
+        target_sources(update_signature_tests PRIVATE
                 src/core/network/UpdateSignature.c
         )
-
-        target_include_directories(update_signature_tests PRIVATE
-                ${SOA_INCLUDE_DIRS}
-        )
-
         target_link_libraries(update_signature_tests PRIVATE
                 OpenSSL::Crypto
         )
-
-        set_target_properties(update_signature_tests PROPERTIES
-                AUTOMOC OFF
-                AUTORCC OFF
-                AUTOUIC OFF
-        )
-
-        add_test(
-                NAME update_signature_tests
-                COMMAND update_signature_tests
+    else()
+        target_link_libraries(update_signature_tests PRIVATE
+                soa_network
         )
     endif()
+
+    set_target_properties(update_signature_tests PROPERTIES
+            AUTOMOC OFF
+            AUTORCC OFF
+            AUTOUIC OFF
+    )
+
+    add_test(
+            NAME update_signature_tests
+            COMMAND update_signature_tests
+    )
 
 endif()

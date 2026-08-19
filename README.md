@@ -74,7 +74,7 @@ for normal play.
 [SergeantSerk's log-hook project](https://github.com/SergeantSerk/log-hook).
 The exact upstream snapshot, author attribution, modifications, MinHook license,
 and redistribution warning are recorded in
-[`third_party/alicia-log-hook/UPSTREAM.md`](third_party/alicia-log-hook/UPSTREAM.md).
+[`third_party/alicia-log-hook/README.md`](third_party/alicia-log-hook/README.md).
 
 On macOS, a diagnostic archive can also be created with:
 

@@ -1,5 +1,41 @@
 import Foundation
+#if canImport(CryptoKit)
+import CryptoKit
+#endif
 import Soa_Courier
+
+#if !os(Linux)
+@_cdecl("soa_verify_ed25519")
+public func soaVerifyEd25519(_ publicKey: UnsafePointer<UInt8>?,
+                             _ publicKeySize: UInt64,
+                             _ message: UnsafePointer<UInt8>?,
+                             _ messageSize: UInt64,
+                             _ signature: UnsafePointer<UInt8>?,
+                             _ signatureSize: UInt64) -> Bool
+{
+    #if canImport(CryptoKit)
+    guard let publicKey, publicKeySize == 32,
+          let signature, signatureSize == 64,
+          messageSize == 0 || message != nil,
+          publicKeySize <= UInt64(Int.max),
+          messageSize <= UInt64(Int.max),
+          signatureSize <= UInt64(Int.max) else {
+        return false
+    }
+    do {
+        let keyData = Data(bytes: publicKey, count: Int(publicKeySize))
+        let messageData = message.map { Data(bytes: $0, count: Int(messageSize)) } ?? Data()
+        let signatureData = Data(bytes: signature, count: Int(signatureSize))
+        let key = try Curve25519.Signing.PublicKey(rawRepresentation: keyData)
+        return key.isValidSignature(signatureData, for: messageData)
+    } catch {
+        return false
+    }
+    #else
+    return false
+    #endif
+}
+#endif
 
 @_cdecl("soa_http_client_create")
 public func soa_http_client_create(_ httpDone: soa_http_done_cb?,
@@ -150,6 +186,15 @@ public func soa_launcher_updater_cancel(_ pointer: UnsafeMutableRawPointer?)
 {
     guard let pointer else { return }
     Unmanaged<LauncherUpdateService>.fromOpaque(pointer).takeUnretainedValue().cancel()
+}
+
+@_cdecl("soa_launcher_updater_select_version")
+public func soa_launcher_updater_select_version(_ pointer: UnsafeMutableRawPointer?,
+                                                _ version: UnsafePointer<CChar>?) -> Bool
+{
+    guard let pointer, let version else { return false }
+    return Unmanaged<LauncherUpdateService>.fromOpaque(pointer).takeUnretainedValue()
+        .selectVersion(String(cString: version))
 }
 
 @_cdecl("soa_discord_rpc_create")

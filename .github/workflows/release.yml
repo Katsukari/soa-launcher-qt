@@ -17,13 +17,16 @@ jobs:
       contents: write
 
     steps:
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+
       - name: Download build artifacts
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
           mkdir -p release-assets
-          for workflow in build-linux.yml build-macos-arm64.yml build-macos-intel.yml; do
+          for workflow in build-linux.yml build-macos.yml; do
             run_id="$(gh run list --workflow "$workflow" --commit "$GITHUB_SHA" \
               --status success --limit 1 --json databaseId --jq '.[0].databaseId')"
             if [ -z "$run_id" ] || [ "$run_id" = "null" ]; then
@@ -34,12 +37,14 @@ jobs:
           done
 
       - name: Verify release packages
+        env:
+          SOA_UPDATE_PUBLIC_KEY_HEX: ${{ vars.SOA_UPDATE_PUBLIC_KEY_HEX }}
         run: |
           set -euo pipefail
           mapfile -t packages < <(find release-assets -type f \
             \( -name '*.AppImage' -o -name '*.dmg' \) -print | sort)
-          if [ "${#packages[@]}" -ne 3 ]; then
-            printf 'Expected one AppImage and two DMGs, found %s:\n' "${#packages[@]}" >&2
+          if [ "${#packages[@]}" -ne 2 ]; then
+            printf 'Expected one AppImage and one universal DMG, found %s:\n' "${#packages[@]}" >&2
             printf '%s\n' "${packages[@]}" >&2
             exit 1
           fi
@@ -47,12 +52,77 @@ jobs:
             \( -name 'version.json' \
                -o -name 'version.json.sig' \
                -o -name 'versions.json' \
-               -o -name 'versions.json.sig' \) -print | sort)
-          if [ "${#metadata[@]}" -ne 4 ]; then
-            printf 'Expected four signed Linux metadata files, found %s:\n' "${#metadata[@]}" >&2
+               -o -name 'versions.json.sig' \
+               -o -name 'macos-version.json' \
+               -o -name 'macos-version.json.sig' \
+               -o -name 'macos-versions.json' \
+               -o -name 'macos-versions.json.sig' \) -print | sort)
+          if [ "${#metadata[@]}" -ne 8 ]; then
+            printf 'Expected eight signed Linux and macOS metadata files, found %s:\n' "${#metadata[@]}" >&2
             printf '%s\n' "${metadata[@]}" >&2
             exit 1
           fi
+          for expected in \
+            version.json version.json.sig versions.json versions.json.sig \
+            macos-version.json macos-version.json.sig \
+            macos-versions.json macos-versions.json.sig; do
+            count="$(find release-assets -type f -name "$expected" | wc -l)"
+            if [ "$count" -ne 1 ]; then
+              echo "Expected exactly one $expected, found $count." >&2
+              exit 1
+            fi
+          done
+          mapfile -t histories < <(find release-assets -type f \
+            \( -name 'versions.json' -o -name 'macos-versions.json' \) -print | sort)
+          if [ "${#histories[@]}" -ne 2 ]; then
+            echo "Expected two launcher release histories." >&2
+            exit 1
+          fi
+          for history in "${histories[@]}"; do
+            case "$(basename "$history")" in
+              versions.json) expected_platform="linux-x86_64" ;;
+              macos-versions.json) expected_platform="macos" ;;
+              *) echo "Unexpected launcher history: $history" >&2; exit 1 ;;
+            esac
+            jq -e --arg platform "$expected_platform" '
+              (.schema == 1)
+              and (.platform == $platform)
+              and (.releases | type == "array")
+              and ((.releases | length) >= 1)
+              and ((.releases | length) <= 3)
+              and (all(.releases[]; .platform == $platform))
+              and (([.releases[].version] | unique | length) == (.releases | length))
+            ' "$history" >/dev/null
+          done
+          default_update_public_key="$(tr -d '[:space:]' < packaging/update-public-key.hex)"
+          update_public_key="${SOA_UPDATE_PUBLIC_KEY_HEX:-$default_update_public_key}"
+          if [[ ! "$update_public_key" =~ ^[0-9A-Fa-f]{64}$ ]]; then
+            echo "SOA_UPDATE_PUBLIC_KEY_HEX must be 64 hexadecimal characters." >&2
+            exit 1
+          fi
+          python3 - "$update_public_key" "$RUNNER_TEMP/soa-update-public.der" <<'PY_KEY'
+          import pathlib
+          import sys
+          key = bytes.fromhex(sys.argv[1])
+          pathlib.Path(sys.argv[2]).write_bytes(bytes.fromhex("302a300506032b6570032100") + key)
+          PY_KEY
+          openssl pkey -pubin -inform DER \
+            -in "$RUNNER_TEMP/soa-update-public.der" \
+            -out "$RUNNER_TEMP/soa-update-public.pem"
+          mapfile -t signed_documents < <(find release-assets -type f -name '*.json' -print | sort)
+          if [ "${#signed_documents[@]}" -ne 4 ]; then
+            echo "Expected four signed launcher metadata documents." >&2
+            exit 1
+          fi
+          for document in "${signed_documents[@]}"; do
+            signature="$document.sig"
+            raw_signature="$RUNNER_TEMP/$(basename "$document").signature"
+            test -f "$signature"
+            openssl base64 -d -A -in "$signature" -out "$raw_signature"
+            openssl pkeyutl -verify -pubin \
+              -inkey "$RUNNER_TEMP/soa-update-public.pem" \
+              -rawin -in "$document" -sigfile "$raw_signature"
+          done
           printf '%s\n' "${packages[@]}"
           printf '%s\n' "${metadata[@]}"
 
@@ -68,7 +138,11 @@ jobs:
             \( -name 'version.json' \
                -o -name 'version.json.sig' \
                -o -name 'versions.json' \
-               -o -name 'versions.json.sig' \) -print | sort)
+               -o -name 'versions.json.sig' \
+               -o -name 'macos-version.json' \
+               -o -name 'macos-version.json.sig' \
+               -o -name 'macos-versions.json' \
+               -o -name 'macos-versions.json.sig' \) -print | sort)
           assets=("${packages[@]}" "${metadata[@]}")
           if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
             gh release upload "${GITHUB_REF_NAME}" "${assets[@]}" --clobber

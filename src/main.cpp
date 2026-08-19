@@ -258,6 +258,7 @@ int main(int argc, char* argv[])
     }
 
     MainWindow* window = new MainWindow;
+    app.setQuitOnLastWindowClosed(true);
     auto& language_manager = util::i18n::LanguageManager::instance();
     language_manager.register_tree(window);
     language_manager.register_tree(launcher_log);

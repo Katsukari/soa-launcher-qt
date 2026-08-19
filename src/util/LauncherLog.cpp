@@ -26,7 +26,6 @@ LauncherLog* LauncherLog::instance()
 
 LauncherLog::LauncherLog(QWidget* parent) : QDialog(parent)
 {
-    setWindowTitle("Launcher Log");
     resize(680, 420);
 
     output = new QPlainTextEdit(this);
@@ -36,14 +35,12 @@ LauncherLog::LauncherLog(QWidget* parent) : QDialog(parent)
         "QPlainTextEdit { background:#1E1B17; color:#D8C9B8;"
         " font-family:'monospace'; font-size:12px; border:none; }");
 
-    auto* clear = new QPushButton("Clear", this);
-    auto* copy  = new QPushButton("Copy", this);
-    auto* lock  = new QPushButton("Autoscroll: On", this);
+    clear_button = new QPushButton(this);
+    copy_button = new QPushButton(this);
+    autoscroll_button = new QPushButton(this);
 
     verbosity = new QComboBox(this);
-    verbosity->addItem("Errors only");
-    verbosity->addItem("Normal");
-    verbosity->addItem("Verbose");
+    verbosity->addItems({QString(), QString(), QString()});
     verbosity->setCurrentIndex(1);
     connect(verbosity, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
         [this](int i)
@@ -52,41 +49,57 @@ LauncherLog::LauncherLog(QWidget* parent) : QDialog(parent)
             rerender();
         });
 
-    connect(clear, &QPushButton::clicked, this, [this]()
+    connect(clear_button, &QPushButton::clicked, this, [this]()
     {
         entries.clear();
         output->clear();
     });
-    connect(copy, &QPushButton::clicked, this, [this]()
+    connect(copy_button, &QPushButton::clicked, this, [this]()
     {
         QApplication::clipboard()->setText(output->toPlainText());
     });
-    connect(lock, &QPushButton::clicked, this, [this, lock]()
+    connect(autoscroll_button, &QPushButton::clicked, this, [this]()
     {
         autoscroll = !autoscroll;
-        lock->setText(autoscroll ? util::i18n::translate("Autoscroll: On")
-                                  : util::i18n::translate("Autoscroll: Off"));
+        retranslate();
         if (autoscroll)
             output->verticalScrollBar()->setValue(output->verticalScrollBar()->maximum());
     });
 
     connect(&util::i18n::LanguageManager::instance(),
-            &util::i18n::LanguageManager::language_changed, this, [this, lock]()
+            &util::i18n::LanguageManager::language_changed, this, [this]()
     {
-        lock->setText(autoscroll ? util::i18n::translate("Autoscroll: On")
-                                  : util::i18n::translate("Autoscroll: Off"));
+        retranslate();
     });
 
     auto* bar = new QHBoxLayout;
-    bar->addWidget(clear);
-    bar->addWidget(copy);
-    bar->addWidget(lock);
+    bar->addWidget(clear_button);
+    bar->addWidget(copy_button);
+    bar->addWidget(autoscroll_button);
     bar->addStretch();
     bar->addWidget(verbosity);
 
     auto* root = new QVBoxLayout(this);
     root->addLayout(bar);
     root->addWidget(output);
+    retranslate();
+}
+
+void LauncherLog::retranslate()
+{
+    using util::i18n::translate;
+    setWindowTitle(translate("Launcher Log"));
+    clear_button->setText(translate("Clear"));
+    copy_button->setText(translate("Copy"));
+    autoscroll_button->setText(translate(
+        autoscroll ? "Autoscroll: On" : "Autoscroll: Off"));
+    const int selected = verbosity->currentIndex();
+    verbosity->blockSignals(true);
+    verbosity->setItemText(0, translate("Errors only"));
+    verbosity->setItemText(1, translate("Normal"));
+    verbosity->setItemText(2, translate("Verbose"));
+    verbosity->setCurrentIndex(selected);
+    verbosity->blockSignals(false);
 }
 
 void LauncherLog::append_line(int level, const QString& text)

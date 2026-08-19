@@ -1,4 +1,4 @@
-name: Build macOS (Intel)
+name: Build macOS (Universal)
 
 on:
   push:
@@ -12,14 +12,14 @@ permissions:
   contents: read
 
 concurrency:
-  group: build-macos-intel-${{ github.ref }}
+  group: build-macos-universal-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   build:
-    name: Build macOS (Intel)
-    if: ${{ github.event_name == 'workflow_dispatch' || (vars.SOA_ACTIONS_ENABLED != 'false' && vars.SOA_MACOS_INTEL_ENABLED != 'false') }}
-    runs-on: macos-15-intel
+    name: Build macOS (Universal)
+    if: ${{ github.event_name == 'workflow_dispatch' || (vars.SOA_ACTIONS_ENABLED != 'false' && vars.SOA_MACOS_ENABLED != 'false') }}
+    runs-on: macos-15
 
     steps:
       - name: Check out repository
@@ -29,7 +29,7 @@ jobs:
         run: sudo xcode-select -s /Applications/Xcode.app
 
       - name: Install macOS build dependencies
-        run: brew install cmake ninja mingw-w64
+        run: brew install cmake ninja mingw-w64 jq openssl@3
 
       - name: Install Qt
         uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730
@@ -48,26 +48,34 @@ jobs:
           i686-w64-mingw32-g++ --version
 
       - name: Configure macOS
-        run: >
-          cmake
-          -S "${{ github.workspace }}"
-          -B "${{ github.workspace }}/build"
-          -G Ninja
-          -DCMAKE_CXX_COMPILER=clang++
-          -DCMAKE_BUILD_TYPE=Release
-          -DCMAKE_OSX_ARCHITECTURES="x86_64"
-          -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
-          -DSOA_REQUIRE_ALICIA_LOG_HOOK=ON
-          -DBUILD_TESTING=ON
+        env:
+          SOA_UPDATE_PUBLIC_KEY_HEX: ${{ vars.SOA_UPDATE_PUBLIC_KEY_HEX }}
+        run: |
+          set -euo pipefail
+          cmake_args=(
+            -S "${{ github.workspace }}"
+            -B "${{ github.workspace }}/build"
+            -G Xcode
+            -DCMAKE_CXX_COMPILER=clang++
+            -DCMAKE_BUILD_TYPE=Release
+            "-DCMAKE_OSX_ARCHITECTURES=x86_64;arm64"
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
+            -DSOA_REQUIRE_ALICIA_LOG_HOOK=ON
+            -DBUILD_TESTING=ON
+          )
+          if [ -n "$SOA_UPDATE_PUBLIC_KEY_HEX" ]; then
+            cmake_args+=("-DSOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX=$SOA_UPDATE_PUBLIC_KEY_HEX")
+          fi
+          cmake "${cmake_args[@]}"
 
       - name: Build
-        run: cmake --build "${{ github.workspace }}/build" --parallel
+        run: cmake --build "${{ github.workspace }}/build" --config Release --parallel
 
       - name: Test
         working-directory: ${{ github.workspace }}/build
         env:
           QT_QPA_PLATFORM: offscreen
-        run: ctest --output-on-failure
+        run: ctest -C Release --output-on-failure
 
       - name: Detect macOS signing credentials
         env:
@@ -132,28 +140,40 @@ jobs:
           chmod 600 "$RUNNER_TEMP/AuthKey.p8"
 
       - name: Bundle and sign macOS application
-        working-directory: ${{ github.workspace }}/build
         env:
           SIGNING_IDENTITY: ${{ secrets.APPLE_DEVELOPER_IDENTITY }}
           NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
           NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
         run: |
           set -euo pipefail
-          APP="$(find . -maxdepth 1 -type d -name '*.app' -print -quit)"
-          test -n "$APP"
+          apps=("$GITHUB_WORKSPACE"/build/Release/*.app)
+          if [ "${#apps[@]}" -ne 1 ] || [ ! -d "${apps[0]}" ]; then
+            printf 'Expected exactly one app bundle in build/Release, found: %s\n' "${apps[*]}" >&2
+            exit 1
+          fi
+          APP="${apps[0]}"
           COURIER="$APP/Contents/Frameworks/libsoa_network.dylib"
+          AUDIO_HOST="$APP/Contents/Resources/alicia-log-hook/soa-audio-host"
           test -f "$COURIER"
           test -f "$APP/Contents/Resources/soa-launcher.icns"
           test -s "$APP/Contents/Resources/alicia-log-hook/SoaAliciaLogInjector.exe"
           test -s "$APP/Contents/Resources/alicia-log-hook/SoaAliciaLogHook.dll"
-          test -s "$APP/Contents/Resources/alicia-log-hook/UPSTREAM.md"
+          test -s "$APP/Contents/Resources/alicia-log-hook/README.md"
           test -s "$APP/Contents/Resources/alicia-log-hook/MINHOOK_LICENSE.txt"
+          test -s "$AUDIO_HOST"
           file "$APP/Contents/Resources/alicia-log-hook/SoaAliciaLogInjector.exe" | grep -F 'PE32 executable'
           file "$APP/Contents/Resources/alicia-log-hook/SoaAliciaLogHook.dll" | grep -F 'PE32 executable'
-          case " $(lipo -archs "$APP/Contents/MacOS/soa_launcher") " in
-            *" x86_64 "*) ;;
-            *) echo "Launcher is missing requested architecture x86_64." >&2; exit 1 ;;
-          esac
+          LAUNCHER_ARCHS=" $(lipo -archs "$APP/Contents/MacOS/soa_launcher") "
+          COURIER_ARCHS=" $(lipo -archs "$COURIER") "
+          AUDIO_HOST_ARCHS=" $(lipo -archs "$AUDIO_HOST") "
+          for arch in x86_64 arm64; do
+            [[ "$LAUNCHER_ARCHS" == *" $arch "* ]] \
+              || { echo "Launcher is missing requested architecture $arch." >&2; exit 1; }
+            [[ "$COURIER_ARCHS" == *" $arch "* ]] \
+              || { echo "Swift network library is missing requested architecture $arch." >&2; exit 1; }
+            [[ "$AUDIO_HOST_ARCHS" == *" $arch "* ]] \
+              || { echo "Audio host is missing requested architecture $arch." >&2; exit 1; }
+          done
           test "$(otool -D "$COURIER" | tail -n 1)" = "@rpath/libsoa_network.dylib"
           otool -L "$APP/Contents/MacOS/soa_launcher" | grep -F "@rpath/libsoa_network.dylib"
           if otool -L "$APP/Contents/MacOS/soa_launcher" | grep -F "${{ github.workspace }}"; then
@@ -166,7 +186,7 @@ jobs:
               "$SIGNING_IDENTITY" \
               "$GITHUB_WORKSPACE/packaging/macos/entitlements.plist"
             if [ "$SOA_NOTARIZATION_ENABLED" = "1" ]; then
-              NOTARY_ZIP="$RUNNER_TEMP/soa-launcher-x86_64.zip"
+              NOTARY_ZIP="$RUNNER_TEMP/soa-launcher-macos.zip"
               ditto -c -k --keepParent "$APP" "$NOTARY_ZIP"
               xcrun notarytool submit "$NOTARY_ZIP" \
                 --key "$RUNNER_TEMP/AuthKey.p8" \
@@ -183,8 +203,8 @@ jobs:
         working-directory: ${{ github.workspace }}/build
         run: |
           set -euo pipefail
-          cpack -G DragNDrop --verbose
-          test -s "Story_Of_Alicia-x86_64.dmg"
+          cpack -G DragNDrop -C Release --verbose
+          test -s "Story_Of_Alicia-macos.dmg"
 
       - name: Sign and notarize macOS DMG
         if: env.SOA_SIGNING_ENABLED == '1'
@@ -195,11 +215,11 @@ jobs:
           NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
         run: |
           set -euo pipefail
-          DMG="Story_Of_Alicia-x86_64.dmg"
+          DMG="Story_Of_Alicia-macos.dmg"
           test -s "$DMG"
           codesign --force --timestamp --sign "$SIGNING_IDENTITY" "$DMG"
           codesign --verify --strict --verbose=4 "$DMG"
-          MOUNT="$RUNNER_TEMP/soa-dmg-x86_64"
+          MOUNT="$RUNNER_TEMP/soa-dmg-macos"
           mkdir -p "$MOUNT"
           hdiutil attach "$DMG" -nobrowse -readonly -mountpoint "$MOUNT"
           trap 'hdiutil detach "$MOUNT" || true' EXIT
@@ -224,12 +244,39 @@ jobs:
             echo "The DMG is signed but was not notarized because notarization credentials are absent."
           fi
 
+      - name: Generate signed macOS update metadata
+        working-directory: ${{ github.workspace }}
+        env:
+          SOA_UPDATE_SIGNING_KEY_B64: ${{ secrets.SOA_UPDATE_SIGNING_KEY_B64 }}
+          SOA_UPDATE_PUBLIC_KEY_HEX: ${{ vars.SOA_UPDATE_PUBLIC_KEY_HEX }}
+        run: |
+          set -euo pipefail
+          if [ -n "$SOA_UPDATE_SIGNING_KEY_B64" ] && [ "$SOA_NOTARIZATION_ENABLED" != "1" ]; then
+            echo "Official macOS update metadata requires a signed and notarized DMG." >&2
+            exit 1
+          fi
+          version="$(sed -nE 's/^[[:space:]]*VERSION[[:space:]]+([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' CMakeLists.txt | head -n 1)"
+          SOA_OPENSSL="$(brew --prefix openssl@3)/bin/openssl" \
+            ./packaging/macos/generate-macos-update-metadata.sh \
+            "$version" "$GITHUB_WORKSPACE/build/Story_Of_Alicia-macos.dmg"
+          if [ -n "$SOA_UPDATE_SIGNING_KEY_B64" ]; then
+            echo "SOA_MACOS_ARTIFACT_NAME=soa-launcher-macos-universal-dmg" >> "$GITHUB_ENV"
+          else
+            echo "SOA_MACOS_ARTIFACT_NAME=soa-launcher-macos-universal-dmg-ephemeral-metadata" >> "$GITHUB_ENV"
+          fi
+
       - name: Upload macOS DMG
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: soa-launcher-macos-x86_64-dmg
-          path: ${{ github.workspace }}/build/Story_Of_Alicia-x86_64.dmg
+          name: ${{ env.SOA_MACOS_ARTIFACT_NAME }}
+          path: |
+            ${{ github.workspace }}/build/Story_Of_Alicia-macos.dmg
+            ${{ github.workspace }}/packaging/macos/macos-version.json
+            ${{ github.workspace }}/packaging/macos/macos-version.json.sig
+            ${{ github.workspace }}/packaging/macos/macos-versions.json
+            ${{ github.workspace }}/packaging/macos/macos-versions.json.sig
           if-no-files-found: error
+          compression-level: 0
           retention-days: 7
 
       - name: Remove temporary signing material

@@ -38,6 +38,19 @@ SHA256="$(sha256sum "$APPIMAGE" | awk '{print $1}')"
 SIZE="$(stat -c '%s' "$APPIMAGE")"
 RELEASED_AT="${SOA_UPDATE_RELEASED_AT:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
 
+validate_history() {
+  local input="$1"
+  jq -e '
+    (.schema == 1)
+    and (.platform == "linux-x86_64")
+    and (.releases | type == "array")
+    and ((.releases | length) >= 1)
+    and ((.releases | length) <= 3)
+    and (all(.releases[]; .platform == "linux-x86_64"))
+    and (([.releases[].version] | unique | length) == (.releases | length))
+  ' "$input" >/dev/null
+}
+
 jq -n \
   --arg version "$VERSION" \
   --arg file_name "$FILE_NAME" \
@@ -66,6 +79,10 @@ if [ -n "$HISTORY_INPUT" ] && [ -f "$HISTORY_INPUT" ]; then
     echo "Existing launcher history has an invalid signature." >&2
     exit 1
   fi
+  if ! validate_history "$HISTORY_INPUT"; then
+    echo "Existing launcher history must contain one to three unique Linux releases." >&2
+    exit 1
+  fi
   rm -f "$VERIFY_SIGNATURE" "$VERIFY_PUBLIC_KEY"
   trap - EXIT
   jq --slurpfile current "$MANIFEST" \
@@ -82,6 +99,14 @@ if [ -n "$HISTORY_INPUT" ] && [ -f "$HISTORY_INPUT" ]; then
 else
   jq -n --slurpfile current "$MANIFEST" \
     '{schema: 1, platform: "linux-x86_64", releases: $current}' >"$HISTORY"
+fi
+
+if ! validate_history "$HISTORY" \
+    || ! jq -e --arg version "$VERSION" \
+      '([.releases[].version] | map(select(. == $version)) | length) == 1' \
+      "$HISTORY" >/dev/null; then
+  echo "Generated launcher history is invalid or does not contain the current release exactly once." >&2
+  exit 1
 fi
 
 sign_file() {

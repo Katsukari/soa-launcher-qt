@@ -8,12 +8,20 @@ names, command-line flags and paths alongside the real UI text.
 `filter-translatable.py` separates the two.
 
     tools/i18n/filter-translatable.py --check translations/*.ts   # CI gate
+    tools/i18n/filter-translatable.py --missing translations/*.ts # missing UI literals
     tools/i18n/filter-translatable.py --list  translations/soa_launcher_en.ts
     tools/i18n/filter-translatable.py --prune translations/*.ts
 
 `--prune` edits every file it is given the same way, and refuses to run unless
 they already contain identical source strings, so the catalogues cannot drift
 apart. `--check` runs in CI on Linux.
+
+`--missing` scans literal `util::i18n::translate("...")` calls under `src/` and
+fails when a source is absent from the `Launcher` context used by that helper.
+It also checks that the `Launcher` context agrees across every catalogue. This
+catches strings stored under the wrong Qt context, which otherwise exist in the
+`.ts` files but still render in English. Dynamic sources still need manual
+review.
 
 ## Markup
 

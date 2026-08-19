@@ -207,7 +207,7 @@ jq -n \
   --arg version "$LAUNCHER_VERSION" \
   --arg manifest_url "https://r2.storyofalicia.com/launcher/linux/version.json" \
   --arg fallback_manifest_url \
-    "https://r2.storyofalicia.com/launcher/linux/version.json" \
+    "https://github.com/Story-Of-Alicia/soa-launcher-qt/releases/latest/download/version.json" \
   --arg signing_public_key "$SOA_UPDATE_PUBLIC_KEY_HEX" \
   '{schema: 1, version: $version, platform: "linux-x86_64",
     manifest_url: $manifest_url, fallback_manifest_url: $fallback_manifest_url,
@@ -325,9 +325,10 @@ copy_qt_plugin iconengines libqsvgicon.so
 copy_qt_library_family libQt6Svg
 copy_qt_library_family libQt6OpenGL
 copy_qt_library_family libQt6XcbQpa
-copy_qt_library_family libQt6WaylandClient
-copy_qt_library_family libQt6WaylandEglClientHwIntegration
-copy_qt_library_family libQt6WlShellIntegration
+
+copy_qt_library_family libQt6WaylandClient 0
+copy_qt_library_family libQt6WaylandEglClientHwIntegration 0
+copy_qt_library_family libQt6WlShellIntegration 0
 
 copy_qt_plugin_directory platforminputcontexts
 copy_qt_plugin_directory xcbglintegrations
