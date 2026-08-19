@@ -214,7 +214,7 @@ jobs:
             echo "The launcher contains a build-workspace dependency path." >&2
             exit 1
           fi
-          macdeployqt "$APP" -verbose=1
+          macdeployqt "$APP" -always-overwrite -verbose=1
           if [ "$SOA_SIGNING_ENABLED" = "1" ]; then
             "$GITHUB_WORKSPACE/packaging/macos/sign-app.sh" \
               "$APP" \

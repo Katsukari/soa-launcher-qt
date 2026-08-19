@@ -16,21 +16,32 @@ remove_signature() {
 }
 
 is_macho() {
-  file -L -b "$1" | grep -q 'Mach-O'
+  local description
+  description="$(file -L -b "$1")"
+  [[ "$description" == *"Mach-O"* ]]
+}
+
+is_signable() {
+  case "$1" in
+    *.dylib|*.so) return 0 ;;
+    *) is_macho "$1" ;;
+  esac
 }
 
 sign_item() {
   local item="$1"
   remove_signature "$item"
+  printf 'Signing nested code: %s\n' "$item"
   if [ "$IDENTITY" = "-" ]; then
     codesign --force --sign - "$item"
   else
     codesign --force --timestamp --options runtime --sign "$IDENTITY" "$item"
   fi
+  codesign --verify --strict --verbose=2 "$item"
 }
 
 while IFS= read -r -d '' item; do
-  if is_macho "$item"; then
+  if is_signable "$item"; then
     remove_signature "$item"
   fi
 done < <(find "$APP/Contents" \( -type f -o -type l \) -print0)
@@ -48,7 +59,7 @@ done < <(find "$APP" -depth -type d \( \
 remove_signature "$APP"
 
 while IFS= read -r -d '' item; do
-  if is_macho "$item"; then
+  if is_signable "$item"; then
     sign_item "$item"
   fi
 done < <(find "$APP/Contents" \( -type f -o -type l \) -print0)
@@ -79,7 +90,7 @@ codesign --verify --deep --strict --verbose=4 "$APP"
 
 if [ "$IDENTITY" = "-" ]; then
   while IFS= read -r -d '' item; do
-    if is_macho "$item"; then
+    if is_signable "$item"; then
       if codesign -dvv "$item" 2>&1 | grep -q '^TeamIdentifier='; then
         team_id="$(codesign -dvv "$item" 2>&1 | sed -n 's/^TeamIdentifier=//p' | head -n 1)"
         if [ -n "$team_id" ] && [ "$team_id" != "not set" ]; then
