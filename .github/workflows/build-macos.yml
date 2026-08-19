@@ -197,7 +197,10 @@ jobs:
           done
           test "$(otool -D "$COURIER" | tail -n 1)" = "@rpath/libsoa_network.dylib"
           otool -L "$APP/Contents/MacOS/soa_launcher" | grep -F "@rpath/libsoa_network.dylib"
-          if otool -L "$APP/Contents/MacOS/soa_launcher" | grep -F "${{ github.workspace }}"; then
+          if otool -L "$APP/Contents/MacOS/soa_launcher" \
+              | awk '/^[[:space:]]/' \
+              | grep -F "${{ github.workspace }}"; then
+            echo "The launcher contains a build-workspace dependency path." >&2
             exit 1
           fi
           macdeployqt "$APP" -verbose=1
