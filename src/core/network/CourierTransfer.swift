@@ -233,7 +233,8 @@ extension Courier
                 log(3, "Retrying download after transient failure (attempt \(attempt)): \(error)")
             }
 
-            try await Task.sleep(for: .seconds(pow(2.0, Double(attempt - 1))))
+            let delayNanoseconds = UInt64(1 << (attempt - 1)) * 1_000_000_000
+            try await Task.sleep(nanoseconds: delayNanoseconds)
         }
     }
 }

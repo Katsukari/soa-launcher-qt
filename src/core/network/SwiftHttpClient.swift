@@ -185,7 +185,8 @@ final class SwiftHttpClient: @unchecked Sendable
             }
             let timeout = Task.detached(priority: .utility) {
                 do {
-                    try await Task.sleep(for: .milliseconds(max(1000, Int(timeoutMilliseconds))))
+                    let timeoutNanoseconds = UInt64(max(1_000, timeoutMilliseconds)) * 1_000_000
+                    try await Task.sleep(nanoseconds: timeoutNanoseconds)
                     race.complete(.failure(NetworkFailure("DNS lookup timed out")))
                 } catch {
                 }
