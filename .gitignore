@@ -86,4 +86,5 @@ Testing/
 /packaging/macos/macos-versions.json
 /packaging/macos/macos-versions.json.sig
 .DS_Store
-/packaging/devloper*
+/packaging/developer*
+/packaging/Auth*
