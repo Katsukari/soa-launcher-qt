@@ -15,6 +15,10 @@ remove_signature() {
   codesign --remove-signature "$1" >/dev/null 2>&1 || true
 }
 
+is_macho() {
+  file -L -b "$1" | grep -q 'Mach-O'
+}
+
 sign_item() {
   local item="$1"
   remove_signature "$item"
@@ -26,10 +30,10 @@ sign_item() {
 }
 
 while IFS= read -r -d '' item; do
-  if file -b "$item" | grep -q 'Mach-O'; then
+  if is_macho "$item"; then
     remove_signature "$item"
   fi
-done < <(find "$APP/Contents" -type f -print0)
+done < <(find "$APP/Contents" \( -type f -o -type l \) -print0)
 
 while IFS= read -r -d '' bundle; do
   remove_signature "$bundle"
@@ -44,10 +48,10 @@ done < <(find "$APP" -depth -type d \( \
 remove_signature "$APP"
 
 while IFS= read -r -d '' item; do
-  if file -b "$item" | grep -q 'Mach-O'; then
+  if is_macho "$item"; then
     sign_item "$item"
   fi
-done < <(find "$APP/Contents" -type f -print0)
+done < <(find "$APP/Contents" \( -type f -o -type l \) -print0)
 
 while IFS= read -r -d '' bundle; do
   sign_item "$bundle"
@@ -75,7 +79,7 @@ codesign --verify --deep --strict --verbose=4 "$APP"
 
 if [ "$IDENTITY" = "-" ]; then
   while IFS= read -r -d '' item; do
-    if file -b "$item" | grep -q 'Mach-O'; then
+    if is_macho "$item"; then
       if codesign -dvv "$item" 2>&1 | grep -q '^TeamIdentifier='; then
         team_id="$(codesign -dvv "$item" 2>&1 | sed -n 's/^TeamIdentifier=//p' | head -n 1)"
         if [ -n "$team_id" ] && [ "$team_id" != "not set" ]; then
@@ -84,5 +88,5 @@ if [ "$IDENTITY" = "-" ]; then
         fi
       fi
     fi
-  done < <(find "$APP/Contents" -type f -print0)
+  done < <(find "$APP/Contents" \( -type f -o -type l \) -print0)
 fi

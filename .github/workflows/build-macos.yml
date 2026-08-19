@@ -152,13 +152,24 @@ jobs:
         if: env.SOA_NOTARIZATION_ENABLED == '1'
         env:
           NOTARY_KEY: ${{ secrets.APPLE_NOTARY_KEY_P8_BASE64 }}
+          NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
         run: |
+          set -euo pipefail
           python3 - <<'PY_NOTARY'
           import base64, os, pathlib
           pathlib.Path(os.environ["RUNNER_TEMP"], "AuthKey.p8").write_bytes(
-              base64.b64decode(os.environ["NOTARY_KEY"]))
+              base64.b64decode(os.environ["NOTARY_KEY"].strip(), validate=True))
           PY_NOTARY
           chmod 600 "$RUNNER_TEMP/AuthKey.p8"
+          "$(brew --prefix openssl@3)/bin/openssl" pkey \
+            -in "$RUNNER_TEMP/AuthKey.p8" \
+            -check \
+            -noout
+          xcrun notarytool history \
+            --key "$RUNNER_TEMP/AuthKey.p8" \
+            --key-id "$NOTARY_KEY_ID" \
+            --issuer "$NOTARY_ISSUER_ID" >/dev/null
 
       - name: Bundle and sign macOS application
         env:
@@ -211,12 +222,35 @@ jobs:
               "$GITHUB_WORKSPACE/packaging/macos/entitlements.plist"
             if [ "$SOA_NOTARIZATION_ENABLED" = "1" ]; then
               NOTARY_ZIP="$RUNNER_TEMP/soa-launcher-macos.zip"
+              NOTARY_RESULT="$RUNNER_TEMP/soa-app-notary-result.json"
               ditto -c -k --keepParent "$APP" "$NOTARY_ZIP"
-              xcrun notarytool submit "$NOTARY_ZIP" \
+              if ! xcrun notarytool submit "$NOTARY_ZIP" \
                 --key "$RUNNER_TEMP/AuthKey.p8" \
                 --key-id "$NOTARY_KEY_ID" \
                 --issuer "$NOTARY_ISSUER_ID" \
-                --wait
+                --wait \
+                --output-format json | tee "$NOTARY_RESULT"; then
+                submission_id="$(jq -r '.id // empty' "$NOTARY_RESULT" 2>/dev/null || true)"
+                if [ -n "$submission_id" ]; then
+                  xcrun notarytool log "$submission_id" \
+                    --key "$RUNNER_TEMP/AuthKey.p8" \
+                    --key-id "$NOTARY_KEY_ID" \
+                    --issuer "$NOTARY_ISSUER_ID" || true
+                fi
+                exit 1
+              fi
+              submission_status="$(jq -r '.status // empty' "$NOTARY_RESULT")"
+              if [ "$submission_status" != "Accepted" ]; then
+                submission_id="$(jq -r '.id // empty' "$NOTARY_RESULT")"
+                if [ -n "$submission_id" ]; then
+                  xcrun notarytool log "$submission_id" \
+                    --key "$RUNNER_TEMP/AuthKey.p8" \
+                    --key-id "$NOTARY_KEY_ID" \
+                    --issuer "$NOTARY_ISSUER_ID" || true
+                fi
+                echo "App notarization finished with status: $submission_status" >&2
+                exit 1
+              fi
               xcrun stapler staple "$APP"
               xcrun stapler validate "$APP"
               spctl --assess --type execute --verbose=4 "$APP"
@@ -256,11 +290,34 @@ jobs:
           hdiutil detach "$MOUNT"
           trap - EXIT
           if [ "$SOA_NOTARIZATION_ENABLED" = "1" ]; then
-            xcrun notarytool submit "$DMG" \
+            NOTARY_RESULT="$RUNNER_TEMP/soa-dmg-notary-result.json"
+            if ! xcrun notarytool submit "$DMG" \
               --key "$RUNNER_TEMP/AuthKey.p8" \
               --key-id "$NOTARY_KEY_ID" \
               --issuer "$NOTARY_ISSUER_ID" \
-              --wait
+              --wait \
+              --output-format json | tee "$NOTARY_RESULT"; then
+              submission_id="$(jq -r '.id // empty' "$NOTARY_RESULT" 2>/dev/null || true)"
+              if [ -n "$submission_id" ]; then
+                xcrun notarytool log "$submission_id" \
+                  --key "$RUNNER_TEMP/AuthKey.p8" \
+                  --key-id "$NOTARY_KEY_ID" \
+                  --issuer "$NOTARY_ISSUER_ID" || true
+              fi
+              exit 1
+            fi
+            submission_status="$(jq -r '.status // empty' "$NOTARY_RESULT")"
+            if [ "$submission_status" != "Accepted" ]; then
+              submission_id="$(jq -r '.id // empty' "$NOTARY_RESULT")"
+              if [ -n "$submission_id" ]; then
+                xcrun notarytool log "$submission_id" \
+                  --key "$RUNNER_TEMP/AuthKey.p8" \
+                  --key-id "$NOTARY_KEY_ID" \
+                  --issuer "$NOTARY_ISSUER_ID" || true
+              fi
+              echo "DMG notarization finished with status: $submission_status" >&2
+              exit 1
+            fi
             xcrun stapler staple "$DMG"
             xcrun stapler validate "$DMG"
             spctl --assess --type open --context context:primary-signature --verbose=4 "$DMG"
