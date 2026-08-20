@@ -11,6 +11,19 @@ if [ ! -d "$APP" ]; then
   exit 1
 fi
 
+MAIN_EXECUTABLE_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Contents/Info.plist")"
+case "$MAIN_EXECUTABLE_NAME" in
+  ""|*/*)
+    echo "Invalid CFBundleExecutable in $APP/Contents/Info.plist" >&2
+    exit 1
+    ;;
+esac
+MAIN_EXECUTABLE="$APP/Contents/MacOS/$MAIN_EXECUTABLE_NAME"
+if [ ! -f "$MAIN_EXECUTABLE" ]; then
+  echo "Application executable does not exist: $MAIN_EXECUTABLE" >&2
+  exit 1
+fi
+
 remove_signature() {
   codesign --remove-signature "$1" >/dev/null 2>&1 || true
 }
@@ -40,7 +53,7 @@ sign_item() {
 }
 
 while IFS= read -r -d '' item; do
-  if is_signable "$item"; then
+  if [ "$item" != "$MAIN_EXECUTABLE" ] && is_signable "$item"; then
     remove_signature "$item"
   fi
 done < <(find "$APP/Contents" \( -type f -o -type l \) -print0)
@@ -58,7 +71,7 @@ done < <(find "$APP" -depth -type d \( \
 remove_signature "$APP"
 
 while IFS= read -r -d '' item; do
-  if is_signable "$item"; then
+  if [ "$item" != "$MAIN_EXECUTABLE" ] && is_signable "$item"; then
     sign_item "$item"
   fi
 done < <(find "$APP/Contents" \( -type f -o -type l \) -print0)
@@ -73,6 +86,7 @@ done < <(find "$APP" -depth -type d \( \
   -name '*.bundle' \
 \) ! -path "$APP" -print0)
 
+printf 'Signing application bundle: %s\n' "$APP"
 if [ "$IDENTITY" = "-" ]; then
   if [ -n "$ENTITLEMENTS" ] && [ -f "$ENTITLEMENTS" ]; then
     codesign --force --entitlements "$ENTITLEMENTS" --sign - "$APP"
