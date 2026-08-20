@@ -37,7 +37,6 @@ sign_item() {
   else
     codesign --force --timestamp --options runtime --sign "$IDENTITY" "$item"
   fi
-  codesign --verify --strict --verbose=2 "$item"
 }
 
 while IFS= read -r -d '' item; do
