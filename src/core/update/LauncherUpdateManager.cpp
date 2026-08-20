@@ -13,6 +13,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <limits>
 #include <utility>
 
@@ -23,7 +24,7 @@
 #ifndef SOA_LAUNCHER_UPDATE_MANIFEST_URL
 #if defined(Q_OS_MACOS)
 #define SOA_LAUNCHER_UPDATE_MANIFEST_URL \
-    "https://r2.storyofalicia.com/launcher/macos/version.json"
+    "https://r2.storyofalicia.com/launcher/macos/macos-version.json"
 #else
 #define SOA_LAUNCHER_UPDATE_MANIFEST_URL \
     "https://r2.storyofalicia.com/launcher/linux/version.json"
@@ -33,10 +34,10 @@
 #ifndef SOA_LAUNCHER_UPDATE_FALLBACK_MANIFEST_URL
 #if defined(Q_OS_MACOS)
 #define SOA_LAUNCHER_UPDATE_FALLBACK_MANIFEST_URL \
-    "https://r2.storyofalicia.com/launcher/macos/version.json"
+    "https://github.com/Story-Of-Alicia/soa-launcher-qt/releases/latest/download/macos-version.json"
 #else
 #define SOA_LAUNCHER_UPDATE_FALLBACK_MANIFEST_URL \
-    "https://r2.storyofalicia.com/launcher/linux/version.json"
+    "https://github.com/Story-Of-Alicia/soa-launcher-qt/releases/latest/download/version.json"
 #endif
 #endif
 
@@ -48,11 +49,11 @@ namespace core::update
 {
     namespace
     {
-        bool is_valid_public_key(const QByteArray& key)
+        bool is_valid_32_byte_hex(const QByteArray& value)
         {
-            if (key.size() != 64)
+            if (value.size() != 64)
                 return false;
-            for (const char character : key)
+            for (const char character : value)
             {
                 const bool decimal = character >= '0' && character <= '9';
                 const bool lower = character >= 'a' && character <= 'f';
@@ -76,18 +77,24 @@ namespace core::update
         const QByteArray public_key_hex =
             QByteArray(SOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX).trimmed();
         const QByteArray platform_bytes = detected_platform_key().toUtf8();
-        const QByteArray directory_bytes = download_directory().toUtf8();
+        const QString update_directory = download_directory();
+        prune_update_cache(update_directory);
+        const QByteArray directory_bytes = update_directory.toUtf8();
         const QByteArray user_agent = QByteArray("Story-Of-Alicia-Launcher/") + SOA_LAUNCHER_VERSION;
+        bool allow_insecure_update_urls = false;
+#ifndef NDEBUG
+        allow_insecure_update_urls =
+            qEnvironmentVariableIntValue("SOA_ALLOW_INSECURE_UPDATE_URLS") == 1;
+#endif
         const bool supported_platform =
             platform_bytes == QByteArrayLiteral("linux-x86_64")
-            || platform_bytes == QByteArrayLiteral("macos-arm64")
-            || platform_bytes == QByteArrayLiteral("macos-x86_64");
+            || platform_bytes == QByteArrayLiteral("macos");
         if (!supported_platform)
         {
             configuration_error = util::i18n::translate(
                 "Launcher self-updates are not available on this platform yet.");
         }
-        else if (!is_valid_public_key(public_key_hex))
+        else if (!is_valid_32_byte_hex(public_key_hex))
         {
             configuration_error = util::i18n::translate(
                 "This launcher build does not contain a valid update-signing public key.");
@@ -100,7 +107,7 @@ namespace core::update
             platform_bytes.constData(),
             directory_bytes.constData(),
             user_agent.constData(),
-            qEnvironmentVariableIntValue("SOA_ALLOW_INSECURE_UPDATE_URLS") == 1,
+            allow_insecure_update_urls,
             &LauncherUpdateManager::check_callback,
             &LauncherUpdateManager::progress_callback,
             &LauncherUpdateManager::download_callback,
@@ -120,7 +127,7 @@ namespace core::update
 
     void LauncherUpdateManager::check_for_updates()
     {
-        if (downloading)
+        if (downloading || check_purpose != CheckPurpose::None)
             return;
         if (!configuration_error.isEmpty())
         {
@@ -135,6 +142,34 @@ namespace core::update
                 "The launcher update service could not be initialized."));
             return;
         }
+        check_purpose = CheckPurpose::Startup;
+        releases.clear();
+        reset_release();
+        emit check_started();
+        soa_launcher_updater_check(updater);
+    }
+
+    void LauncherUpdateManager::manage_versions()
+    {
+        if (downloading || check_purpose != CheckPurpose::None)
+        {
+            emit manual_check_failed(util::i18n::translate(
+                "A launcher update operation is already running."));
+            return;
+        }
+        if (!configuration_error.isEmpty())
+        {
+            emit manual_check_failed(configuration_error);
+            return;
+        }
+        if (!updater)
+        {
+            emit manual_check_failed(util::i18n::translate(
+                "The launcher update service could not be initialized."));
+            return;
+        }
+        check_purpose = CheckPurpose::Manual;
+        releases.clear();
         reset_release();
         emit check_started();
         soa_launcher_updater_check(updater);
@@ -266,18 +301,60 @@ namespace core::update
                                              const bool is_required,
                                              QString releases_json)
     {
-        if (result == soa_launcher_check_no_update)
+        const bool manual_check = check_purpose == CheckPurpose::Manual;
+        check_purpose = CheckPurpose::None;
+        if (result != soa_launcher_check_no_update
+            && result != soa_launcher_check_update_available)
         {
-            reset_release();
-            emit no_update_available();
-            return;
-        }
-        if (result != soa_launcher_check_update_available)
-        {
+            releases.clear();
             reset_release();
             const QString reason = error_message(error_code, http_status, error_detail);
             SPDLOG_WARN("launcher update check failed: {}", reason.toStdString());
-            emit check_failed(reason);
+            if (manual_check)
+                emit manual_check_failed(reason);
+            else
+                emit check_failed(reason);
+            return;
+        }
+
+        if (!parse_launcher_release_catalogue(
+                releases_json, detected_platform_key(), &releases))
+        {
+            releases.clear();
+            reset_release();
+            const QString reason = util::i18n::translate(
+                "No valid signed launcher releases could be found.");
+            SPDLOG_WARN("launcher release catalogue rejected: {}", reason.toStdString());
+            if (manual_check)
+                emit manual_check_failed(reason);
+            else
+                emit check_failed(reason);
+            return;
+        }
+
+        if (result == soa_launcher_check_no_update)
+        {
+            reset_release();
+            if (manual_check)
+            {
+                const bool selected = select_version(current_version())
+                    || select_version(releases.constFirst().version);
+                if (!selected)
+                {
+                    releases.clear();
+                    const QString reason = util::i18n::translate(
+                        "No valid signed launcher releases could be found.");
+                    SPDLOG_WARN("launcher release selection failed: {}",
+                                reason.toStdString());
+                    emit manual_check_failed(reason);
+                    return;
+                }
+                emit catalogue_ready();
+            }
+            else
+            {
+                emit no_update_available();
+            }
             return;
         }
 
@@ -288,10 +365,39 @@ namespace core::update
         package_file_name = std::move(file_name);
         package_url = std::move(url);
         expected_sha256 = std::move(sha256);
-        release_catalogue_json = std::move(releases_json);
         expected_size = size;
         required = is_required;
-        emit update_found();
+        if (manual_check)
+            emit catalogue_ready();
+        else
+            emit update_found();
+    }
+
+    bool LauncherUpdateManager::select_version(const QString& version)
+    {
+        if (!updater || downloading)
+            return false;
+        const auto found = std::find_if(releases.cbegin(), releases.cend(),
+            [&version](const LauncherRelease& release)
+        {
+            return release.version == version;
+        });
+        if (found == releases.cend())
+            return false;
+        const QByteArray version_bytes = found->version.toUtf8();
+        if (!soa_launcher_updater_select_version(updater, version_bytes.constData()))
+            return false;
+        release_version = found->version;
+        minimum_version = found->minimum_version;
+        message = found->message;
+        package_kind = found->package_kind;
+        package_file_name = found->file_name;
+        package_url = found->url;
+        expected_sha256 = found->sha256;
+        expected_size = found->size;
+        required = found->required;
+        final_download_path.clear();
+        return true;
     }
 
     void LauncherUpdateManager::handle_download(const soa_launcher_download_result result,
@@ -301,6 +407,11 @@ namespace core::update
                                                 QString final_path)
     {
         downloading = false;
+        if (result == soa_launcher_download_cancelled)
+        {
+            final_download_path.clear();
+            return;
+        }
         if (result != soa_launcher_download_completed)
         {
             const QString reason = error_message(error_code, http_status, error_detail);
@@ -322,7 +433,6 @@ namespace core::update
         final_download_path.clear();
         package_url.clear();
         expected_sha256.clear();
-        release_catalogue_json.clear();
         expected_size = 0;
         required = false;
     }
@@ -395,6 +505,97 @@ namespace core::update
             emit update_failed(util::i18n::translate("The macOS launcher update is not a DMG installer."));
             return;
         }
+        if (!QFileInfo::exists(final_download_path)
+            || QFileInfo(final_download_path).suffix().compare(
+                QStringLiteral("dmg"), Qt::CaseInsensitive) != 0)
+        {
+            emit update_failed(util::i18n::translate(
+                "The downloaded macOS installer could not be found."));
+            return;
+        }
+
+        auto* image_verification = new QProcess(this);
+        connect(image_verification, &QProcess::errorOccurred, this,
+                [this, image_verification](QProcess::ProcessError)
+        {
+            if (image_verification->property("soa_completed").toBool())
+                return;
+            image_verification->setProperty("soa_completed", true);
+            SPDLOG_ERROR("macOS launcher DMG verification failed: {}",
+                         image_verification->errorString().toStdString());
+            emit update_failed(util::i18n::translate(
+                "The downloaded macOS installer failed disk image verification."));
+            image_verification->deleteLater();
+        });
+        connect(image_verification, &QProcess::finished, this,
+                [this, image_verification](const int exit_code,
+                                           const QProcess::ExitStatus exit_status)
+        {
+            if (image_verification->property("soa_completed").toBool())
+                return;
+            image_verification->setProperty("soa_completed", true);
+            const bool valid = exit_status == QProcess::NormalExit && exit_code == 0;
+            if (!valid)
+            {
+                SPDLOG_ERROR("macOS launcher DMG verification failed: {}",
+                             image_verification->readAllStandardError().toStdString());
+                emit update_failed(util::i18n::translate(
+                    "The downloaded macOS installer failed disk image verification."));
+            }
+            image_verification->deleteLater();
+            if (valid)
+                verify_macos_installer_signature();
+        });
+        image_verification->start(QStringLiteral("/usr/bin/hdiutil"),
+                                  {QStringLiteral("verify"), final_download_path});
+    }
+
+    void LauncherUpdateManager::verify_macos_installer_signature()
+    {
+        auto* signature_verification = new QProcess(this);
+        connect(signature_verification, &QProcess::errorOccurred, this,
+                [this, signature_verification](QProcess::ProcessError)
+        {
+            if (signature_verification->property("soa_completed").toBool())
+                return;
+            signature_verification->setProperty("soa_completed", true);
+            SPDLOG_ERROR("macOS launcher DMG signature verification failed: {}",
+                         signature_verification->errorString().toStdString());
+            emit update_failed(util::i18n::translate(
+                "The downloaded macOS installer could not be verified by macOS."));
+            signature_verification->deleteLater();
+        });
+        connect(signature_verification, &QProcess::finished, this,
+                [this, signature_verification](const int exit_code,
+                                               const QProcess::ExitStatus exit_status)
+        {
+            if (signature_verification->property("soa_completed").toBool())
+                return;
+            signature_verification->setProperty("soa_completed", true);
+            const bool valid = exit_status == QProcess::NormalExit && exit_code == 0;
+            if (!valid)
+            {
+                SPDLOG_ERROR("macOS launcher DMG signature verification failed: {}",
+                             signature_verification->readAllStandardError().toStdString());
+                emit update_failed(util::i18n::translate(
+                    "The downloaded macOS installer could not be verified by macOS."));
+            }
+            signature_verification->deleteLater();
+            if (valid)
+                open_verified_macos_installer();
+        });
+        signature_verification->start(QStringLiteral("/usr/sbin/spctl"),
+                                      {QStringLiteral("--assess"),
+                                       QStringLiteral("--type"),
+                                       QStringLiteral("open"),
+                                       QStringLiteral("--context"),
+                                       QStringLiteral("context:primary-signature"),
+                                       QStringLiteral("--verbose=4"),
+                                       final_download_path});
+    }
+
+    void LauncherUpdateManager::open_verified_macos_installer()
+    {
         if (!QProcess::startDetached(QStringLiteral("/usr/bin/open"), {final_download_path}))
         {
             emit update_failed(util::i18n::translate("The launcher could not open the downloaded macOS installer."));
@@ -434,11 +635,20 @@ namespace core::update
         }
 
         QString target = final_download_path;
+        QString previous;
+        bool replaced_current = false;
         const QString current = qEnvironmentVariable("APPIMAGE").trimmed();
         if (!current.isEmpty() && QFileInfo::exists(current))
         {
+            if (QFileInfo(final_download_path).absoluteFilePath()
+                == QFileInfo(current).absoluteFilePath())
+            {
+                emit update_failed(util::i18n::translate(
+                    "The launcher update download path conflicts with the running AppImage."));
+                return;
+            }
             const QString staging = current + QStringLiteral(".soa-update-new");
-            const QString previous = current + QStringLiteral(".soa-previous");
+            previous = current + QStringLiteral(".soa-previous");
             QFile::remove(staging);
             if (!QFile::copy(final_download_path, staging)
                 || !QFile::setPermissions(staging, executable_permissions))
@@ -462,6 +672,7 @@ namespace core::update
                 return;
             }
             target = current;
+            replaced_current = true;
         }
 
         const QString command = QStringLiteral(
@@ -477,8 +688,22 @@ namespace core::update
         };
         if (!QProcess::startDetached(QStringLiteral("/bin/sh"), arguments))
         {
+            if (replaced_current)
+            {
+                QFile::remove(target);
+                if (!QFile::rename(previous, target))
+                {
+                    SPDLOG_CRITICAL("failed to restore previous AppImage after restart scheduling failed: {}",
+                                    previous.toStdString());
+                }
+            }
             emit update_failed(util::i18n::translate("The updated AppImage was installed, but the launcher could not schedule its restart."));
             return;
+        }
+        if (replaced_current && !QFile::remove(final_download_path))
+        {
+            SPDLOG_WARN("could not remove cached launcher update: {}",
+                        final_download_path.toStdString());
         }
         emit installer_started(target);
     }
@@ -486,24 +711,29 @@ namespace core::update
     void LauncherUpdateManager::schedule_health_checkpoint()
     {
 #if defined(Q_OS_LINUX)
-        if (!QCoreApplication::arguments().contains(QStringLiteral("--launcher-updated")))
-            return;
         const QString current = qEnvironmentVariable("APPIMAGE").trimmed();
         if (current.isEmpty())
             return;
+        const QString previous = current + QStringLiteral(".soa-previous");
+        if (!QCoreApplication::arguments().contains(QStringLiteral("--launcher-updated"))
+            && !QFile::exists(previous))
+        {
+            return;
+        }
         QTimer::singleShot(15000, this, [current]()
         {
-            QFile::remove(current + QStringLiteral(".soa-previous"));
+            const QString previous = current + QStringLiteral(".soa-previous");
+            if (QFile::exists(previous) && !QFile::remove(previous))
+                SPDLOG_WARN("could not remove previous AppImage after successful update: {}",
+                            previous.toStdString());
         });
 #endif
     }
 
     QString LauncherUpdateManager::detected_platform_key()
     {
-#if defined(Q_OS_MACOS) && defined(Q_PROCESSOR_ARM_64)
-        return QStringLiteral("macos-arm64");
-#elif defined(Q_OS_MACOS)
-        return QStringLiteral("macos-x86_64");
+#if defined(Q_OS_MACOS)
+        return QStringLiteral("macos");
 #elif defined(Q_OS_LINUX) && defined(Q_PROCESSOR_X86_64)
         return QStringLiteral("linux-x86_64");
 #elif defined(Q_OS_LINUX) && defined(Q_PROCESSOR_ARM_64)
@@ -515,12 +745,40 @@ namespace core::update
 
     QString LauncherUpdateManager::download_directory()
     {
-        QString directory = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
+        QString directory = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
         if (directory.isEmpty())
             directory = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
         if (directory.isEmpty())
             directory = QDir::tempPath();
+        directory = QDir(directory).filePath(QStringLiteral("launcher-updates"));
+        QDir().mkpath(directory);
         return directory;
+    }
+
+    void LauncherUpdateManager::prune_update_cache(const QString& directory)
+    {
+        QDir cache(directory);
+        if (!cache.exists())
+            return;
+
+        const QString appimage = qEnvironmentVariable("APPIMAGE").trimmed();
+        const QString current_appimage = appimage.isEmpty()
+            ? QString()
+            : QFileInfo(appimage).absoluteFilePath();
+        const QString current_executable = QFileInfo(
+            QCoreApplication::applicationFilePath()).absoluteFilePath();
+        const QFileInfoList stale_files = cache.entryInfoList(
+            {QStringLiteral("*.AppImage"), QStringLiteral("*.appimage"),
+             QStringLiteral("*.dmg"), QStringLiteral("*.part")},
+            QDir::Files | QDir::NoSymLinks);
+        for (const QFileInfo& file : stale_files)
+        {
+            const QString path = file.absoluteFilePath();
+            if (path == current_appimage || path == current_executable)
+                continue;
+            if (!QFile::remove(path))
+                SPDLOG_WARN("could not remove stale launcher update: {}", path.toStdString());
+        }
     }
 
     bool LauncherUpdateManager::update_available() const
@@ -551,5 +809,19 @@ namespace core::update
     QString LauncherUpdateManager::downloaded_path() const
     {
         return final_download_path;
+    }
+
+    QStringList LauncherUpdateManager::available_versions() const
+    {
+        QStringList versions;
+        versions.reserve(releases.size());
+        for (const LauncherRelease& release : releases)
+            versions.push_back(release.version);
+        return versions;
+    }
+
+    QString LauncherUpdateManager::current_version()
+    {
+        return QString::fromLatin1(SOA_LAUNCHER_VERSION);
     }
 }

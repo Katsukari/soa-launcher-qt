@@ -421,7 +421,7 @@ final class DiscordRpcService: @unchecked Sendable
             while !Task.isCancelled {
                 await self.pollProxy(username: currentUsername, generation: generation)
                 do {
-                    try await Task.sleep(for: .seconds(5))
+                    try await Task.sleep(nanoseconds: 5_000_000_000)
                 } catch {
                     return
                 }

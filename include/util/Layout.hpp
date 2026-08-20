@@ -273,7 +273,23 @@ namespace util::layout
     namespace advanced_settings
     {
         inline constexpr int k_row_single = 78;
+        inline constexpr int k_row_top = 96;
+        inline constexpr int k_row_gap = 100;
         int row(int i = 0, int count = 3);
+    }
+
+    namespace launcher_update
+    {
+        QRect box(QSize win);
+        QRect title(QSize win);
+        QRect message(QSize win);
+        QRect details(QSize win, bool catalogue);
+        QRect version_combo(QSize win);
+        QRect progress_label(QSize win);
+        QRect progress_bar(QSize win);
+        QRect cancel_button(QSize win, bool catalogue, bool downloading);
+        QRect update_button(QSize win, bool catalogue, bool cancel_visible);
+        QRect close_button(QSize win);
     }
 
     namespace dropdown

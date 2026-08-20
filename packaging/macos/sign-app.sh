@@ -11,13 +11,40 @@ if [ ! -d "$APP" ]; then
   exit 1
 fi
 
+MAIN_EXECUTABLE_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Contents/Info.plist")"
+case "$MAIN_EXECUTABLE_NAME" in
+  ""|*/*)
+    echo "Invalid CFBundleExecutable in $APP/Contents/Info.plist" >&2
+    exit 1
+    ;;
+esac
+MAIN_EXECUTABLE="$APP/Contents/MacOS/$MAIN_EXECUTABLE_NAME"
+if [ ! -f "$MAIN_EXECUTABLE" ]; then
+  echo "Application executable does not exist: $MAIN_EXECUTABLE" >&2
+  exit 1
+fi
+
 remove_signature() {
   codesign --remove-signature "$1" >/dev/null 2>&1 || true
+}
+
+is_macho() {
+  local description
+  description="$(file -L -b "$1")"
+  [[ "$description" == *"Mach-O"* ]]
+}
+
+is_signable() {
+  case "$1" in
+    *.dylib|*.so) return 0 ;;
+    *) is_macho "$1" ;;
+  esac
 }
 
 sign_item() {
   local item="$1"
   remove_signature "$item"
+  printf 'Signing nested code: %s\n' "$item"
   if [ "$IDENTITY" = "-" ]; then
     codesign --force --sign - "$item"
   else
@@ -26,10 +53,10 @@ sign_item() {
 }
 
 while IFS= read -r -d '' item; do
-  if file -b "$item" | grep -q 'Mach-O'; then
+  if [ "$item" != "$MAIN_EXECUTABLE" ] && is_signable "$item"; then
     remove_signature "$item"
   fi
-done < <(find "$APP/Contents" -type f -print0)
+done < <(find "$APP/Contents" \( -type f -o -type l \) -print0)
 
 while IFS= read -r -d '' bundle; do
   remove_signature "$bundle"
@@ -44,10 +71,10 @@ done < <(find "$APP" -depth -type d \( \
 remove_signature "$APP"
 
 while IFS= read -r -d '' item; do
-  if file -b "$item" | grep -q 'Mach-O'; then
+  if [ "$item" != "$MAIN_EXECUTABLE" ] && is_signable "$item"; then
     sign_item "$item"
   fi
-done < <(find "$APP/Contents" -type f -print0)
+done < <(find "$APP/Contents" \( -type f -o -type l \) -print0)
 
 while IFS= read -r -d '' bundle; do
   sign_item "$bundle"
@@ -59,6 +86,7 @@ done < <(find "$APP" -depth -type d \( \
   -name '*.bundle' \
 \) ! -path "$APP" -print0)
 
+printf 'Signing application bundle: %s\n' "$APP"
 if [ "$IDENTITY" = "-" ]; then
   if [ -n "$ENTITLEMENTS" ] && [ -f "$ENTITLEMENTS" ]; then
     codesign --force --entitlements "$ENTITLEMENTS" --sign - "$APP"
@@ -75,7 +103,7 @@ codesign --verify --deep --strict --verbose=4 "$APP"
 
 if [ "$IDENTITY" = "-" ]; then
   while IFS= read -r -d '' item; do
-    if file -b "$item" | grep -q 'Mach-O'; then
+    if is_signable "$item"; then
       if codesign -dvv "$item" 2>&1 | grep -q '^TeamIdentifier='; then
         team_id="$(codesign -dvv "$item" 2>&1 | sed -n 's/^TeamIdentifier=//p' | head -n 1)"
         if [ -n "$team_id" ] && [ "$team_id" != "not set" ]; then
@@ -84,5 +112,5 @@ if [ "$IDENTITY" = "-" ]; then
         fi
       fi
     fi
-  done < <(find "$APP/Contents" -type f -print0)
+  done < <(find "$APP/Contents" \( -type f -o -type l \) -print0)
 fi

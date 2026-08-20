@@ -2,6 +2,9 @@ import Foundation
 #if canImport(FoundationNetworking)
 import FoundationNetworking
 #endif
+#if canImport(CryptoKit)
+import CryptoKit
+#endif
 import Soa_Courier
 
 struct LauncherUpdateSelection
@@ -293,7 +296,7 @@ final class LauncherUpdateService: @unchecked Sendable
     {
         lock.lock()
         defer { lock.unlock() }
-        guard !stopped, task == nil, let selected = catalogue[normalizedVersion(version)] else {
+        guard !stopped, let selected = catalogue[normalizedVersion(version)] else {
             return false
         }
         selection = selected
@@ -386,8 +389,7 @@ final class LauncherUpdateService: @unchecked Sendable
     private func performCheck() async
     {
         let supportedPlatform = platform == "linux-x86_64"
-            || platform == "macos-arm64"
-            || platform == "macos-x86_64"
+            || platform == "macos"
 
         guard !currentVersion.isEmpty,
               supportedPlatform,
@@ -456,8 +458,16 @@ final class LauncherUpdateService: @unchecked Sendable
     {
         let manifestData = try await fetchSignedJSON(manifestURL, maximumBytes: 64 * 1024)
         let selected = try parseManifest(manifestData)
+        let manifestName = manifestURL.lastPathComponent
+        let versionSuffix = "version.json"
+        guard manifestName.hasSuffix(versionSuffix) else {
+            throw LauncherServiceFailure(
+                soa_launcher_error_invalid_configuration,
+                "The launcher update manifest name is invalid")
+        }
+        let historyName = String(manifestName.dropLast(versionSuffix.count)) + "versions.json"
         let historyURL = manifestURL.deletingLastPathComponent()
-            .appendingPathComponent("versions.json")
+            .appendingPathComponent(historyName)
         let historyData = try await fetchSignedJSON(historyURL, maximumBytes: 1024 * 1024)
         let parsedCatalogue = try parseCatalogue(historyData)
         guard parsedCatalogue.releases.contains(where: {
@@ -538,10 +548,15 @@ final class LauncherUpdateService: @unchecked Sendable
                 "The launcher release has an invalid minimum version")
         }
 
-        let name = safeFileName(manifest["file_name"] as? String ?? "")
+        let rawName = manifest["file_name"] as? String ?? ""
+        let name = safeFileName(rawName)
         let urlText = manifest["url"] as? String ?? ""
+        let expectedExtension = platform == "macos" ? ".dmg" : ".appimage"
         guard !name.isEmpty,
+              rawName == name,
+              name.lowercased().hasSuffix(expectedExtension),
               let url = secureURL(urlText, allowInsecureHTTP: allowInsecureHTTP),
+              url.lastPathComponent == name,
               Self.trustedReleaseHost(url.host?.lowercased() ?? "") else {
             throw LauncherServiceFailure(
                 soa_launcher_error_unsafe_url,
@@ -551,6 +566,7 @@ final class LauncherUpdateService: @unchecked Sendable
         if let mirrors = manifest["mirrors"] as? [String] {
             for mirror in mirrors {
                 guard let mirrorURL = secureURL(mirror, allowInsecureHTTP: allowInsecureHTTP),
+                      mirrorURL.lastPathComponent == name,
                       Self.trustedReleaseHost(mirrorURL.host?.lowercased() ?? "") else {
                     throw LauncherServiceFailure(
                         soa_launcher_error_unsafe_url,
@@ -583,7 +599,7 @@ final class LauncherUpdateService: @unchecked Sendable
                 soa_launcher_error_invalid_size,
                 "The launcher release package has no valid size")
         }
-        guard expectedSize <= 4 * 1024 * 1024 * 1024 else {
+        guard expectedSize <= 1024 * 1024 * 1024 else {
             throw LauncherServiceFailure(
                 soa_launcher_error_invalid_size,
                 "The launcher release package exceeds the maximum allowed size")
@@ -593,12 +609,12 @@ final class LauncherUpdateService: @unchecked Sendable
             version: tag,
             minimumVersion: minimum,
             message: manifest["message"] as? String ?? "",
-            packageKind: platform.hasPrefix("macos-") ? "dmg" : "appimage",
+            packageKind: platform == "macos" ? "dmg" : "appimage",
             fileName: name,
             packageURLs: packageURLs,
             sha256: digest,
             expectedSize: expectedSize,
-            required: false)
+            required: manifest["required"] as? Bool ?? false)
     }
 
     private func parseCatalogue(_ data: Data) throws
@@ -618,8 +634,7 @@ final class LauncherUpdateService: @unchecked Sendable
         let oldestAllowed = now.addingTimeInterval(-365 * 24 * 60 * 60)
         let newestAllowed = now.addingTimeInterval(24 * 60 * 60)
         let formatter = ISO8601DateFormatter()
-        var releases: [LauncherUpdateSelection] = []
-        var acceptedEntries: [[String: Any]] = []
+        var accepted: [(release: LauncherUpdateSelection, entry: [String: Any])] = []
         var versions = Set<String>()
 
         for entry in entries {
@@ -636,20 +651,21 @@ final class LauncherUpdateService: @unchecked Sendable
                     soa_launcher_error_invalid_release,
                     "The signed launcher release catalogue contains duplicate versions")
             }
-            releases.append(release)
-            acceptedEntries.append(entry)
+            accepted.append((release, entry))
         }
 
-        guard !releases.isEmpty else {
+        guard !accepted.isEmpty else {
             throw LauncherServiceFailure(
                 soa_launcher_error_invalid_release,
                 "No signed launcher release from the last year is available")
         }
-        releases.sort { compareVersions($0.version, $1.version) > 0 }
-        acceptedEntries.sort {
-            compareVersions($0["version"] as? String ?? "", $1["version"] as? String ?? "") > 0
-        }
-        let filtered: [String: Any] = ["releases": acceptedEntries]
+        accepted.sort { compareVersions($0.release.version, $1.release.version) > 0 }
+        let releases = accepted.map(\.release)
+        let filtered: [String: Any] = [
+            "schema": 1,
+            "platform": platform,
+            "releases": accepted.map(\.entry)
+        ]
         let filteredData = try JSONSerialization.data(withJSONObject: filtered, options: [.sortedKeys])
         guard let json = String(data: filteredData, encoding: .utf8) else {
             throw LauncherServiceFailure(
@@ -828,7 +844,7 @@ final class LauncherUpdateService: @unchecked Sendable
                 "The launcher update signature is malformed")
         }
 
-        #if os(Linux)
+        #if os(Linux) || canImport(CryptoKit)
         let valid = publicKey.withUnsafeBytes { keyBuffer in
             manifest.withUnsafeBytes { manifestBuffer in
                 signatureBytes.withUnsafeBytes { signatureBuffer in
@@ -850,7 +866,7 @@ final class LauncherUpdateService: @unchecked Sendable
         #else
         throw LauncherServiceFailure(
             soa_launcher_error_invalid_configuration,
-            "Launcher self-updates are disabled on this platform")
+            "Launcher signature verification is unavailable on this platform")
         #endif
     }
 

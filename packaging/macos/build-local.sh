@@ -5,11 +5,11 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 BUILD_DIR="${SOA_BUILD_DIR:-$PROJECT_ROOT/build-macos-local}"
-ARCH="${SOA_MACOS_ARCH:-$(uname -m)}"
+ARCHS="${SOA_MACOS_ARCHS:-${SOA_MACOS_ARCH:-x86_64;arm64}}"
 BUILD_TYPE="${SOA_BUILD_TYPE:-Release}"
 LOCAL_SIGN="${SOA_LOCAL_SIGN:-0}"
 
-for tool in cmake ninja swift xcrun lipo otool file i686-w64-mingw32-gcc i686-w64-mingw32-g++; do
+for tool in cmake swift xcrun lipo otool file i686-w64-mingw32-gcc i686-w64-mingw32-g++; do
   if ! command -v "$tool" >/dev/null 2>&1; then
     echo "Required tool not found: $tool" >&2
     exit 1
@@ -50,22 +50,24 @@ fi
 cmake \
   -S "$PROJECT_ROOT" \
   -B "$BUILD_DIR" \
-  -G Ninja \
+  -G Xcode \
   -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
-  -DCMAKE_OSX_ARCHITECTURES="$ARCH" \
+  -DCMAKE_OSX_ARCHITECTURES="$ARCHS" \
   -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
   "${CMAKE_QT_ARGS[@]}" \
   -DSOA_REQUIRE_ALICIA_LOG_HOOK=ON \
   -DBUILD_TESTING=ON
 
-cmake --build "$BUILD_DIR" --parallel
-ctest --test-dir "$BUILD_DIR" --output-on-failure
+cmake --build "$BUILD_DIR" --config "$BUILD_TYPE" --parallel
+ctest --test-dir "$BUILD_DIR" -C "$BUILD_TYPE" --output-on-failure
 
-APP="$(find "$BUILD_DIR" -maxdepth 1 -type d -name '*.app' -print -quit)"
-if [ -z "$APP" ]; then
-  echo "No .app bundle was produced in $BUILD_DIR" >&2
+apps=("$BUILD_DIR/$BUILD_TYPE"/*.app)
+if [ "${#apps[@]}" -ne 1 ] || [ ! -d "${apps[0]}" ]; then
+  printf 'Expected exactly one app bundle in %s/%s, found: %s\n' \
+    "$BUILD_DIR" "$BUILD_TYPE" "${apps[*]}" >&2
   exit 1
 fi
+APP="${apps[0]}"
 
 "$MACDEPLOYQT" "$APP" -always-overwrite -verbose=1
 
@@ -79,20 +81,48 @@ fi
 
 BINARY="$APP/Contents/MacOS/soa_launcher"
 ACTUAL_ARCHS="$(lipo -archs "$BINARY")"
-case " $ACTUAL_ARCHS " in
-  *" $ARCH "*) ;;
-  *)
-    echo "The launcher binary does not contain requested architecture $ARCH: $ACTUAL_ARCHS" >&2
-    exit 1
-    ;;
-esac
+IFS=';' read -r -a REQUESTED_ARCHS <<< "$ARCHS"
+for requested_arch in "${REQUESTED_ARCHS[@]}"; do
+  case " $ACTUAL_ARCHS " in
+    *" $requested_arch "*) ;;
+    *)
+      echo "The launcher binary does not contain requested architecture $requested_arch: $ACTUAL_ARCHS" >&2
+      exit 1
+      ;;
+  esac
+done
 
 COURIER="$APP/Contents/Frameworks/libsoa_network.dylib"
 if [ ! -f "$COURIER" ]; then
   echo "The Swift Courier library is missing from the application bundle." >&2
   exit 1
 fi
+COURIER_ARCHS="$(lipo -archs "$COURIER")"
+for requested_arch in "${REQUESTED_ARCHS[@]}"; do
+  case " $COURIER_ARCHS " in
+    *" $requested_arch "*) ;;
+    *)
+      echo "The Swift network library does not contain requested architecture $requested_arch: $COURIER_ARCHS" >&2
+      exit 1
+      ;;
+  esac
+done
 HOOK_ROOT="$APP/Contents/Resources/alicia-log-hook"
+AUDIO_HOST="$HOOK_ROOT/soa-audio-host"
+if [ ! -s "$AUDIO_HOST" ]; then
+  echo "The bundled CoreAudio helper is missing: $AUDIO_HOST" >&2
+  exit 1
+fi
+AUDIO_HOST_ARCHS="$(lipo -archs "$AUDIO_HOST")"
+for requested_arch in "${REQUESTED_ARCHS[@]}"; do
+  case " $AUDIO_HOST_ARCHS " in
+    *" $requested_arch "*) ;;
+    *)
+      echo "The audio host does not contain requested architecture $requested_arch: $AUDIO_HOST_ARCHS" >&2
+      exit 1
+      ;;
+  esac
+done
 for hook_artifact in SoaAliciaLogInjector.exe SoaAliciaLogHook.dll README.md MINHOOK_LICENSE.txt; do
   if [ ! -s "$HOOK_ROOT/$hook_artifact" ]; then
     echo "The bundled Alicia injector/compatibility component is missing: $HOOK_ROOT/$hook_artifact" >&2

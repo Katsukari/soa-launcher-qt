@@ -122,6 +122,9 @@ struct SwiftNetworkABITests
             nil) else {
             fatalError("Could not create the Swift launcher updater")
         }
+        guard !soa_launcher_updater_select_version(updater, "1.0.0") else {
+            fatalError("The Swift launcher updater selected a release before loading a catalogue")
+        }
         soa_launcher_updater_check(updater)
         guard updateSemaphore.wait(timeout: .now() + 2) == .success else {
             fatalError("The Swift launcher updater did not reject invalid configuration")

@@ -13,6 +13,8 @@
 #include <QLabel>
 #include <QMouseEvent>
 #include <QPushButton>
+#include <QScreen>
+#include <QShowEvent>
 #include <QUrl>
 #include <QVBoxLayout>
 
@@ -23,7 +25,7 @@ LauncherInfoDialog::LauncherInfoDialog(const Page page_, QWidget* parent)
     setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
     setWindowModality(Qt::ApplicationModal);
     setAttribute(Qt::WA_TranslucentBackground);
-    setFixedSize(680, 580);
+    setFixedSize(page == Page::Credits ? QSize(610, 460) : QSize(680, 500));
     setup_ui();
     retranslate();
 
@@ -40,7 +42,7 @@ void LauncherInfoDialog::setup_ui()
 {
     auto* panel = new QFrame(this);
     panel->setObjectName(QStringLiteral("launcherInfoPanel"));
-    panel->setGeometry(18, 18, 644, 544);
+    panel->setGeometry(rect().adjusted(18, 18, -18, -18));
     panel->setStyleSheet(QStringLiteral(
         "QFrame#launcherInfoPanel {"
         "background: rgba(249,244,240,252);"
@@ -66,16 +68,6 @@ void LauncherInfoDialog::setup_ui()
         "QPushButton#launcherInfoLink:pressed {"
         "background: rgba(219,198,186,242);"
         "}"
-        "QPushButton#launcherInfoClose {"
-        "background: rgba(255,255,255,112);"
-        "border: 1px solid rgba(79,23,23,45);"
-        "border-radius: 9px;"
-        "padding: 0px;"
-        "}"
-        "QPushButton#launcherInfoClose:hover {"
-        "background: rgba(235,220,211,225);"
-        "border-color: rgba(79,23,23,95);"
-        "}"
         "QLabel { background: transparent; }"));
 
     auto* shadow = new QGraphicsDropShadowEffect(panel);
@@ -85,42 +77,36 @@ void LauncherInfoDialog::setup_ui()
     panel->setGraphicsEffect(shadow);
 
     auto* root = new QVBoxLayout(panel);
-    root->setContentsMargins(34, 22, 34, 28);
-    root->setSpacing(8);
-
-    auto* top_row = new QHBoxLayout;
-    top_row->setContentsMargins(0, 0, 0, 0);
-
-    section_label = new QLabel(panel);
-    QFont section_font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
-    section_font.setPixelSize(13);
-    section_font.setWeight(QFont::Black);
-    section_label->setFont(section_font);
-    section_label->setStyleSheet(QStringLiteral("color: #9E8E7E; letter-spacing: 1px;"));
-    top_row->addWidget(section_label);
-    top_row->addStretch();
+    const int horizontal_margin = page == Page::Credits ? 30 : 34;
+    root->setContentsMargins(horizontal_margin,
+                             page == Page::Credits ? 24 : 28,
+                             horizontal_margin,
+                             page == Page::Credits ? 22 : 26);
+    root->setSpacing(page == Page::Credits ? 7 : 8);
 
     close_button = new QPushButton(panel);
-    close_button->setObjectName(QStringLiteral("launcherInfoClose"));
-    close_button->setFixedSize(40, 40);
+    close_button->setFlat(true);
+    close_button->setFixedSize(QSize(28, 28));
     close_button->setCursor(Qt::PointingHandCursor);
+    close_button->setStyleSheet(QStringLiteral("border:none; background:transparent;"));
     close_button->setIcon(QIcon(util::assets::images[util::assets::Image::CloseSettings]));
-    close_button->setIconSize(QSize(16, 16));
+    close_button->setIconSize(QSize(22, 22));
+    close_button->move(panel->width() - horizontal_margin - close_button->width(), 16);
     connect(close_button, &QPushButton::clicked, this, &QDialog::accept);
-    top_row->addWidget(close_button);
-    root->addLayout(top_row);
+    close_button->raise();
 
     logo_label = new QLabel(panel);
     logo_label->setAlignment(Qt::AlignCenter);
     logo_label->setPixmap(util::assets::images[util::assets::Image::SoaLogo]
-        .scaled(132, 91, Qt::KeepAspectRatio, Qt::SmoothTransformation));
-    logo_label->setFixedHeight(91);
+        .scaled(page == Page::Credits ? QSize(78, 54) : QSize(120, 82),
+                Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    logo_label->setFixedHeight(page == Page::Credits ? 54 : 82);
     root->addWidget(logo_label);
 
     title_label = new QLabel(panel);
     title_label->setAlignment(Qt::AlignCenter);
     QFont title_font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
-    title_font.setPixelSize(26);
+    title_font.setPixelSize(page == Page::Credits ? 23 : 26);
     title_font.setWeight(QFont::Black);
     title_label->setFont(title_font);
     title_label->setStyleSheet(QStringLiteral("color: #4F1717;"));
@@ -130,7 +116,7 @@ void LauncherInfoDialog::setup_ui()
     subtitle_label->setAlignment(Qt::AlignCenter);
     subtitle_label->setWordWrap(true);
     QFont subtitle_font = util::assets::fonts[util::assets::Font::Inter];
-    subtitle_font.setPixelSize(14);
+    subtitle_font.setPixelSize(page == Page::Credits ? 13 : 14);
     subtitle_font.setWeight(QFont::Medium);
     subtitle_label->setFont(subtitle_font);
     subtitle_label->setStyleSheet(QStringLiteral("color: #5A4636;"));
@@ -138,7 +124,7 @@ void LauncherInfoDialog::setup_ui()
 
     badge_label = new QLabel(panel);
     badge_label->setAlignment(Qt::AlignCenter);
-    badge_label->setFixedHeight(28);
+    badge_label->setFixedHeight(page == Page::Credits ? 26 : 28);
     QFont badge_font = util::assets::fonts[util::assets::Font::EurostileBlack];
     badge_font.setPixelSize(12);
     badge_font.setWeight(QFont::Black);
@@ -151,7 +137,10 @@ void LauncherInfoDialog::setup_ui()
     auto* info_card = new QFrame(panel);
     info_card->setObjectName(QStringLiteral("launcherInfoCard"));
     auto* info_layout = new QVBoxLayout(info_card);
-    info_layout->setContentsMargins(22, 16, 22, 16);
+    info_layout->setContentsMargins(page == Page::Credits ? 18 : 22,
+                                    page == Page::Credits ? 13 : 12,
+                                    page == Page::Credits ? 18 : 22,
+                                    page == Page::Credits ? 13 : 12);
     info_label = new QLabel(info_card);
     info_label->setTextFormat(Qt::RichText);
     info_label->setWordWrap(true);
@@ -159,19 +148,22 @@ void LauncherInfoDialog::setup_ui()
     info_label->setOpenExternalLinks(true);
     info_label->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     QFont info_font = util::assets::fonts[util::assets::Font::Inter];
-    info_font.setPixelSize(13);
+    info_font.setPixelSize(page == Page::Credits ? 12 : 13);
     info_font.setWeight(QFont::Medium);
     info_label->setFont(info_font);
     info_label->setStyleSheet(QStringLiteral("color: #4F1717;"));
-    info_label->setMinimumHeight(112);
+    info_label->setMinimumHeight(page == Page::Credits ? 150 : 88);
     info_layout->addWidget(info_label);
-    root->addWidget(info_card, 1);
+    info_card->setFixedHeight(page == Page::Credits ? 190 : 122);
+    root->addWidget(info_card);
 
-    auto* link_row = new QHBoxLayout;
+    links_widget = new QWidget(panel);
+    auto* link_row = new QHBoxLayout(links_widget);
+    link_row->setContentsMargins(0, 0, 0, 0);
     link_row->setSpacing(10);
-    const auto make_link_button = [panel]()
+    const auto make_link_button = [this]()
     {
-        auto* button = new QPushButton(panel);
+        auto* button = new QPushButton(links_widget);
         button->setObjectName(QStringLiteral("launcherInfoLink"));
         button->setCursor(Qt::PointingHandCursor);
         button->setMinimumHeight(40);
@@ -188,7 +180,8 @@ void LauncherInfoDialog::setup_ui()
     link_row->addWidget(website_button);
     link_row->addWidget(source_button);
     link_row->addWidget(contact_button);
-    root->addLayout(link_row);
+    root->addWidget(links_widget);
+    links_widget->setVisible(page == Page::About);
 
     connect(website_button, &QPushButton::clicked, this, []()
     {
@@ -203,15 +196,6 @@ void LauncherInfoDialog::setup_ui()
         QDesktopServices::openUrl(QUrl(QStringLiteral("mailto:dev@storyofalicia.com")));
     });
 
-    footer_label = new QLabel(panel);
-    footer_label->setAlignment(Qt::AlignCenter);
-    footer_label->setWordWrap(true);
-    QFont footer_font = util::assets::fonts[util::assets::Font::Inter];
-    footer_font.setPixelSize(11);
-    footer_font.setWeight(QFont::Medium);
-    footer_label->setFont(footer_font);
-    footer_label->setStyleSheet(QStringLiteral("color: #8D7768;"));
-    root->addWidget(footer_label);
 }
 
 void LauncherInfoDialog::retranslate()
@@ -229,7 +213,6 @@ void LauncherInfoDialog::retranslate()
     if (page == Page::About)
     {
         setWindowTitle(translate("About Story of Alicia Launcher"));
-        section_label->setText(translate("ABOUT"));
         title_label->setText(translate("Story of Alicia Launcher"));
         subtitle_label->setText(translate("The official launcher for Linux and macOS."));
         badge_label->setText(translate("VERSION %1 · QT %2")
@@ -239,21 +222,18 @@ void LauncherInfoDialog::retranslate()
                  translate("Install, update, verify, repair, and launch both supported Story of Alicia game profiles."),
                  translate("Linux and macOS"),
                  translate("Linux supports Wine and Proton. macOS supports Wine.")));
-        footer_label->setText(translate(
-            "Game and artwork remain owned by their respective copyright holders."));
     }
     else
     {
         setWindowTitle(translate("Credits"));
-        section_label->setText(translate("CREDITS"));
         title_label->setText(translate("Credits"));
         subtitle_label->setText(translate("Built with help from the Story of Alicia community."));
         badge_label->setText(translate("THANK YOU"));
         info_label->setText(QStringLiteral(
-            "<b>%1</b><br>%2<br><br>"
-            "<b>%3</b><br>%4<br><br>"
-            "<b>%5</b><br>%6<br><br>"
-            "<b>%7</b><br>%8")
+            "<b>%1</b><br>%2<br>"
+            "<br><b>%3</b><br>%4<br>"
+            "<br><b>%5</b><br>%6<br>"
+            "<br><b>%7</b><br>%8")
             .arg(translate("Launcher development"),
                  translate("Story of Alicia team and contributors"),
                  translate("Artwork and branding"),
@@ -262,8 +242,6 @@ void LauncherInfoDialog::retranslate()
                  translate("Community translators, testers, and players"),
                  translate("Open-source technology"),
                  translate("Qt, Wine, spdlog, fmt, and their contributors")));
-        footer_label->setText(translate(
-            "Thank you to everyone who helps players enjoy Story of Alicia."));
     }
 }
 
@@ -294,4 +272,24 @@ void LauncherInfoDialog::mouseReleaseEvent(QMouseEvent* event)
 {
     dragging = false;
     QDialog::mouseReleaseEvent(event);
+}
+
+void LauncherInfoDialog::showEvent(QShowEvent* event)
+{
+    QDialog::showEvent(event);
+
+    QWidget* anchor = parentWidget() ? parentWidget()->window() : nullptr;
+    QScreen* target_screen = anchor ? anchor->screen() : screen();
+    const QRect available = target_screen
+        ? target_screen->availableGeometry()
+        : QRect(QPoint(0, 0), size());
+    const QPoint center = anchor && anchor->isVisible()
+        ? anchor->frameGeometry().center()
+        : available.center();
+    QPoint position = center - QPoint(width() / 2, height() / 2);
+    position.setX(qBound(available.left(), position.x(),
+                         qMax(available.left(), available.right() - width() + 1)));
+    position.setY(qBound(available.top(), position.y(),
+                         qMax(available.top(), available.bottom() - height() + 1)));
+    move(position);
 }

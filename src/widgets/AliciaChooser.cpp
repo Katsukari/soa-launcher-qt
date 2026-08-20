@@ -728,8 +728,8 @@ void AliciaChooser::refresh_game_text()
     const bool alicia_2 = game_version == core::game::GameVersion::Alicia2;
 
     title_label->setText(alicia_2
-        ? util::i18n::translate("STORY OF ALICIA 2.0 PLAYTEST")
-        : util::i18n::translate("PLAYTEST"));
+        ? util::i18n::translate("Story Of Alicia 2.0 Playtest")
+        : util::i18n::translate("Story Of Alicia Playtest"));
 }
 
 void AliciaChooser::paintEvent(QPaintEvent* event)

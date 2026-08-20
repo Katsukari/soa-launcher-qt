@@ -1208,7 +1208,7 @@ Met Aanmeldlink kopiëren kun je de exacte link in elke browser plakken.</transl
         <message>
             <location filename="../src/widgets/Settings.cpp" line="188" />
             <source>LAUNCHER</source>
-            <translation>STARTPROGRAMMA</translation>
+            <translation>LAUNCHER</translation>
         </message>
         <message>
             <source>Launcher Busy</source>
@@ -1529,9 +1529,10 @@ Met Aanmeldlink kopiëren kun je de exacte link in elke browser plakken.</transl
             <translation>SPELER</translation>
         </message>
         <message>
-            <location filename="../src/widgets/AliciaChooser.cpp" line="618" />
-            <source>PLAYTEST</source>
-            <translation>SPEELTEST</translation>
+            <location filename="../src/MainWindow.cpp" line="798" />
+            <location filename="../src/widgets/AliciaChooser.cpp" line="732" />
+            <source>Story Of Alicia Playtest</source>
+            <translation>Story Of Alicia Speeltest</translation>
         </message>
         <message>
             <source>Prefix setup complete.</source>
@@ -2157,9 +2158,10 @@ Ontbreekt: %1. %2 en start daarna de launcher opnieuw.</translation>
             <translation>Story of Alicia 2.0</translation>
         </message>
         <message>
-            <location filename="../src/widgets/AliciaChooser.cpp" line="617" />
-            <source>STORY OF ALICIA 2.0 PLAYTEST</source>
-            <translation>STORY OF ALICIA 2.0-PLAYTEST</translation>
+            <location filename="../src/MainWindow.cpp" line="810" />
+            <location filename="../src/widgets/AliciaChooser.cpp" line="731" />
+            <source>Story Of Alicia 2.0 Playtest</source>
+            <translation>Story Of Alicia 2.0 Speeltest</translation>
         </message>
         <message>
             <source>Story Of Alicia Launcher</source>
@@ -2172,10 +2174,6 @@ Ontbreekt: %1. %2 en start daarna de launcher opnieuw.</translation>
         <message>
             <source>Story of Alicia Managed Runtime</source>
             <translation>Story of Alicia Managed Runtime</translation>
-        </message>
-        <message>
-            <source>Story of Alicia Playtest</source>
-            <translation>Story of Alicia-playtest</translation>
         </message>
         <message>
             <location filename="../src/widgets/RulesAgreement.cpp" line="180" />
@@ -3664,6 +3662,242 @@ Ontbreekt: %1.</translation>
     <message>
         <source>All Files</source>
         <translation>Alle bestanden</translation>
+    </message>
+    <message>
+        <source>DIAGNOSTIC MODE</source>
+        <translation>DIAGNOSTISCHE MODUS</translation>
+    </message>
+    <message>
+        <source>Creates labeled Alicia and Wine logs, a launch timeline and summary. Leave off for normal play.</source>
+        <translation>Maakt gelabelde Alicia- en Wine-logboeken, een starttijdlijn en een samenvatting. Laat dit uitgeschakeld tijdens normaal spelen.</translation>
+    </message>
+    <message>
+        <source>Creates labeled Alicia and Wine logs, a launch timeline, summary and host sample. Leave off for normal play.</source>
+        <translation>Maakt gelabelde Alicia- en Wine-logboeken, een starttijdlijn, een samenvatting en een hostsysteem-sample. Laat dit uitgeschakeld tijdens normaal spelen.</translation>
+    </message>
+    <message>
+        <source>Diagnostic mode</source>
+        <translation>Diagnostische modus</translation>
+    </message>
+    <message>
+        <source>Create detailed files for each game launch</source>
+        <translation>Gedetailleerde bestanden maken voor elke spelstart</translation>
+    </message>
+    <message>
+        <source>A launcher update operation is already running.</source>
+        <translation>Er wordt al een launcherupdate uitgevoerd.</translation>
+    </message>
+    <message>
+        <source>The launcher update configuration is invalid.</source>
+        <translation>De configuratie voor launcherupdates is ongeldig.</translation>
+    </message>
+    <message>
+        <source>The launcher update server returned HTTP %1.</source>
+        <translation>De launcherupdateserver heeft HTTP %1 geretourneerd.</translation>
+    </message>
+    <message>
+        <source>The launcher update response is unexpectedly large.</source>
+        <translation>Het antwoord van de launcherupdateserver is onverwacht groot.</translation>
+    </message>
+    <message>
+        <source>The launcher update server returned an invalid manifest.</source>
+        <translation>De launcherupdateserver heeft een ongeldig manifest geretourneerd.</translation>
+    </message>
+    <message>
+        <source>No compatible launcher package was attached to the release.</source>
+        <translation>Er was geen compatibel launcherpakket aan de release toegevoegd.</translation>
+    </message>
+    <message>
+        <source>The launcher release contains an invalid or untrusted package URL.</source>
+        <translation>De launcherrelease bevat een ongeldige of niet-vertrouwde pakket-URL.</translation>
+    </message>
+    <message>
+        <source>The launcher release package has no valid SHA-256 digest.</source>
+        <translation>Het launcherreleasepakket heeft geen geldige SHA-256-controlesom.</translation>
+    </message>
+    <message>
+        <source>The launcher release package has an invalid size.</source>
+        <translation>Het launcherreleasepakket heeft een ongeldige grootte.</translation>
+    </message>
+    <message>
+        <source>The launcher could not create the update file.</source>
+        <translation>De launcher kon het updatebestand niet aanmaken.</translation>
+    </message>
+    <message>
+        <source>The launcher update was cancelled.</source>
+        <translation>De launcherupdate is geannuleerd.</translation>
+    </message>
+    <message>
+        <source>The launcher update signature is invalid or does not match this launcher.</source>
+        <translation>De handtekening van de launcherupdate is ongeldig of komt niet overeen met deze launcher.</translation>
+    </message>
+    <message>
+        <source>The launcher update network request failed.</source>
+        <translation>Het netwerkverzoek voor de launcherupdate is mislukt.</translation>
+    </message>
+    <message>
+        <source>The launcher update network request failed: %1</source>
+        <translation>Het netwerkverzoek voor de launcherupdate is mislukt: %1</translation>
+    </message>
+    <message>
+        <source>The launcher update failed.</source>
+        <translation>De launcherupdate is mislukt.</translation>
+    </message>
+    <message>
+        <source>&#10;&#10;Diagnostic run: %1</source>
+        <translation>&#10;&#10;Diagnostische uitvoering: %1</translation>
+    </message>
+    <message>
+        <source>choose Wine</source>
+        <translation>Wine kiezen</translation>
+    </message>
+    <message>
+        <source>%1 GB</source>
+        <translation>%1 GB</translation>
+    </message>
+    <message>
+        <source>%1 MB</source>
+        <translation>%1 MB</translation>
+    </message>
+    <message>
+        <source>%1 KB</source>
+        <translation>%1 KB</translation>
+    </message>
+    <message>
+        <source>%1 B</source>
+        <translation>%1 B</translation>
+    </message>
+    <message>
+        <source>%1/s</source>
+        <translation>%1/s</translation>
+    </message>
+    <message>
+        <source>%1h %2m</source>
+        <translation>%1 u %2 min</translation>
+    </message>
+    <message>
+        <source>%1h</source>
+        <translation>%1 u</translation>
+    </message>
+    <message>
+        <source>%1m %2s</source>
+        <translation>%1 min %2 s</translation>
+    </message>
+    <message>
+        <source>%1m</source>
+        <translation>%1 min</translation>
+    </message>
+    <message>
+        <source>%1s</source>
+        <translation>%1 s</translation>
+    </message>
+    <message>
+        <source>%1 MB of %2 MB</source>
+        <translation>%1 MB van %2 MB</translation>
+    </message>
+    <message>
+        <source>Looking for a usable Wine setup. Nothing will be installed automatically.</source>
+        <translation>Er wordt gezocht naar een bruikbare Wine-configuratie. Er wordt niets automatisch geïnstalleerd.</translation>
+    </message>
+    <message>
+        <source>UMU</source>
+        <translation>UMU</translation>
+    </message>
+    <message>
+        <source>PROTON</source>
+        <translation>PROTON</translation>
+    </message>
+    <message>
+        <source>WINE</source>
+        <translation>WINE</translation>
+    </message>
+    <message>
+        <source>%1 is the recommended Wine setup for this Mac. Alicia will use compatibility graphics and a 64-bit Wine prefix. Nothing will be installed automatically.</source>
+        <translation>%1 is de aanbevolen Wine-configuratie voor deze Mac. Alicia gebruikt compatibiliteitsgraphics en een 64-bits Wine-prefix. Er wordt niets automatisch geïnstalleerd.</translation>
+    </message>
+    <message>
+        <source>Failed to start the rules request.</source>
+        <translation>Het regelsverzoek kon niet worden gestart.</translation>
+    </message>
+    <message>
+        <source>Scanning Wine installations…</source>
+        <translation>Wine-installaties worden gescand…</translation>
+    </message>
+    <message>
+        <source>winetricks: %1 · Rosetta: %2</source>
+        <translation>winetricks: %1 · Rosetta: %2</translation>
+    </message>
+    <message>
+        <source>not found</source>
+        <translation>niet gevonden</translation>
+    </message>
+    <message>
+        <source>Select Wine Folder</source>
+        <translation>Wine-map selecteren</translation>
+    </message>
+    <message>
+        <source>Select Wine App or Executable</source>
+        <translation>Wine-app of uitvoerbaar bestand selecteren</translation>
+    </message>
+    <message>
+        <source>Manage Launcher Versions</source>
+        <translation>Launcherversies beheren</translation>
+    </message>
+    <message>
+        <source>No valid signed launcher releases could be found.</source>
+        <translation>Er zijn geen geldige, ondertekende launcherversies gevonden.</translation>
+    </message>
+    <message>
+        <source>The downloaded macOS installer could not be found.</source>
+        <translation>Het gedownloade macOS-installatieprogramma is niet gevonden.</translation>
+    </message>
+    <message>
+        <source>The downloaded macOS installer failed disk image verification.</source>
+        <translation>Het gedownloade macOS-installatieprogramma heeft de schijfkopieverificatie niet doorstaan.</translation>
+    </message>
+    <message>
+        <source>The downloaded macOS installer could not be verified by macOS.</source>
+        <translation>Het gedownloade macOS-installatieprogramma kon niet door macOS worden geverifieerd.</translation>
+    </message>
+    <message>
+        <source>The launcher update download path conflicts with the running AppImage.</source>
+        <translation>Het downloadpad van de launcherupdate conflicteert met de actieve AppImage.</translation>
+    </message>
+    <message>
+        <source>LAUNCHER VERSIONS</source>
+        <translation>LAUNCHERVERSIES</translation>
+    </message>
+    <message>
+        <source>Choose from up to three signed launcher releases.</source>
+        <translation>Kies uit maximaal drie ondertekende launcherversies.</translation>
+    </message>
+    <message>
+        <source>Installed: %1 · Selected: %2</source>
+        <translation>Geïnstalleerd: %1 · Geselecteerd: %2</translation>
+    </message>
+    <message>
+        <source>REINSTALL VERSION</source>
+        <translation>VERSIE OPNIEUW INSTALLEREN</translation>
+    </message>
+    <message>
+        <source>DOWNGRADE</source>
+        <translation>DOWNGRADEN</translation>
+    </message>
+    <message>
+        <source>CANCEL</source>
+        <translation>ANNULEREN</translation>
+    </message>
+    <message>
+        <source>CANCEL DOWNLOAD</source>
+        <translation>DOWNLOAD ANNULEREN</translation>
+    </message>
+    <message>
+        <source>Cancel launcher update</source>
+        <translation>Launcherupdate annuleren</translation>
+    </message>
+    <message>
+        <source>Cancel launcher update download</source>
+        <translation>Download van launcherupdate annuleren</translation>
     </message>
 </context>
     <context>

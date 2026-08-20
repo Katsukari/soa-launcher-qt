@@ -351,7 +351,7 @@ DXVK er fortsatt valgfritt og kan aktiveres senere i Innstillinger. Ingenting in
         <message>
             <location filename="../src/widgets/RulesAgreement.cpp" line="102" />
             <source>Before entering the playtest</source>
-            <translation>Før du går inn i playtesten</translation>
+            <translation>Før du går inn i spilltesten</translation>
         </message>
         <message>
             <location filename="../src/widgets/LauncherSettings.cpp" line="432" />
@@ -915,12 +915,12 @@ Kopier innloggingslenke lar deg lime inn den nøyaktige lenken i valgfri nettles
             <location filename="../src/widgets/AliciaChooser.cpp" line="444" />
             <location filename="../src/widgets/AliciaChooser.cpp" line="593" />
             <source>ENTER THE PLAYTEST</source>
-            <translation>START PLAYTESTEN</translation>
+            <translation>START SPILLTESTEN</translation>
         </message>
         <message>
             <location filename="../src/widgets/AliciaChooser.cpp" line="446" />
             <source>Enter the playtest</source>
-            <translation>Start playtesten</translation>
+            <translation>Start spilltesten</translation>
         </message>
         <message>
             <source>ERROR</source>
@@ -1208,7 +1208,7 @@ Kopier innloggingslenke lar deg lime inn den nøyaktige lenken i valgfri nettles
         <message>
             <location filename="../src/widgets/Settings.cpp" line="188" />
             <source>LAUNCHER</source>
-            <translation>STARTPROGRAM</translation>
+            <translation>LAUNCHER</translation>
         </message>
         <message>
             <source>Launcher Busy</source>
@@ -1529,9 +1529,10 @@ Kopier innloggingslenke lar deg lime inn den nøyaktige lenken i valgfri nettles
             <translation>SPILLER</translation>
         </message>
         <message>
-            <location filename="../src/widgets/AliciaChooser.cpp" line="618" />
-            <source>PLAYTEST</source>
-            <translation>TESTVERSJON</translation>
+            <location filename="../src/MainWindow.cpp" line="798" />
+            <location filename="../src/widgets/AliciaChooser.cpp" line="732" />
+            <source>Story Of Alicia Playtest</source>
+            <translation>Story Of Alicia Spilltest</translation>
         </message>
         <message>
             <source>Prefix setup complete.</source>
@@ -2124,7 +2125,7 @@ Mangler: %1. %2, og start deretter launcheren på nytt.</translation>
         <message>
             <location filename="../src/widgets/AliciaChooser.cpp" line="535" />
             <source>Start the selected Alicia playtest</source>
-            <translation>Start den valgte Alicia-playtesten</translation>
+            <translation>Start den valgte Alicia-spilltesten</translation>
         </message>
         <message>
             <location filename="../src/widgets/PrefixProgress.cpp" line="129" />
@@ -2157,9 +2158,10 @@ Mangler: %1. %2, og start deretter launcheren på nytt.</translation>
             <translation>Story of Alicia 2.0</translation>
         </message>
         <message>
-            <location filename="../src/widgets/AliciaChooser.cpp" line="617" />
-            <source>STORY OF ALICIA 2.0 PLAYTEST</source>
-            <translation>STORY OF ALICIA 2.0-PLAYTEST</translation>
+            <location filename="../src/MainWindow.cpp" line="810" />
+            <location filename="../src/widgets/AliciaChooser.cpp" line="731" />
+            <source>Story Of Alicia 2.0 Playtest</source>
+            <translation>Story Of Alicia 2.0 Spilltest</translation>
         </message>
         <message>
             <source>Story Of Alicia Launcher</source>
@@ -2174,13 +2176,9 @@ Mangler: %1. %2, og start deretter launcheren på nytt.</translation>
             <translation>Administrert kjøremiljø for Story of Alicia</translation>
         </message>
         <message>
-            <source>Story of Alicia Playtest</source>
-            <translation>Story of Alicia-playtest</translation>
-        </message>
-        <message>
             <location filename="../src/widgets/RulesAgreement.cpp" line="180" />
             <source>STORY OF ALICIA PLAYTEST RULES</source>
-            <translation>REGLER FOR STORY OF ALICIA-PLAYTESTEN</translation>
+            <translation>REGLER FOR STORY OF ALICIA-SPILLTESTEN</translation>
         </message>
         <message>
             <source>Story of Alicia Runtime</source>
@@ -2316,7 +2314,7 @@ Mangler: %1. %2, og start deretter launcheren på nytt.</translation>
         <message>
             <location filename="../src/widgets/AliciaChooser.cpp" line="214" />
             <source>The game is installed. Review and accept the playtest rules before signing in.</source>
-            <translation>Spillet er installert. Les og godta playtestreglene før du logger inn.</translation>
+            <translation>Spillet er installert. Les og godta spilltestreglene før du logger inn.</translation>
         </message>
         <message>
             <source>The game launch was cancelled.</source>
@@ -2894,7 +2892,7 @@ Mangler: %1.</translation>
         <message>
             <location filename="../src/widgets/AliciaChooser.cpp" line="73" />
             <source>Welcome to %1. To participate in the playtest, you have to first %2.</source>
-            <translation>Velkommen til %1. For å delta i playtesten må du først %2.</translation>
+            <translation>Velkommen til %1. For å delta i spilltesten må du først %2.</translation>
         </message>
         <message>
             <location filename="../src/widgets/AdvancedSettings.cpp" line="43" />
@@ -3022,7 +3020,7 @@ Mangler: %1.</translation>
         <message>
             <location filename="../src/widgets/RulesAgreement.cpp" line="108" />
             <source>Your playtest acknowledgement</source>
-            <translation>Din bekreftelse for playtesten</translation>
+            <translation>Din bekreftelse for spilltesten</translation>
         </message>
         <message>
             <location filename="../src/widgets/GameInstall.cpp" line="248" />
@@ -3327,7 +3325,7 @@ Mangler: %1.</translation>
         </message>
         <message>
             <source>Playtest status acknowledged</source>
-            <translation>Playteststatus bekreftet</translation>
+            <translation>Spillteststatus bekreftet</translation>
         </message>
         <message>
             <source>Server rules acknowledged</source>
@@ -3343,7 +3341,7 @@ Mangler: %1.</translation>
         </message>
         <message>
             <source>LAUNCHER UPDATE AVAILABLE</source>
-            <translation>STARTPROGRAMOPPDATERING TILGJENGELIG</translation>
+            <translation>OPPDATERING TILGJENGELIG</translation>
         </message>
         <message>
             <source>Version %1 is available. You must update the launcher before continuing.</source>
@@ -3664,6 +3662,242 @@ Mangler: %1.</translation>
     <message>
         <source>All Files</source>
         <translation>Alle filer</translation>
+    </message>
+    <message>
+        <source>DIAGNOSTIC MODE</source>
+        <translation>DIAGNOSTIKKMODUS</translation>
+    </message>
+    <message>
+        <source>Creates labeled Alicia and Wine logs, a launch timeline and summary. Leave off for normal play.</source>
+        <translation>Oppretter merkede Alicia- og Wine-logger, en oppstartstidslinje og et sammendrag. La den være avslått ved vanlig spilling.</translation>
+    </message>
+    <message>
+        <source>Creates labeled Alicia and Wine logs, a launch timeline, summary and host sample. Leave off for normal play.</source>
+        <translation>Oppretter merkede Alicia- og Wine-logger, en oppstartstidslinje, et sammendrag og en vertssystemprøve. La den være avslått ved vanlig spilling.</translation>
+    </message>
+    <message>
+        <source>Diagnostic mode</source>
+        <translation>Diagnostikkmodus</translation>
+    </message>
+    <message>
+        <source>Create detailed files for each game launch</source>
+        <translation>Opprett detaljerte filer for hver spillstart</translation>
+    </message>
+    <message>
+        <source>A launcher update operation is already running.</source>
+        <translation>En launcheroppdatering pågår allerede.</translation>
+    </message>
+    <message>
+        <source>The launcher update configuration is invalid.</source>
+        <translation>Konfigurasjonen for launcheroppdatering er ugyldig.</translation>
+    </message>
+    <message>
+        <source>The launcher update server returned HTTP %1.</source>
+        <translation>Launcheroppdateringsserveren returnerte HTTP %1.</translation>
+    </message>
+    <message>
+        <source>The launcher update response is unexpectedly large.</source>
+        <translation>Svaret fra launcheroppdateringsserveren er uventet stort.</translation>
+    </message>
+    <message>
+        <source>The launcher update server returned an invalid manifest.</source>
+        <translation>Launcheroppdateringsserveren returnerte et ugyldig manifest.</translation>
+    </message>
+    <message>
+        <source>No compatible launcher package was attached to the release.</source>
+        <translation>Ingen kompatibel launcherpakke var vedlagt utgivelsen.</translation>
+    </message>
+    <message>
+        <source>The launcher release contains an invalid or untrusted package URL.</source>
+        <translation>Launcherutgivelsen inneholder en ugyldig eller upålitelig pakke-URL.</translation>
+    </message>
+    <message>
+        <source>The launcher release package has no valid SHA-256 digest.</source>
+        <translation>Launcherpakken har ingen gyldig SHA-256-kontrollsum.</translation>
+    </message>
+    <message>
+        <source>The launcher release package has an invalid size.</source>
+        <translation>Launcherpakken har en ugyldig størrelse.</translation>
+    </message>
+    <message>
+        <source>The launcher could not create the update file.</source>
+        <translation>Launcheren kunne ikke opprette oppdateringsfilen.</translation>
+    </message>
+    <message>
+        <source>The launcher update was cancelled.</source>
+        <translation>Launcheroppdateringen ble avbrutt.</translation>
+    </message>
+    <message>
+        <source>The launcher update signature is invalid or does not match this launcher.</source>
+        <translation>Signaturen for launcheroppdateringen er ugyldig eller samsvarer ikke med denne launcheren.</translation>
+    </message>
+    <message>
+        <source>The launcher update network request failed.</source>
+        <translation>Nettverksforespørselen for launcheroppdateringen mislyktes.</translation>
+    </message>
+    <message>
+        <source>The launcher update network request failed: %1</source>
+        <translation>Nettverksforespørselen for launcheroppdateringen mislyktes: %1</translation>
+    </message>
+    <message>
+        <source>The launcher update failed.</source>
+        <translation>Launcheroppdateringen mislyktes.</translation>
+    </message>
+    <message>
+        <source>&#10;&#10;Diagnostic run: %1</source>
+        <translation>&#10;&#10;Diagnostikkjøring: %1</translation>
+    </message>
+    <message>
+        <source>choose Wine</source>
+        <translation>velge Wine</translation>
+    </message>
+    <message>
+        <source>%1 GB</source>
+        <translation>%1 GB</translation>
+    </message>
+    <message>
+        <source>%1 MB</source>
+        <translation>%1 MB</translation>
+    </message>
+    <message>
+        <source>%1 KB</source>
+        <translation>%1 KB</translation>
+    </message>
+    <message>
+        <source>%1 B</source>
+        <translation>%1 B</translation>
+    </message>
+    <message>
+        <source>%1/s</source>
+        <translation>%1/s</translation>
+    </message>
+    <message>
+        <source>%1h %2m</source>
+        <translation>%1 t %2 min</translation>
+    </message>
+    <message>
+        <source>%1h</source>
+        <translation>%1 t</translation>
+    </message>
+    <message>
+        <source>%1m %2s</source>
+        <translation>%1 min %2 s</translation>
+    </message>
+    <message>
+        <source>%1m</source>
+        <translation>%1 min</translation>
+    </message>
+    <message>
+        <source>%1s</source>
+        <translation>%1 s</translation>
+    </message>
+    <message>
+        <source>%1 MB of %2 MB</source>
+        <translation>%1 MB av %2 MB</translation>
+    </message>
+    <message>
+        <source>Looking for a usable Wine setup. Nothing will be installed automatically.</source>
+        <translation>Ser etter et brukbart Wine-oppsett. Ingenting installeres automatisk.</translation>
+    </message>
+    <message>
+        <source>UMU</source>
+        <translation>UMU</translation>
+    </message>
+    <message>
+        <source>PROTON</source>
+        <translation>PROTON</translation>
+    </message>
+    <message>
+        <source>WINE</source>
+        <translation>WINE</translation>
+    </message>
+    <message>
+        <source>%1 is the recommended Wine setup for this Mac. Alicia will use compatibility graphics and a 64-bit Wine prefix. Nothing will be installed automatically.</source>
+        <translation>%1 er det anbefalte Wine-oppsettet for denne Mac-en. Alicia bruker kompatibilitetsgrafikk og et 64-bits Wine-prefiks. Ingenting installeres automatisk.</translation>
+    </message>
+    <message>
+        <source>Failed to start the rules request.</source>
+        <translation>Kunne ikke starte forespørselen om reglene.</translation>
+    </message>
+    <message>
+        <source>Scanning Wine installations…</source>
+        <translation>Søker etter Wine-installasjoner…</translation>
+    </message>
+    <message>
+        <source>winetricks: %1 · Rosetta: %2</source>
+        <translation>winetricks: %1 · Rosetta: %2</translation>
+    </message>
+    <message>
+        <source>not found</source>
+        <translation>ikke funnet</translation>
+    </message>
+    <message>
+        <source>Select Wine Folder</source>
+        <translation>Velg Wine-mappe</translation>
+    </message>
+    <message>
+        <source>Select Wine App or Executable</source>
+        <translation>Velg Wine-app eller kjørbar fil</translation>
+    </message>
+    <message>
+        <source>Manage Launcher Versions</source>
+        <translation>Administrer launcherversjoner</translation>
+    </message>
+    <message>
+        <source>No valid signed launcher releases could be found.</source>
+        <translation>Ingen gyldige, signerte launcherversjoner ble funnet.</translation>
+    </message>
+    <message>
+        <source>The downloaded macOS installer could not be found.</source>
+        <translation>Det nedlastede macOS-installasjonsprogrammet ble ikke funnet.</translation>
+    </message>
+    <message>
+        <source>The downloaded macOS installer failed disk image verification.</source>
+        <translation>Det nedlastede macOS-installasjonsprogrammet bestod ikke verifiseringen av diskavbildningen.</translation>
+    </message>
+    <message>
+        <source>The downloaded macOS installer could not be verified by macOS.</source>
+        <translation>Det nedlastede macOS-installasjonsprogrammet kunne ikke verifiseres av macOS.</translation>
+    </message>
+    <message>
+        <source>The launcher update download path conflicts with the running AppImage.</source>
+        <translation>Nedlastingsbanen for launcheroppdateringen er i konflikt med AppImage-filen som kjører.</translation>
+    </message>
+    <message>
+        <source>LAUNCHER VERSIONS</source>
+        <translation>LAUNCHERVERSJONER</translation>
+    </message>
+    <message>
+        <source>Choose from up to three signed launcher releases.</source>
+        <translation>Velg blant opptil tre signerte launcherversjoner.</translation>
+    </message>
+    <message>
+        <source>Installed: %1 · Selected: %2</source>
+        <translation>Installert: %1 · Valgt: %2</translation>
+    </message>
+    <message>
+        <source>REINSTALL VERSION</source>
+        <translation>INSTALLER PÅ NYTT</translation>
+    </message>
+    <message>
+        <source>DOWNGRADE</source>
+        <translation>NEDGRADER</translation>
+    </message>
+    <message>
+        <source>CANCEL</source>
+        <translation>AVBRYT</translation>
+    </message>
+    <message>
+        <source>CANCEL DOWNLOAD</source>
+        <translation>AVBRYT NEDLASTING</translation>
+    </message>
+    <message>
+        <source>Cancel launcher update</source>
+        <translation>Avbryt launcheroppdatering</translation>
+    </message>
+    <message>
+        <source>Cancel launcher update download</source>
+        <translation>Avbryt nedlasting av launcheroppdatering</translation>
     </message>
 </context>
     <context>

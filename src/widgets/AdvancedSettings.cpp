@@ -21,6 +21,21 @@ namespace aset = util::layout::advanced_settings;
 namespace
 {
     constexpr int kAdvancedRowCount = 4;
+    constexpr const char* kDiagnosticTitle =
+        QT_TRANSLATE_NOOP("Launcher", "DIAGNOSTIC MODE");
+    constexpr const char* kDiagnosticLinuxDescription =
+        QT_TRANSLATE_NOOP(
+            "Launcher",
+            "Creates labeled Alicia and Wine logs, a launch timeline and summary. Leave off for normal play.");
+    constexpr const char* kDiagnosticMacDescription =
+        QT_TRANSLATE_NOOP(
+            "Launcher",
+            "Creates labeled Alicia and Wine logs, a launch timeline, summary and host sample. Leave off for normal play.");
+    constexpr const char* kDiagnosticAccessibleName =
+        QT_TRANSLATE_NOOP("Launcher", "Diagnostic mode");
+    constexpr const char* kDiagnosticAccessibleDescription =
+        QT_TRANSLATE_NOOP("Launcher", "Create detailed files for each game launch");
+
 }
 
 AdvancedSettings::AdvancedSettings(QWidget* parent) : QWidget(parent)
@@ -184,27 +199,31 @@ void AdvancedSettings::setup_diagnostics_option()
 {
     const QSize w = window()->size();
     const int y = aset::row(3, kAdvancedRowCount);
-#if defined(Q_OS_MACOS)
-    const char* description =
-        "Creates labeled Alicia and Wine logs, a launch timeline, summary and host sample. Leave off for normal play.";
-#else
-    const char* description =
-        "Creates labeled Alicia and Wine logs, a launch timeline and summary. Leave off for normal play.";
-#endif
+
     util::simple_utils::make_label_block(
-        this, w, y,
-        "DIAGNOSTIC MODE",
-        description);
+        this, w, y, QString::fromUtf8(kDiagnosticTitle),
+#if defined(Q_OS_MACOS)
+        QString::fromUtf8(kDiagnosticMacDescription));
+#else
+        QString::fromUtf8(kDiagnosticLinuxDescription));
+#endif
 
-    auto* slider = util::simple_utils::make_flat_button(this);
+    auto* diagnostic_slider = util::simple_utils::make_flat_button(this);
     const QRect geometry = ls::slider_rect(w, y);
-    slider->setGeometry(geometry);
-    slider->setIconSize(geometry.size());
-    slider->setAccessibleName(QStringLiteral("Diagnostic mode"));
-    slider->setAccessibleDescription(
-        QStringLiteral("Create detailed files for each game launch"));
+    diagnostic_slider->setGeometry(geometry);
+    diagnostic_slider->setIconSize(geometry.size());
+    diagnostic_slider->setAccessibleName(
+        util::i18n::translate(QString::fromUtf8(kDiagnosticAccessibleName)));
+    diagnostic_slider->setAccessibleDescription(
+        util::i18n::translate(QString::fromUtf8(kDiagnosticAccessibleDescription)));
+    diagnostic_slider->setProperty(
+        "soa_i18n_accessible_name_source", QString::fromUtf8(kDiagnosticAccessibleName));
+    diagnostic_slider->setProperty(
+        "soa_i18n_accessible_description_source",
+        QString::fromUtf8(kDiagnosticAccessibleDescription));
 
-    const auto paint = [slider, size = geometry.size()](const bool enabled)
+    const auto paint = [slider = diagnostic_slider,
+                        size = geometry.size()](const bool enabled)
     {
         const auto& asset = enabled
             ? util::assets::button(util::assets::Button::SliderOn)
@@ -213,13 +232,13 @@ void AdvancedSettings::setup_diagnostics_option()
             size, Qt::KeepAspectRatio, Qt::SmoothTransformation)));
     };
     paint(Config::instance().diagnostics_enabled());
-    connect(slider, &QPushButton::clicked, this, [paint]()
+    connect(diagnostic_slider, &QPushButton::clicked, this, [paint]()
     {
         Config::instance().set_diagnostics_enabled(
             !Config::instance().diagnostics_enabled());
         paint(Config::instance().diagnostics_enabled());
     });
-    connect(&Config::instance(), &Config::changed, slider, [paint]()
+    connect(&Config::instance(), &Config::changed, diagnostic_slider, [paint]()
     {
         paint(Config::instance().diagnostics_enabled());
     });

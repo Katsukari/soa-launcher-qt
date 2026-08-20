@@ -1529,9 +1529,10 @@ Copy Login Link lets you paste the exact sign-in link into any browser.</transla
             <translation>PLAYER</translation>
         </message>
         <message>
-            <location filename="../src/widgets/AliciaChooser.cpp" line="618" />
-            <source>PLAYTEST</source>
-            <translation>PLAYTEST</translation>
+            <location filename="../src/MainWindow.cpp" line="798" />
+            <location filename="../src/widgets/AliciaChooser.cpp" line="732" />
+            <source>Story Of Alicia Playtest</source>
+            <translation>Story Of Alicia Playtest</translation>
         </message>
         <message>
             <source>Prefix setup complete.</source>
@@ -2157,9 +2158,10 @@ Missing: %1. %2, then restart the launcher.</translation>
             <translation>Story of Alicia 2.0</translation>
         </message>
         <message>
-            <location filename="../src/widgets/AliciaChooser.cpp" line="617" />
-            <source>STORY OF ALICIA 2.0 PLAYTEST</source>
-            <translation>STORY OF ALICIA 2.0 PLAYTEST</translation>
+            <location filename="../src/MainWindow.cpp" line="810" />
+            <location filename="../src/widgets/AliciaChooser.cpp" line="731" />
+            <source>Story Of Alicia 2.0 Playtest</source>
+            <translation>Story Of Alicia 2.0 Playtest</translation>
         </message>
         <message>
             <source>Story Of Alicia Launcher</source>
@@ -2172,10 +2174,6 @@ Missing: %1. %2, then restart the launcher.</translation>
         <message>
             <source>Story of Alicia Managed Runtime</source>
             <translation>Story of Alicia Managed Runtime</translation>
-        </message>
-        <message>
-            <source>Story of Alicia Playtest</source>
-            <translation>Story of Alicia Playtest</translation>
         </message>
         <message>
             <location filename="../src/widgets/RulesAgreement.cpp" line="180" />
@@ -3664,6 +3662,242 @@ Missing: %1.</translation>
     <message>
         <source>All Files</source>
         <translation>All Files</translation>
+    </message>
+    <message>
+        <source>DIAGNOSTIC MODE</source>
+        <translation>DIAGNOSTIC MODE</translation>
+    </message>
+    <message>
+        <source>Creates labeled Alicia and Wine logs, a launch timeline and summary. Leave off for normal play.</source>
+        <translation>Creates labeled Alicia and Wine logs, a launch timeline and summary. Leave off for normal play.</translation>
+    </message>
+    <message>
+        <source>Creates labeled Alicia and Wine logs, a launch timeline, summary and host sample. Leave off for normal play.</source>
+        <translation>Creates labeled Alicia and Wine logs, a launch timeline, summary and host sample. Leave off for normal play.</translation>
+    </message>
+    <message>
+        <source>Diagnostic mode</source>
+        <translation>Diagnostic mode</translation>
+    </message>
+    <message>
+        <source>Create detailed files for each game launch</source>
+        <translation>Create detailed files for each game launch</translation>
+    </message>
+    <message>
+        <source>A launcher update operation is already running.</source>
+        <translation>A launcher update operation is already running.</translation>
+    </message>
+    <message>
+        <source>The launcher update configuration is invalid.</source>
+        <translation>The launcher update configuration is invalid.</translation>
+    </message>
+    <message>
+        <source>The launcher update server returned HTTP %1.</source>
+        <translation>The launcher update server returned HTTP %1.</translation>
+    </message>
+    <message>
+        <source>The launcher update response is unexpectedly large.</source>
+        <translation>The launcher update response is unexpectedly large.</translation>
+    </message>
+    <message>
+        <source>The launcher update server returned an invalid manifest.</source>
+        <translation>The launcher update server returned an invalid manifest.</translation>
+    </message>
+    <message>
+        <source>No compatible launcher package was attached to the release.</source>
+        <translation>No compatible launcher package was attached to the release.</translation>
+    </message>
+    <message>
+        <source>The launcher release contains an invalid or untrusted package URL.</source>
+        <translation>The launcher release contains an invalid or untrusted package URL.</translation>
+    </message>
+    <message>
+        <source>The launcher release package has no valid SHA-256 digest.</source>
+        <translation>The launcher release package has no valid SHA-256 digest.</translation>
+    </message>
+    <message>
+        <source>The launcher release package has an invalid size.</source>
+        <translation>The launcher release package has an invalid size.</translation>
+    </message>
+    <message>
+        <source>The launcher could not create the update file.</source>
+        <translation>The launcher could not create the update file.</translation>
+    </message>
+    <message>
+        <source>The launcher update was cancelled.</source>
+        <translation>The launcher update was cancelled.</translation>
+    </message>
+    <message>
+        <source>The launcher update signature is invalid or does not match this launcher.</source>
+        <translation>The launcher update signature is invalid or does not match this launcher.</translation>
+    </message>
+    <message>
+        <source>The launcher update network request failed.</source>
+        <translation>The launcher update network request failed.</translation>
+    </message>
+    <message>
+        <source>The launcher update network request failed: %1</source>
+        <translation>The launcher update network request failed: %1</translation>
+    </message>
+    <message>
+        <source>The launcher update failed.</source>
+        <translation>The launcher update failed.</translation>
+    </message>
+    <message>
+        <source>&#10;&#10;Diagnostic run: %1</source>
+        <translation>&#10;&#10;Diagnostic run: %1</translation>
+    </message>
+    <message>
+        <source>choose Wine</source>
+        <translation>choose Wine</translation>
+    </message>
+    <message>
+        <source>%1 GB</source>
+        <translation>%1 GB</translation>
+    </message>
+    <message>
+        <source>%1 MB</source>
+        <translation>%1 MB</translation>
+    </message>
+    <message>
+        <source>%1 KB</source>
+        <translation>%1 KB</translation>
+    </message>
+    <message>
+        <source>%1 B</source>
+        <translation>%1 B</translation>
+    </message>
+    <message>
+        <source>%1/s</source>
+        <translation>%1/s</translation>
+    </message>
+    <message>
+        <source>%1h %2m</source>
+        <translation>%1h %2m</translation>
+    </message>
+    <message>
+        <source>%1h</source>
+        <translation>%1h</translation>
+    </message>
+    <message>
+        <source>%1m %2s</source>
+        <translation>%1m %2s</translation>
+    </message>
+    <message>
+        <source>%1m</source>
+        <translation>%1m</translation>
+    </message>
+    <message>
+        <source>%1s</source>
+        <translation>%1s</translation>
+    </message>
+    <message>
+        <source>%1 MB of %2 MB</source>
+        <translation>%1 MB of %2 MB</translation>
+    </message>
+    <message>
+        <source>Looking for a usable Wine setup. Nothing will be installed automatically.</source>
+        <translation>Looking for a usable Wine setup. Nothing will be installed automatically.</translation>
+    </message>
+    <message>
+        <source>UMU</source>
+        <translation>UMU</translation>
+    </message>
+    <message>
+        <source>PROTON</source>
+        <translation>PROTON</translation>
+    </message>
+    <message>
+        <source>WINE</source>
+        <translation>WINE</translation>
+    </message>
+    <message>
+        <source>%1 is the recommended Wine setup for this Mac. Alicia will use compatibility graphics and a 64-bit Wine prefix. Nothing will be installed automatically.</source>
+        <translation>%1 is the recommended Wine setup for this Mac. Alicia will use compatibility graphics and a 64-bit Wine prefix. Nothing will be installed automatically.</translation>
+    </message>
+    <message>
+        <source>Failed to start the rules request.</source>
+        <translation>Failed to start the rules request.</translation>
+    </message>
+    <message>
+        <source>Scanning Wine installations…</source>
+        <translation>Scanning Wine installations…</translation>
+    </message>
+    <message>
+        <source>winetricks: %1 · Rosetta: %2</source>
+        <translation>winetricks: %1 · Rosetta: %2</translation>
+    </message>
+    <message>
+        <source>not found</source>
+        <translation>not found</translation>
+    </message>
+    <message>
+        <source>Select Wine Folder</source>
+        <translation>Select Wine Folder</translation>
+    </message>
+    <message>
+        <source>Select Wine App or Executable</source>
+        <translation>Select Wine App or Executable</translation>
+    </message>
+    <message>
+        <source>Manage Launcher Versions</source>
+        <translation>Manage Launcher Versions</translation>
+    </message>
+    <message>
+        <source>No valid signed launcher releases could be found.</source>
+        <translation>No valid signed launcher releases could be found.</translation>
+    </message>
+    <message>
+        <source>The downloaded macOS installer could not be found.</source>
+        <translation>The downloaded macOS installer could not be found.</translation>
+    </message>
+    <message>
+        <source>The downloaded macOS installer failed disk image verification.</source>
+        <translation>The downloaded macOS installer failed disk image verification.</translation>
+    </message>
+    <message>
+        <source>The downloaded macOS installer could not be verified by macOS.</source>
+        <translation>The downloaded macOS installer could not be verified by macOS.</translation>
+    </message>
+    <message>
+        <source>The launcher update download path conflicts with the running AppImage.</source>
+        <translation>The launcher update download path conflicts with the running AppImage.</translation>
+    </message>
+    <message>
+        <source>LAUNCHER VERSIONS</source>
+        <translation>LAUNCHER VERSIONS</translation>
+    </message>
+    <message>
+        <source>Choose from up to three signed launcher releases.</source>
+        <translation>Choose from up to three signed launcher releases.</translation>
+    </message>
+    <message>
+        <source>Installed: %1 · Selected: %2</source>
+        <translation>Installed: %1 · Selected: %2</translation>
+    </message>
+    <message>
+        <source>REINSTALL VERSION</source>
+        <translation>REINSTALL VERSION</translation>
+    </message>
+    <message>
+        <source>DOWNGRADE</source>
+        <translation>DOWNGRADE</translation>
+    </message>
+    <message>
+        <source>CANCEL</source>
+        <translation>CANCEL</translation>
+    </message>
+    <message>
+        <source>CANCEL DOWNLOAD</source>
+        <translation>CANCEL DOWNLOAD</translation>
+    </message>
+    <message>
+        <source>Cancel launcher update</source>
+        <translation>Cancel launcher update</translation>
+    </message>
+    <message>
+        <source>Cancel launcher update download</source>
+        <translation>Cancel launcher update download</translation>
     </message>
 </context>
     <context>
