@@ -57,6 +57,20 @@ private slots:
                               QStringLiteral("English UK")}));
     }
 
+    void moves_runtime_environment_entries_out_of_game_arguments()
+    {
+        const auto result = util::launch_arguments::validate(
+            QStringLiteral("UMU_CONTAINER_NSENTER=1 -windowed "
+                           "DXVK_HUD=fps SOA_LABEL=\"hello world\""));
+
+        QVERIFY(result.valid);
+        QCOMPARE(result.arguments, QStringList({QStringLiteral("-windowed")}));
+        QCOMPARE(result.environment_entries,
+                 QStringList({QStringLiteral("UMU_CONTAINER_NSENTER=1"),
+                              QStringLiteral("DXVK_HUD=fps"),
+                              QStringLiteral("SOA_LABEL=hello world")}));
+    }
+
     void rejects_reserved_game_arguments()
     {
         for (const QString& value : {

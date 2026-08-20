@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-echo "SOA AppImage packager: minimal Qt plugins revision 2026-08-04"
+echo "SOA AppImage packager: minimal Qt plugins revision 2026-08-20"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -109,6 +109,7 @@ require_command timeout
 require_command desktop-file-validate
 require_command jq
 require_command openssl
+require_command patchelf
 require_command i686-w64-mingw32-gcc
 require_command i686-w64-mingw32-g++
 
@@ -256,6 +257,26 @@ copy_qt_library_family() {
   cp -a "${matches[@]}" "$APPDIR/usr/lib/"
 }
 
+copy_qt_platform_dependency() {
+  local consumer="$1"
+  local soname="$2"
+  local source
+
+  source="$(
+    ldd "$consumer" 2>/dev/null \
+      | awk -v expected="$soname" \
+          '$1 == expected && $2 == "=>" && $3 ~ /^\// { print $3; exit }'
+  )"
+  if [ -z "$source" ] || [ ! -f "$source" ]; then
+    echo "Required Qt platform dependency not found: $soname (needed by $consumer)" >&2
+    exit 1
+  fi
+
+  mkdir -p "$APPDIR/usr/lib"
+  install -m 755 "$source" "$APPDIR/usr/lib/$soname"
+  echo "Included Qt platform dependency: $soname"
+}
+
 copy_qt_plugin() {
   local category="$1"
   local filename="$2"
@@ -286,6 +307,7 @@ copy_qt_plugin() {
 
   mkdir -p "$destination"
   install -m 755 "$source" "$destination/$filename"
+  patchelf --set-rpath '$ORIGIN/../../lib' "$destination/$filename"
   echo "Included Qt plugin: $category/$filename"
 }
 
@@ -303,6 +325,8 @@ copy_qt_plugin_directory() {
 }
 
 copy_qt_plugin platforms libqxcb.so 1
+copy_qt_platform_dependency "$QT_PLATFORM_DIR/libqxcb.so" libxcb-cursor.so.0
+copy_qt_platform_dependency "$QT_PLATFORM_DIR/libqxcb.so" libxkbcommon-x11.so.0
 
 if [ -f "$QT_PLATFORM_DIR/libqwayland.so" ]; then
   copy_qt_plugin platforms libqwayland.so 1
@@ -326,7 +350,7 @@ copy_qt_library_family libQt6Svg
 copy_qt_library_family libQt6OpenGL
 copy_qt_library_family libQt6XcbQpa
 
-copy_qt_library_family libQt6WaylandClient 0
+copy_qt_library_family libQt6WaylandClient
 copy_qt_library_family libQt6WaylandEglClientHwIntegration 0
 copy_qt_library_family libQt6WlShellIntegration 0
 
@@ -346,6 +370,18 @@ Plugins = plugins
 Translations = translations
 EOF
 
+cat >"$APPDIR/AppRun" <<'EOF'
+#!/usr/bin/env sh
+set -eu
+SOA_BUNDLED_QT_RUNTIME=1
+APPDIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+export LD_LIBRARY_PATH="$APPDIR/usr/lib:$APPDIR/usr/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export QT_PLUGIN_PATH="$APPDIR/usr/plugins"
+export QT_QPA_PLATFORM_PLUGIN_PATH="$APPDIR/usr/plugins/platforms"
+exec "$APPDIR/usr/bin/soa_launcher" "$@"
+EOF
+chmod 755 "$APPDIR/AppRun"
+
 if [ -d "$QT_TRANSLATIONS_DIR" ]; then
   find "$QT_TRANSLATIONS_DIR" -maxdepth 1 -type f \
     \( -name 'qt_*.qm' -o -name 'qtbase_*.qm' \) \
@@ -359,6 +395,12 @@ while IFS= read -r -d '' packaged_plugin; do
   fi
 done < <(find "$APPDIR/usr/plugins" -type f -name '*.so' -print0)
 
+OUTPUT="$SCRIPT_DIR/Story_Of_Alicia-x86_64.AppImage"
+if [ -e "$OUTPUT" ]; then
+  echo "Removing previous AppImage output: $OUTPUT"
+  rm -f "$OUTPUT"
+fi
+
 ./linuxdeploy-x86_64.AppImage \
   --appdir "$APPDIR" \
   --output appimage \
@@ -367,7 +409,6 @@ done < <(find "$APPDIR/usr/plugins" -type f -name '*.so' -print0)
 
 run_portability_check "$APPDIR"
 
-OUTPUT="$SCRIPT_DIR/Story_Of_Alicia-x86_64.AppImage"
 if [ ! -f "$OUTPUT" ]; then
   echo "The expected AppImage was not produced: $OUTPUT" >&2
   exit 1
@@ -385,6 +426,22 @@ fi
   cd "$SCRIPT_DIR"
   APPIMAGE_EXTRACT_AND_RUN=1 "$OUTPUT" --appimage-extract >/dev/null
 )
+
+if ! grep -q 'SOA_BUNDLED_QT_RUNTIME' "$SCRIPT_DIR/squashfs-root/AppRun"; then
+  echo "The bundled-library AppRun wrapper is missing from the AppImage." >&2
+  exit 1
+fi
+
+for required_platform_library in \
+    libQt6WaylandClient.so.6 \
+    libQt6XcbQpa.so.6 \
+    libxcb-cursor.so.0 \
+    libxkbcommon-x11.so.0; do
+  if [ ! -s "$SCRIPT_DIR/squashfs-root/usr/lib/$required_platform_library" ]; then
+    echo "Required Qt platform library is missing from the AppImage: $required_platform_library" >&2
+    exit 1
+  fi
+done
 
 run_portability_check "$SCRIPT_DIR/squashfs-root"
 

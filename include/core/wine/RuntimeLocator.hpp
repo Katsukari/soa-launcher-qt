@@ -2,6 +2,7 @@
 
 #include <QProcessEnvironment>
 #include <QString>
+#include <QStringList>
 
 #include <functional>
 
@@ -43,6 +44,8 @@ namespace core::wine
 
         static void apply_wine_environment_entries(QProcessEnvironment& environment,
                                                    const QString& entries);
+        static void apply_runtime_environment_entries(QProcessEnvironment& environment,
+                                                      const QStringList& entries);
 
     private:
         SettingsProvider settings_provider_;

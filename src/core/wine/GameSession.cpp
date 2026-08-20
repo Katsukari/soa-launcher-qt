@@ -1895,6 +1895,8 @@ namespace core::wine
                 environment.insert(QStringLiteral("PROTON_USE_WINED3D"), QStringLiteral("1"));
             }
             runtime_.apply_wine_environment(environment);
+            RuntimeLocator::apply_runtime_environment_entries(
+                environment, custom_arguments.environment_entries);
 
             if (alicia_log_hook.available)
             {
@@ -2101,6 +2103,8 @@ namespace core::wine
                                           : QStringLiteral("d3d9,d3d10core,d3d11,dxgi=b"));
 #endif
         runtime_.apply_wine_environment(environment);
+        RuntimeLocator::apply_runtime_environment_entries(
+            environment, custom_arguments.environment_entries);
         if (alicia_log_hook.available)
         {
             if (!alicia_log_hook.log_windows_path.isEmpty())

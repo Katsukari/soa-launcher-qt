@@ -10,14 +10,19 @@ namespace core::wine
     void RuntimeLocator::apply_wine_environment_entries(QProcessEnvironment& environment,
                                                         const QString& entries)
     {
+        apply_runtime_environment_entries(environment, QProcess::splitCommand(entries));
+    }
+
+    void RuntimeLocator::apply_runtime_environment_entries(QProcessEnvironment& environment,
+                                                           const QStringList& entries)
+    {
         static const QRegularExpression key_pattern(QStringLiteral(R"(^[A-Za-z_][A-Za-z0-9_]*$)"));
-        const QStringList tokens = QProcess::splitCommand(entries);
-        for (const QString& token : tokens)
+        for (const QString& token : entries)
         {
             const int equals = token.indexOf(QLatin1Char('='));
             if (equals <= 0)
             {
-                SPDLOG_WARN("ignoring Wine environment entry "
+                SPDLOG_WARN("ignoring runtime environment entry "
                             "(expected KEY=VALUE): {}",
                             token.toStdString());
                 continue;
@@ -27,7 +32,7 @@ namespace core::wine
             const QString value = token.mid(equals + 1);
             if (!key_pattern.match(key).hasMatch())
             {
-                SPDLOG_WARN("ignoring invalid Wine environment key: {}", key.toStdString());
+                SPDLOG_WARN("ignoring invalid runtime environment key: {}", key.toStdString());
                 continue;
             }
 
@@ -45,7 +50,7 @@ namespace core::wine
                 upper.startsWith(QStringLiteral("STEAM_COMPAT_"));
             if (protected_key)
             {
-                SPDLOG_WARN("ignoring launcher-owned Wine "
+                SPDLOG_WARN("ignoring launcher-owned runtime "
                             "environment key: {}",
                             key.toStdString());
                 continue;
@@ -55,7 +60,7 @@ namespace core::wine
             const bool sensitive = key.contains(QStringLiteral("TOKEN"), Qt::CaseInsensitive) ||
                                    key.contains(QStringLiteral("PASSWORD"), Qt::CaseInsensitive) ||
                                    key.contains(QStringLiteral("SECRET"), Qt::CaseInsensitive);
-            SPDLOG_DEBUG("wine env: {}={}", key.toStdString(),
+            SPDLOG_DEBUG("runtime env: {}={}", key.toStdString(),
                          sensitive ? "[REDACTED]" : value.toStdString());
         }
     }

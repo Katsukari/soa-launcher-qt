@@ -23,6 +23,14 @@ namespace util::launch_arguments
             }
             return false;
         }
+
+        bool is_environment_assignment(const QString& argument)
+        {
+            static const QRegularExpression key_pattern(
+                QStringLiteral(R"(^[A-Za-z_][A-Za-z0-9_]*$)"));
+            const int equals = argument.indexOf(QLatin1Char('='));
+            return equals > 0 && key_pattern.match(argument.left(equals)).hasMatch();
+        }
     }
 
     ValidationResult validate(const QString& raw)
@@ -34,15 +42,15 @@ namespace util::launch_arguments
             return result;
         }
 
-        result.arguments = QProcess::splitCommand(raw);
-        if (result.arguments.size() > 64)
+        const QStringList tokens = QProcess::splitCommand(raw);
+        if (tokens.size() > 64)
         {
             result.error = QStringLiteral("Too many game launch arguments were provided.");
             return result;
         }
 
         static const QRegularExpression controlCharacters(QStringLiteral("[\\x00-\\x1F\\x7F]"));
-        for (const QString& argument : result.arguments)
+        for (const QString& argument : tokens)
         {
             if (argument.size() > 1024 || controlCharacters.match(argument).hasMatch())
             {
@@ -54,6 +62,14 @@ namespace util::launch_arguments
                 result.error = QStringLiteral(
                     "-OP, -ID, and -GameID are managed by the launcher and cannot be overridden.");
                 return result;
+            }
+            if (is_environment_assignment(argument))
+            {
+                result.environment_entries.append(argument);
+            }
+            else
+            {
+                result.arguments.append(argument);
             }
         }
 

@@ -45,6 +45,24 @@ private slots:
         QVERIFY(!environment.contains(QStringLiteral("invalid-key")));
     }
 
+    void applies_umu_and_dxvk_environment_entries()
+    {
+        QProcessEnvironment environment;
+        environment.insert(QStringLiteral("WINEPREFIX"), QStringLiteral("/safe/prefix"));
+
+        core::wine::RuntimeLocator::apply_runtime_environment_entries(
+            environment,
+            {QStringLiteral("UMU_CONTAINER_NSENTER=1"),
+             QStringLiteral("DXVK_HUD=fps"),
+             QStringLiteral("WINEPREFIX=/escape")});
+
+        QCOMPARE(environment.value(QStringLiteral("UMU_CONTAINER_NSENTER")),
+                 QStringLiteral("1"));
+        QCOMPARE(environment.value(QStringLiteral("DXVK_HUD")), QStringLiteral("fps"));
+        QCOMPARE(environment.value(QStringLiteral("WINEPREFIX")),
+                 QStringLiteral("/safe/prefix"));
+    }
+
     void redacts_process_arguments_and_output()
     {
         const QString secret = QStringLiteral("private-token");
