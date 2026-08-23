@@ -92,8 +92,7 @@ void LauncherInfoDialog::setup_ui()
     close_button->setIcon(QIcon(util::assets::images[util::assets::Image::CloseSettings]));
     close_button->setIconSize(QSize(22, 22));
     close_button->move(panel->width() - horizontal_margin - close_button->width(), 16);
-    connect(close_button, &QPushButton::clicked, this, &QDialog::accept);
-    close_button->raise();
+    connect(close_button, &QPushButton::clicked, this, &QDialog::reject);
 
     logo_label = new QLabel(panel);
     logo_label->setAlignment(Qt::AlignCenter);
@@ -196,6 +195,9 @@ void LauncherInfoDialog::setup_ui()
         QDesktopServices::openUrl(QUrl(QStringLiteral("mailto:dev@storyofalicia.com")));
     });
 
+    // Layout-managed children are created after the overlaid close button.
+    // Keep the button above them so the Credits logo/title cannot consume its clicks.
+    close_button->raise();
 }
 
 void LauncherInfoDialog::retranslate()

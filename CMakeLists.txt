@@ -12,28 +12,28 @@ project(soa_launcher
 
 if(APPLE)
     set(SOA_LAUNCHER_UPDATE_MANIFEST_URL
-        "https://r2.storyofalicia.com/launcher/macos/macos-version.json"
+        "https://r2.storyofalicia.com/launcher/macos/manifest.json"
         CACHE STRING "HTTPS URL of the launcher update manifest")
     set(SOA_LAUNCHER_UPDATE_FALLBACK_MANIFEST_URL
-        "https://github.com/Story-Of-Alicia/soa-launcher-qt/releases/latest/download/macos-version.json"
+        "https://raw.githubusercontent.com/Story-Of-Alicia/soa-launcher-qt/launcher-updates/macos/manifest.json"
         CACHE STRING "Fallback HTTPS URL of the launcher update manifest")
 else()
     set(SOA_LAUNCHER_UPDATE_MANIFEST_URL
-        "https://r2.storyofalicia.com/launcher/linux/version.json"
+        "https://r2.storyofalicia.com/launcher/linux/manifest.json"
         CACHE STRING "HTTPS URL of the launcher update manifest")
     set(SOA_LAUNCHER_UPDATE_FALLBACK_MANIFEST_URL
-        "https://github.com/Story-Of-Alicia/soa-launcher-qt/releases/latest/download/version.json"
+        "https://raw.githubusercontent.com/Story-Of-Alicia/soa-launcher-qt/launcher-updates/linux/manifest.json"
         CACHE STRING "Fallback HTTPS URL of the launcher update manifest")
 endif()
 file(READ
-    "${CMAKE_CURRENT_SOURCE_DIR}/packaging/update-public-key.hex"
+    "${CMAKE_CURRENT_SOURCE_DIR}/packaging/soa-update-public-key.hex"
     SOA_DEFAULT_UPDATE_PUBLIC_KEY_HEX)
 string(STRIP
     "${SOA_DEFAULT_UPDATE_PUBLIC_KEY_HEX}"
     SOA_DEFAULT_UPDATE_PUBLIC_KEY_HEX)
 set(SOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX
     "${SOA_DEFAULT_UPDATE_PUBLIC_KEY_HEX}"
-    CACHE STRING "Raw Ed25519 update-signing public key as 64 hexadecimal characters")
+    CACHE STRING "Raw Ed25519 public key used by SOA Seal v1 as 64 hexadecimal characters")
 
 string(LENGTH
         "${SOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX}"
@@ -72,10 +72,13 @@ include(CTest)
 option(SOA_ALLOW_FETCHCONTENT "Allow downloading missing dependencies during configure" ON)
 option(SOA_REQUIRE_ALICIA_LOG_HOOK
        "Fail configuration unless the Windows x86 Alicia diagnostic hook can be built" OFF)
+option(SOA_PORTABLE_BUILD
+       "Use conservative x86-64 compiler settings for distributable Linux builds" ON)
 
 set(SOA_PORTABLE_CXX_OPTIONS)
 
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux"
+if(SOA_PORTABLE_BUILD
+        AND CMAKE_SYSTEM_NAME STREQUAL "Linux"
         AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$"
         AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     list(APPEND SOA_PORTABLE_CXX_OPTIONS
@@ -141,11 +144,28 @@ add_library(soa_network SHARED
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     find_package(OpenSSL 3.0 REQUIRED COMPONENTS Crypto)
-    target_sources(soa_network PRIVATE
-            src/core/network/UpdateSignature.c
+
+    add_library(soa_seal_crypto STATIC
+            src/core/network/SOASeal.c
     )
-    target_link_libraries(soa_network PRIVATE
+
+    target_include_directories(soa_seal_crypto PRIVATE
+            ${SOA_INCLUDE_DIRS}
+    )
+
+    target_link_libraries(soa_seal_crypto PUBLIC
             OpenSSL::Crypto
+    )
+
+    set_target_properties(soa_seal_crypto PROPERTIES
+            POSITION_INDEPENDENT_CODE ON
+            AUTOMOC OFF
+            AUTORCC OFF
+            AUTOUIC OFF
+    )
+
+    target_link_libraries(soa_network PRIVATE
+            soa_seal_crypto
     )
 endif()
 
@@ -722,36 +742,33 @@ if(BUILD_TESTING)
             COMMAND launcher_release_catalogue_tests
     )
 
-    add_executable(update_signature_tests
-            tests/update_signature_tests.c
+    add_executable(soa_seal_tests
+            tests/soa_seal_tests.cpp
     )
 
-    target_include_directories(update_signature_tests PRIVATE
+    target_include_directories(soa_seal_tests PRIVATE
             ${SOA_INCLUDE_DIRS}
     )
 
     if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-        target_sources(update_signature_tests PRIVATE
-                src/core/network/UpdateSignature.c
-        )
-        target_link_libraries(update_signature_tests PRIVATE
-                OpenSSL::Crypto
+        target_link_libraries(soa_seal_tests PRIVATE
+                soa_seal_crypto
         )
     else()
-        target_link_libraries(update_signature_tests PRIVATE
+        target_link_libraries(soa_seal_tests PRIVATE
                 soa_network
         )
     endif()
 
-    set_target_properties(update_signature_tests PROPERTIES
+    set_target_properties(soa_seal_tests PROPERTIES
             AUTOMOC OFF
             AUTORCC OFF
             AUTOUIC OFF
     )
 
     add_test(
-            NAME update_signature_tests
-            COMMAND update_signature_tests
+            NAME soa_seal_tests
+            COMMAND soa_seal_tests
     )
 
 endif()

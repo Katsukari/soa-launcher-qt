@@ -68,11 +68,6 @@ Se launcher.log for fullstendig kommandoutdata.</translation>
             <translation> etter et krasj</translation>
         </message>
         <message>
-            <location filename="../src/widgets/PrerequisitesIntro.cpp" line="106" />
-            <source> and </source>
-            <translation> og </translation>
-        </message>
-        <message>
             <source> The launcher stayed in Launching instead of falsely reporting Running; check the diagnostic log for the first runtime or DLL error.</source>
             <translation> Startprogrammet ble stående på Starter i stedet for feilaktig å vise Kjører. Se diagnoseloggen etter den første kjøremiljø- eller DLL-feilen.</translation>
         </message>
@@ -139,11 +134,6 @@ DXVK er fortsatt valgfritt og kan aktiveres senere i Innstillinger. Ingenting in
         <message>
             <source>%1 · Wine %2</source>
             <translation>%1 · Wine %2</translation>
-        </message>
-        <message>
-            <location filename="../src/widgets/PrerequisitesIntro.cpp" line="109" />
-            <source>, and </source>
-            <translation>, og </translation>
         </message>
         <message>
             <source>-OP, -ID, and -GameID are managed by the launcher and cannot be overridden.</source>
@@ -3899,6 +3889,19 @@ Mangler: %1.</translation>
         <source>Cancel launcher update download</source>
         <translation>Avbryt nedlasting av launcheroppdatering</translation>
     </message>
+    <message>
+        <source>%1 and %2</source>
+        <translation>%1 og %2</translation>
+    </message>
+    <message>
+        <source>%1, and %2</source>
+        <translation>%1 og %2</translation>
+    </message>
+    <message>
+        <source>Linux supports Wine and Proton. macOS supports Wine.</source>
+        <translation>Linux støtter Wine og Proton. macOS støtter Wine.</translation>
+    </message>
+
 </context>
     <context>
         <name>QPlatformTheme</name>

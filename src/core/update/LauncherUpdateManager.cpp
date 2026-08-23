@@ -24,20 +24,20 @@
 #ifndef SOA_LAUNCHER_UPDATE_MANIFEST_URL
 #if defined(Q_OS_MACOS)
 #define SOA_LAUNCHER_UPDATE_MANIFEST_URL \
-    "https://r2.storyofalicia.com/launcher/macos/macos-version.json"
+    "https://r2.storyofalicia.com/launcher/macos/manifest.json"
 #else
 #define SOA_LAUNCHER_UPDATE_MANIFEST_URL \
-    "https://r2.storyofalicia.com/launcher/linux/version.json"
+    "https://r2.storyofalicia.com/launcher/linux/manifest.json"
 #endif
 #endif
 
 #ifndef SOA_LAUNCHER_UPDATE_FALLBACK_MANIFEST_URL
 #if defined(Q_OS_MACOS)
 #define SOA_LAUNCHER_UPDATE_FALLBACK_MANIFEST_URL \
-    "https://github.com/Story-Of-Alicia/soa-launcher-qt/releases/latest/download/macos-version.json"
+    "https://raw.githubusercontent.com/Story-Of-Alicia/soa-launcher-qt/launcher-updates/macos/manifest.json"
 #else
 #define SOA_LAUNCHER_UPDATE_FALLBACK_MANIFEST_URL \
-    "https://github.com/Story-Of-Alicia/soa-launcher-qt/releases/latest/download/version.json"
+    "https://raw.githubusercontent.com/Story-Of-Alicia/soa-launcher-qt/launcher-updates/linux/manifest.json"
 #endif
 #endif
 

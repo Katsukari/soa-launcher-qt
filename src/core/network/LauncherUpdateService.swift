@@ -458,16 +458,13 @@ final class LauncherUpdateService: @unchecked Sendable
     {
         let manifestData = try await fetchSignedJSON(manifestURL, maximumBytes: 64 * 1024)
         let selected = try parseManifest(manifestData)
-        let manifestName = manifestURL.lastPathComponent
-        let versionSuffix = "version.json"
-        guard manifestName.hasSuffix(versionSuffix) else {
+        guard manifestURL.lastPathComponent == "manifest.json" else {
             throw LauncherServiceFailure(
                 soa_launcher_error_invalid_configuration,
                 "The launcher update manifest name is invalid")
         }
-        let historyName = String(manifestName.dropLast(versionSuffix.count)) + "versions.json"
         let historyURL = manifestURL.deletingLastPathComponent()
-            .appendingPathComponent(historyName)
+            .appendingPathComponent("versions.json")
         let historyData = try await fetchSignedJSON(historyURL, maximumBytes: 1024 * 1024)
         let parsedCatalogue = try parseCatalogue(historyData)
         guard parsedCatalogue.releases.contains(where: {
@@ -502,12 +499,12 @@ final class LauncherUpdateService: @unchecked Sendable
             throw LauncherServiceFailure(soa_launcher_error_http,
                                          "HTTP \(response.status)", status: response.status)
         }
-        var signatureRequest = URLRequest(url: url.appendingPathExtension("sig"))
-        signatureRequest.setValue(userAgent, forHTTPHeaderField: "User-Agent")
-        signatureRequest.setValue("text/plain", forHTTPHeaderField: "Accept")
-        signatureRequest.setValue("no-store", forHTTPHeaderField: "Cache-Control")
-        let signatureResponse = try await fetchBounded(
-            signatureRequest,
+        var sealRequest = URLRequest(url: url.appendingPathExtension("seal"))
+        sealRequest.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+        sealRequest.setValue("text/plain", forHTTPHeaderField: "Accept")
+        sealRequest.setValue("no-store", forHTTPHeaderField: "Cache-Control")
+        let sealResponse = try await fetchBounded(
+            sealRequest,
             timeoutMilliseconds: 12_000,
             maximumBytes: 256,
             allowInsecureHTTP: allowInsecureHTTP,
@@ -516,12 +513,16 @@ final class LauncherUpdateService: @unchecked Sendable
                     && Self.trustedReleaseHost(source.host?.lowercased() ?? "")
                     && Self.trustedReleaseHost(destination.host?.lowercased() ?? "")
             })
-        guard (200...299).contains(signatureResponse.status) else {
+        guard (200...299).contains(sealResponse.status) else {
             throw LauncherServiceFailure(soa_launcher_error_http,
-                                         "HTTP \(signatureResponse.status)",
-                                         status: signatureResponse.status)
+                                         "HTTP \(sealResponse.status)",
+                                         status: sealResponse.status)
         }
-        try verifyManifest(response.data, signature: signatureResponse.data)
+        let sealKind = try soaSealDocumentKind(for: url)
+        try verifySOASeal(response.data,
+                          seal: sealResponse.data,
+                          expectedKind: sealKind.name,
+                          documentKind: sealKind.abiValue)
         return response.data
     }
 
@@ -832,41 +833,95 @@ final class LauncherUpdateService: @unchecked Sendable
         }
     }
 
-    private func verifyManifest(_ manifest: Data, signature: Data) throws
+    private func soaSealDocumentKind(for url: URL) throws -> (name: String, abiValue: UInt8)
     {
-        guard let signatureText = String(data: signature, encoding: .utf8)?
-            .trimmingCharacters(in: .whitespacesAndNewlines),
+        let name = url.lastPathComponent
+        if name == "versions.json" {
+            return ("history", 2)
+        }
+        if name == "manifest.json" {
+            return ("manifest", 1)
+        }
+        throw LauncherServiceFailure(
+            soa_launcher_error_invalid_configuration,
+            "The launcher update document name is not supported by SOA Seal v1")
+    }
+
+    private func verifySOASeal(_ document: Data,
+                               seal: Data,
+                               expectedKind: String,
+                               documentKind: UInt8) throws
+    {
+        guard var sealText = String(data: seal, encoding: .utf8) else {
+            throw LauncherServiceFailure(
+                soa_launcher_error_invalid_signature,
+                "The SOA Seal signature is not valid UTF-8")
+        }
+
+        sealText = sealText.replacingOccurrences(of: "\r\n", with: "\n")
+        if sealText.hasSuffix("\n") {
+            sealText.removeLast()
+        }
+        guard !sealText.contains("\r") else {
+            throw LauncherServiceFailure(
+                soa_launcher_error_invalid_signature,
+                "The SOA Seal signature has invalid line endings")
+        }
+
+        let lines = sealText.split(separator: "\n", omittingEmptySubsequences: false)
+        guard lines.count == 4,
+              lines[0] == "SOA-SEAL-V1",
+              lines[1] == "kind=\(expectedKind)",
+              lines[2].hasPrefix("key="),
+              lines[3].hasPrefix("sig=") else {
+            throw LauncherServiceFailure(
+                soa_launcher_error_invalid_signature,
+                "The launcher update is not signed with SOA Seal v1")
+        }
+
+        let keyID = String(lines[2].dropFirst(4))
+        let signatureText = String(lines[3].dropFirst(4))
+        guard keyID.range(
+                of: #"^SOA1-(?:[0-9A-F]{4}-){7}[0-9A-F]{4}$"#,
+                options: .regularExpression) != nil,
+              keyID.utf8.count == 44,
               let signatureBytes = Data(base64Encoded: signatureText),
               signatureBytes.count == 64,
               let publicKey = decodeHex(publicKeyHex), publicKey.count == 32 else {
             throw LauncherServiceFailure(
                 soa_launcher_error_invalid_signature,
-                "The launcher update signature is malformed")
+                "The SOA Seal signature is malformed")
         }
 
         #if os(Linux) || canImport(CryptoKit)
-        let valid = publicKey.withUnsafeBytes { keyBuffer in
-            manifest.withUnsafeBytes { manifestBuffer in
-                signatureBytes.withUnsafeBytes { signatureBuffer in
-                    soa_verify_ed25519(
-                        keyBuffer.bindMemory(to: UInt8.self).baseAddress,
-                        UInt64(publicKey.count),
-                        manifestBuffer.bindMemory(to: UInt8.self).baseAddress,
-                        UInt64(manifest.count),
-                        signatureBuffer.bindMemory(to: UInt8.self).baseAddress,
-                        UInt64(signatureBytes.count))
+        let keyIDCString = keyID.utf8CString
+        let valid = keyIDCString.withUnsafeBufferPointer { keyIDBuffer in
+            publicKey.withUnsafeBytes { keyBuffer in
+                document.withUnsafeBytes { documentBuffer in
+                    signatureBytes.withUnsafeBytes { signatureBuffer in
+                        soa_verify_soa_seal_v1(
+                            keyBuffer.bindMemory(to: UInt8.self).baseAddress,
+                            UInt64(publicKey.count),
+                            documentKind,
+                            documentBuffer.bindMemory(to: UInt8.self).baseAddress,
+                            UInt64(document.count),
+                            keyIDBuffer.baseAddress,
+                            UInt64(keyIDCString.count - 1),
+                            signatureBuffer.bindMemory(to: UInt8.self).baseAddress,
+                            UInt64(signatureBytes.count))
+                    }
                 }
             }
         }
         guard valid else {
             throw LauncherServiceFailure(
                 soa_launcher_error_invalid_signature,
-                "The launcher update manifest is not signed by Story of Alicia")
+                "The launcher update does not have a valid Story of Alicia seal")
         }
         #else
         throw LauncherServiceFailure(
             soa_launcher_error_invalid_configuration,
-            "Launcher signature verification is unavailable on this platform")
+            "SOA Seal verification is unavailable on this platform")
         #endif
     }
 

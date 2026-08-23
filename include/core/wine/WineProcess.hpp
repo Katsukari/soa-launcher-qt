@@ -20,6 +20,9 @@ namespace core::wine
                                                        const QString& host_path,
                                                        QString* error = nullptr);
 
+    [[nodiscard]] bool host_path_is_inside_prefix(const QString& prefix,
+                                                  const QString& host_path);
+
 
 
     [[nodiscard]] QString decode_windows_process_output(const QByteArray& output);

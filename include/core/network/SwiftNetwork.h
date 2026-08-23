@@ -143,12 +143,15 @@ void soa_launcher_updater_download(soa_launcher_updater* updater);
 void soa_launcher_updater_cancel(soa_launcher_updater* updater);
 bool soa_launcher_updater_select_version(soa_launcher_updater* updater, const char* version);
 
-bool soa_verify_ed25519(const uint8_t* public_key,
-                        uint64_t public_key_size,
-                        const uint8_t* message,
-                        uint64_t message_size,
-                        const uint8_t* signature,
-                        uint64_t signature_size);
+bool soa_verify_soa_seal_v1(const uint8_t* public_key,
+                            uint64_t public_key_size,
+                            uint8_t document_kind,
+                            const uint8_t* message,
+                            uint64_t message_size,
+                            const char* key_id,
+                            uint64_t key_id_size,
+                            const uint8_t* signature,
+                            uint64_t signature_size);
 
 typedef struct soa_discord_rpc soa_discord_rpc;
 

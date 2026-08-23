@@ -15,6 +15,11 @@ namespace core::wine
             return info.exists() ? info.canonicalFilePath() : QString();
         }
 
+        QString absolute_clean_path(const QString& path)
+        {
+            return QDir::cleanPath(QFileInfo(path).absoluteFilePath());
+        }
+
         bool path_has_prefix(const QString& candidate, const QString& root)
         {
             if (candidate == root)
@@ -194,6 +199,38 @@ namespace core::wine
         if (error)
             error->clear();
         return QStringLiteral("C:\\") + relative;
+    }
+
+    bool host_path_is_inside_prefix(const QString& prefix, const QString& host_path)
+    {
+        const QString root_absolute = absolute_clean_path(prefix);
+        const QString candidate_absolute = absolute_clean_path(host_path);
+        if (!path_has_prefix(candidate_absolute, root_absolute))
+            return false;
+
+        const QString root_canonical = canonical_existing_path(root_absolute);
+        if (root_canonical.isEmpty())
+            return false;
+
+        QString ancestor = candidate_absolute;
+        while (true)
+        {
+            const QFileInfo info(ancestor);
+            if (info.isSymLink() && !info.exists())
+                return false;
+            if (info.exists())
+            {
+                const QString ancestor_canonical = info.canonicalFilePath();
+                return !ancestor_canonical.isEmpty()
+                    && path_has_prefix(QDir::cleanPath(ancestor_canonical),
+                                       QDir::cleanPath(root_canonical));
+            }
+
+            const QString parent = info.dir().absolutePath();
+            if (parent == ancestor)
+                return false;
+            ancestor = parent;
+        }
     }
 
     std::optional<WindowsProcessInfo> find_windows_process(const QString& tasklist_output,

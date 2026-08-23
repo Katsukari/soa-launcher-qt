@@ -79,6 +79,21 @@ private slots:
             QStringLiteral("launch -OP [REDACTED] [REDACTED]"));
     }
 
+    void native_shell_does_not_require_rosetta()
+    {
+#if defined(Q_OS_MACOS)
+        const QString shell = QStandardPaths::findExecutable(QStringLiteral("sh"));
+        QVERIFY(!shell.isEmpty());
+        QVERIFY2(!core::wine::macos::executable_requires_rosetta(shell),
+                 qPrintable(QStringLiteral("Native shell was classified as Intel-only: %1 (%2)")
+                                .arg(shell,
+                                     core::wine::macos::executable_architectures(shell)
+                                         .join(QLatin1Char(' ')))));
+#else
+        QSKIP("Rosetta classification only applies to macOS.");
+#endif
+    }
+
     void process_runner_completes_once()
     {
         const QString shell = QStandardPaths::findExecutable(QStringLiteral("sh"));

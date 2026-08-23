@@ -17,6 +17,7 @@
 #include <utility>
 
 #include "core/Log.hpp"
+#include "core/wine/WineProcess.hpp"
 #include "core/wine/WineRegistry.hpp"
 #include "core/wine/MacWineRuntime.hpp"
 #include "util/CredentialStore.hpp"
@@ -31,16 +32,26 @@ namespace util::config
             return QDir::cleanPath(QFileInfo(path).absoluteFilePath());
         }
 
-        QString canonical_or_absolute(const QString& path)
-        {
-            const QFileInfo info(path);
-            const QString canonical = info.canonicalFilePath();
-            return canonical.isEmpty() ? absolute_clean_path(path) : QDir::cleanPath(canonical);
-        }
-
         bool path_has_prefix(const QString& candidate, const QString& root)
         {
             return candidate == root || candidate.startsWith(root + QDir::separator());
+        }
+
+        QString host_wine_user()
+        {
+            return qEnvironmentVariable(
+                "USER", QDir::homePath().section(QLatin1Char('/'), -1));
+        }
+
+        QString game_path_for_user(const QString& prefix,
+                                   const core::game::GameVersion version,
+                                   const QString& user)
+        {
+            const QString folder = QString::fromLatin1(
+                core::game::profile(version).default_install_directory);
+            return QDir(prefix).filePath(
+                QStringLiteral("drive_c/users/%1/AppData/Roaming/%2/game")
+                    .arg(user, folder));
         }
 
         QByteArray file_digest(const QString& path)
@@ -55,24 +66,6 @@ namespace util::config
             return QCryptographicHash::hash(file.readAll(), QCryptographicHash::Sha256);
         }
 
-        bool existing_chain_has_symlink(const QString& root, const QString& candidate)
-        {
-            const QString relative = QDir(root).relativeFilePath(candidate);
-            if (relative == QStringLiteral("..") || relative.startsWith(QStringLiteral("../")))
-                return true;
-
-            QString current = root;
-            for (const QString& component : relative.split(QDir::separator(), Qt::SkipEmptyParts))
-            {
-                if (component == QStringLiteral("."))
-                    continue;
-                current = QDir(current).filePath(component);
-                const QFileInfo info(current);
-                if (info.exists() && info.isSymLink())
-                    return true;
-            }
-            return false;
-        }
     }
 
         QString normalized_launcher_size(const QString& value)
@@ -515,12 +508,9 @@ namespace util::config
     {
         const bool proton = core::wine::WineRegistry::identify(wine_binary())
             == core::wine::RuntimeType::Proton;
-        const QString user = proton
-            ? QStringLiteral("steamuser")
-            : qEnvironmentVariable("USER", QDir::homePath().section(QLatin1Char('/'), -1));
-        const QString folder = QString::fromLatin1(core::game::profile(version).default_install_directory);
-        return QDir(prefix).filePath(
-            QStringLiteral("drive_c/users/%1/AppData/Roaming/%2/game").arg(user, folder));
+        return game_path_for_user(prefix, version,
+                                  proton ? QStringLiteral("steamuser")
+                                         : host_wine_user());
     }
 
     void Config::probe_system_paths()
@@ -654,14 +644,28 @@ namespace util::config
             d->values.value(QStringLiteral("proton_compat_data_root")).toString());
 
         const QString activePrefix = absolute_clean_path(prefix_root());
+        const bool proton = runtime_is_proton();
         for (const auto version : {core::game::GameVersion::Playtest,
                                    core::game::GameVersion::Alicia2})
         {
             const QString key = game_install_path_key(version);
             const QString stored = d->values.value(key).toString().trimmed();
-            const QString normalized = stored.isEmpty()
+            QString normalized = stored.isEmpty()
                 ? derive_game_path(activePrefix, version)
                 : normalize_game_path(stored);
+            const QString fallback = derive_game_path(activePrefix, version);
+
+            if (proton && host_wine_user() != QStringLiteral("steamuser"))
+            {
+                const QString preselectionDefault = absolute_clean_path(
+                    game_path_for_user(activePrefix, version, host_wine_user()));
+                if (absolute_clean_path(normalized) == preselectionDefault)
+                {
+                    SPDLOG_INFO("config: migrated pre-Proton game path {} to {}",
+                                normalized.toStdString(), fallback.toStdString());
+                    normalized = fallback;
+                }
+            }
 
             if (path_has_prefix(normalized, activePrefix))
             {
@@ -669,7 +673,6 @@ namespace util::config
                 continue;
             }
 
-            const QString fallback = derive_game_path(activePrefix, version);
             SPDLOG_WARN("config: replacing game path {} outside active prefix {} with {}",
                         normalized.toStdString(), activePrefix.toStdString(),
                         fallback.toStdString());
@@ -963,22 +966,7 @@ namespace util::config
             return false;
 
         const QString rootAbsolute = absolute_clean_path(prefix_root());
-        if (!path_has_prefix(candidate, rootAbsolute))
-            return false;
-        if (existing_chain_has_symlink(rootAbsolute, candidate))
-            return false;
-
-        const QString rootCanonical = canonical_or_absolute(rootAbsolute);
-        QString ancestor = candidate;
-        while (!QFileInfo::exists(ancestor))
-        {
-            const QString parent = QFileInfo(ancestor).dir().absolutePath();
-            if (parent == ancestor)
-                break;
-            ancestor = parent;
-        }
-        const QString ancestorCanonical = canonical_or_absolute(ancestor);
-        return path_has_prefix(ancestorCanonical, rootCanonical);
+        return core::wine::host_path_is_inside_prefix(rootAbsolute, candidate);
     }
 
     QString Config::username() const { return d->username; }
@@ -991,12 +979,34 @@ namespace util::config
         if (wine_binary() == value)
             return;
 
+        const bool oldProton = runtime_is_proton();
         const QString oldPrefix = prefix_root();
         const QString oldPlaytestPath = game_install_path(core::game::GameVersion::Playtest);
         const QString oldAlicia2Path = game_install_path(core::game::GameVersion::Alicia2);
+        const QString oldPlaytestDefault = derive_game_path(
+            oldPrefix, core::game::GameVersion::Playtest);
+        const QString oldAlicia2Default = derive_game_path(
+            oldPrefix, core::game::GameVersion::Alicia2);
 
         d->values[QStringLiteral("wine_binary")] = value;
         rebase_game_install_paths(oldPrefix, oldPlaytestPath, oldAlicia2Path);
+
+        if (oldProton != runtime_is_proton())
+        {
+            const auto updateDefault = [this](const core::game::GameVersion version,
+                                              const QString& oldPath,
+                                              const QString& oldDefault)
+            {
+                if (absolute_clean_path(oldPath) != absolute_clean_path(oldDefault))
+                    return;
+                d->values[game_install_path_key(version)] =
+                    derive_game_path(prefix_root(), version);
+            };
+            updateDefault(core::game::GameVersion::Playtest,
+                          oldPlaytestPath, oldPlaytestDefault);
+            updateDefault(core::game::GameVersion::Alicia2,
+                          oldAlicia2Path, oldAlicia2Default);
+        }
         persist_change();
     }
     void Config::set_winetricks_binary(const QString& value)

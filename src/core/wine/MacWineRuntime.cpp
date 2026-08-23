@@ -34,6 +34,7 @@ namespace core::wine::macos
 #if defined(Q_OS_MACOS)
             const QString architecture = QSysInfo::currentCpuArchitecture().toLower();
             return architecture == QStringLiteral("arm64")
+                || architecture == QStringLiteral("arm64e")
                 || architecture == QStringLiteral("aarch64");
 #else
             return false;
@@ -222,8 +223,10 @@ namespace core::wine::macos
         if (!is_apple_silicon_host() || executable.isEmpty() || is_script(executable))
             return false;
         const QStringList architectures = executable_architectures(executable);
+        const bool has_apple_silicon_slice = architectures.contains(QStringLiteral("arm64"))
+            || architectures.contains(QStringLiteral("arm64e"));
         return architectures.contains(QStringLiteral("x86_64"))
-            && !architectures.contains(QStringLiteral("arm64"));
+            && !has_apple_silicon_slice;
 #else
         Q_UNUSED(executable);
         return false;
