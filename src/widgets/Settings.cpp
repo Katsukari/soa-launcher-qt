@@ -1,4 +1,8 @@
+#include <QAbstractButton>
+#include <QLineEdit>
 #include <QPainter>
+#include <QVariant>
+#include <QPainterPath>
 #include <QPushButton>
 #include <QStackedWidget>
 #include "widgets/Settings.hpp"
@@ -10,6 +14,7 @@
 #include <QGraphicsBlurEffect>
 
 #include "widgets/LauncherSettings.hpp"
+#include "widgets/ImageDropdown.hpp"
 #include "widgets/WineSettings.hpp"
 #include "widgets/AdvancedSettings.hpp"
 #include "util/Layout.hpp"
@@ -17,6 +22,60 @@
 #include "util/Colors.hpp"
 #include "spdlog/spdlog.h"
 #include "core/wine/Shell.hpp"
+
+namespace
+{
+    constexpr auto k_allow_while_locked = "soa_allow_while_mutation_locked";
+    constexpr auto k_previous_enabled = "soa_mutation_previous_enabled";
+    constexpr auto k_previous_tooltip = "soa_mutation_previous_tooltip";
+
+    bool allowed_while_locked(const QWidget* widget)
+    {
+        const QObject* current = widget;
+        while (current)
+        {
+            if (current->property(k_allow_while_locked).toBool())
+                return true;
+            current = current->parent();
+        }
+        return false;
+    }
+
+    bool is_mutation_control(QWidget* widget)
+    {
+        return qobject_cast<QAbstractButton*>(widget)
+            || qobject_cast<QLineEdit*>(widget)
+            || qobject_cast<ImageDropdown*>(widget);
+    }
+
+    void set_mutation_control_enabled(QWidget* widget, const bool enabled,
+                                      const QString& disabled_reason)
+    {
+        if (enabled)
+        {
+            const QVariant previous_enabled = widget->property(k_previous_enabled);
+            if (previous_enabled.isValid())
+            {
+                widget->setEnabled(previous_enabled.toBool());
+                widget->setProperty(k_previous_enabled, QVariant{});
+            }
+            const QVariant previous_tooltip = widget->property(k_previous_tooltip);
+            if (previous_tooltip.isValid())
+            {
+                widget->setToolTip(previous_tooltip.toString());
+                widget->setProperty(k_previous_tooltip, QVariant{});
+            }
+            return;
+        }
+
+        if (!widget->property(k_previous_enabled).isValid())
+            widget->setProperty(k_previous_enabled, widget->isEnabled());
+        if (!widget->property(k_previous_tooltip).isValid())
+            widget->setProperty(k_previous_tooltip, widget->toolTip());
+        widget->setToolTip(disabled_reason);
+        widget->setEnabled(false);
+    }
+}
 
 Settings::Settings(core::wine::Shell * shell, QWidget* parent) : ModalOverlay(parent), shell(shell)
 {
@@ -35,15 +94,33 @@ void Settings::set_mutation_enabled(const bool enabled, const QString& reason)
 {
     mutation_enabled = enabled;
     mutation_reason = reason;
+    const QString translated_reason = util::i18n::translate(reason);
+
     if (stack)
     {
-        const QString translated_reason = util::i18n::translate(reason);
-        stack->setEnabled(enabled);
-        stack->setToolTip(enabled ? QString() : translated_reason);
+        const auto controls = stack->findChildren<QWidget*>();
+        for (QWidget* widget : controls)
+        {
+            if (!widget || !is_mutation_control(widget) || allowed_while_locked(widget))
+                continue;
+            set_mutation_control_enabled(widget, enabled, translated_reason);
+        }
+
+        stack->setToolTip(QString());
         stack->setAccessibleDescription(enabled
             ? util::i18n::translate("Settings are editable")
             : translated_reason);
     }
+
+    for (QPushButton* button : tab_buttons)
+    {
+        if (!button)
+            continue;
+        button->setEnabled(true);
+        button->setCursor(Qt::PointingHandCursor);
+        button->setToolTip(QString());
+    }
+    update();
 }
 
 void Settings::setup_pages()
@@ -174,9 +251,20 @@ void Settings::paint_content(QPainter& painter)
         const char* labels[] = {"LAUNCHER", runtimeLabel, "ADVANCED"};
         const QRect r = util::layout::settings::tab_rect(w, i, expanded);
         const bool  on = i == active_tab;
+        // Round the top corners only: the tab tucks under the settings panel
+        // by settings::k_tab_overlap, so a rounded bottom would show a notch
+        // where the tab meets a square-edged panel.
+        const QRectF rf(r);
+        const qreal corner =
+            qMin<qreal>(radius, qMin(rf.width(), rf.height()) / 2.0);
         QPainterPath p;
-
-        p.addRoundedRect(QRectF(r), radius, radius);
+        p.moveTo(rf.bottomLeft());
+        p.lineTo(rf.left(), rf.top() + corner);
+        p.quadTo(rf.left(), rf.top(), rf.left() + corner, rf.top());
+        p.lineTo(rf.right() - corner, rf.top());
+        p.quadTo(rf.right(), rf.top(), rf.right(), rf.top() + corner);
+        p.lineTo(rf.bottomRight());
+        p.closeSubpath();
         painter.fillPath(p, on ? active : inactive);
         painter.setPen(on ? textCol : textCol.lighter(140));
         painter.drawText(r, Qt::AlignCenter, util::i18n::translate(labels[i]));

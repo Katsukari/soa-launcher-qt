@@ -114,8 +114,21 @@ namespace util::config
         Config(const Config&) = delete;
         Config& operator=(const Config&) = delete;
 
+        enum class LoadOutcome
+        {
+            Loaded,      // file existed and parsed
+            Missing,     // file is not there at all
+            Unreadable   // file exists but is empty, locked, or not valid JSON
+        };
+
+        // Reads config.json into d->values. On Missing or Unreadable it leaves
+        // d->values untouched so the caller can decide what the authority is.
+        LoadOutcome load_document();
         bool load();
         bool save();
+        bool restore_from_backup();
+        bool write_backup(const QByteArray& contents) const;
+        QString backup_path() const;
         void load_credentials();
         bool save_credentials();
         bool clear_saved_credentials();
@@ -147,6 +160,9 @@ namespace util::config
 
         QFileSystemWatcher* watcher {};
         QTimer* reload_timer {};
+        QTimer* integrity_timer {};
+        int consecutive_unreadable {};
+        bool recovering {};
         QByteArray config_digest;
         QByteArray env_digest;
         bool writing {};

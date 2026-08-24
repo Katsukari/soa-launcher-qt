@@ -144,20 +144,9 @@ namespace core::wine
         return home + QStringLiteral("/.steam");
     }
 
-    QProcessEnvironment RuntimeLocator::proton_env() const
+    QProcessEnvironment RuntimeLocator::umu_environment() const
     {
-        const RuntimeSettings values = settings();
-        QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
-        environment.insert(QStringLiteral("STEAM_COMPAT_DATA_PATH"),
-                           values.proton_compat_data_root);
-        environment.insert(QStringLiteral("STEAM_COMPAT_CLIENT_INSTALL_PATH"), steam_root());
-        environment.insert(QStringLiteral("WINEDLLOVERRIDES"), QStringLiteral("winegstreamer="));
-        if (!values.use_dxvk)
-        {
-            environment.insert(QStringLiteral("PROTON_USE_WINED3D"), QStringLiteral("1"));
-        }
-        apply_wine_environment_entries(environment, values.wine_args);
-        return environment;
+        return make_umu_environment(settings(), proton_root());
     }
 
     QProcessEnvironment RuntimeLocator::winetricks_environment() const

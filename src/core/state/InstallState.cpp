@@ -10,6 +10,7 @@
 #include "core/status/StatusBus.hpp"
 #include "core/status/StatusReporter.hpp"
 #include "core/wine/PrefixInspector.hpp"
+#include "core/wine/RuntimeLocator.hpp"
 #include "core/wine/WineRegistry.hpp"
 #include "util/Config.hpp"
 #include <spdlog/spdlog.h>
@@ -81,12 +82,35 @@ namespace core::state
             probe_timer->start();
     }
 
+    void InstallState::confirm_rules_reviewed()
+    {
+        if (rules_reviewed)
+            return;
+        rules_reviewed = true;
+        recompute();
+    }
+
+    void InstallState::clear_rules_reviewed()
+    {
+        rules_reviewed = false;
+    }
+
     void InstallState::probe()
     {
         if (probe_timer)
             probe_timer->stop();
 
         auto& config = util::config::Config::instance();
+#if !defined(Q_OS_MACOS)
+        // Older builds passed the wine prefix to umu as WINEPREFIX, so Proton
+        // built at <compat-root>/pfx/pfx. Repair that before probing, otherwise
+        // an existing install looks missing.
+        if (core::wine::WineRegistry::identify(config.wine_binary())
+            == core::wine::RuntimeType::Proton)
+        {
+            core::wine::repair_doubled_proton_prefix(config.proton_compat_data_root());
+        }
+#endif
         const QString prefix = config.prefix_root();
         prerequisites_confirmed = config.prerequisites_confirmed();
         rules_accepted = config.rules_accepted();
@@ -338,7 +362,7 @@ namespace core::state
         if (!game_installed) return Stage::NeedsDownload;
         if (update_check_in_progress) return Stage::CheckingUpdate;
         if (update_needed) return Stage::NeedsUpdate;
-        if (!rules_accepted) return Stage::NeedsRules;
+        if (!rules_accepted && !rules_reviewed) return Stage::NeedsRules;
         if (auth_state == State::Working) return Stage::Authenticating;
         if (!authed) return Stage::NeedsAuth;
         return Stage::Ready;

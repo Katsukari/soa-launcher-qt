@@ -1,5 +1,7 @@
 #include "core/wine/RuntimeLocator.hpp"
 
+#include <QDir>
+#include <QFileInfo>
 #include <QProcess>
 #include <QRegularExpression>
 
@@ -7,6 +9,131 @@
 
 namespace core::wine
 {
+    bool repair_doubled_proton_prefix(const QString& compat_data_root)
+    {
+        if (compat_data_root.isEmpty())
+            return false;
+
+        const QDir root(compat_data_root);
+        const QString prefix = root.filePath(QStringLiteral("pfx"));
+        const QString inner = QDir(prefix).filePath(QStringLiteral("pfx"));
+
+        if (!QFileInfo(inner).isDir())
+            return false;
+
+        // If the outer directory is already a real prefix, an inner pfx is not
+        // ours to touch -- leave it alone.
+        if (QFileInfo(QDir(prefix).filePath(QStringLiteral("drive_c"))).isDir())
+            return false;
+
+        const bool innerIsRealPrefix =
+            QFileInfo(QDir(inner).filePath(QStringLiteral("drive_c"))).isDir();
+
+        if (!innerIsRealPrefix)
+        {
+            // A stub from a failed setup: no drive_c, nothing to preserve.
+            SPDLOG_INFO("prefix: removing empty doubled prefix at {}", inner.toStdString());
+            return QDir(inner).removeRecursively();
+        }
+
+        // Hoist the real prefix up one level and discard the wrapper, which only
+        // holds Proton's compat-data bookkeeping (version, config_info,
+        // tracked_files). Staged through a sibling name so a failure at any step
+        // leaves the original tree intact.
+        const QString staging = root.filePath(QStringLiteral(".pfx-migrating"));
+        if (QFileInfo::exists(staging))
+        {
+            SPDLOG_WARN("prefix: migration staging path {} already exists; skipping",
+                        staging.toStdString());
+            return false;
+        }
+
+        SPDLOG_INFO("prefix: found doubled Proton prefix; hoisting {} to {}",
+                    inner.toStdString(), prefix.toStdString());
+
+        if (!QDir().rename(prefix, staging))
+        {
+            SPDLOG_ERROR("prefix: could not move {} aside for migration", prefix.toStdString());
+            return false;
+        }
+
+        const QString stagedInner = QDir(staging).filePath(QStringLiteral("pfx"));
+        if (!QDir().rename(stagedInner, prefix))
+        {
+            SPDLOG_ERROR("prefix: could not hoist {}; restoring original layout",
+                         stagedInner.toStdString());
+            if (!QDir().rename(staging, prefix))
+                SPDLOG_CRITICAL("prefix: could not restore {} from {}",
+                                prefix.toStdString(), staging.toStdString());
+            return false;
+        }
+
+        if (!QDir(staging).removeRecursively())
+            SPDLOG_WARN("prefix: hoisted the prefix but could not remove leftover {}",
+                        staging.toStdString());
+
+        SPDLOG_INFO("prefix: doubled prefix repaired");
+        return true;
+    }
+
+    QProcessEnvironment RuntimeLocator::make_umu_environment(const RuntimeSettings& settings,
+                                                             const QString& proton_root)
+    {
+        QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
+        for (const QString& key : {
+                 QStringLiteral("STEAM_COMPAT_DATA_PATH"),
+                 QStringLiteral("STEAM_COMPAT_CLIENT_INSTALL_PATH"),
+                 QStringLiteral("STEAM_COMPAT_APP_ID"),
+                 QStringLiteral("STEAM_COMPAT_INSTALL_PATH"),
+                 QStringLiteral("STEAM_COMPAT_SHADER_PATH"),
+                 QStringLiteral("STEAM_COMPAT_TOOL_PATHS"),
+                 QStringLiteral("STEAM_COMPAT_MOUNTS"),
+                 QStringLiteral("STEAM_COMPAT_LAUNCHER_SERVICE"),
+                 QStringLiteral("SteamAppId")})
+        {
+            environment.remove(key);
+        }
+        const QString preload = environment.value(QStringLiteral("LD_PRELOAD"));
+        if (!preload.isEmpty())
+        {
+            QStringList retained;
+            for (const QString& entry :
+                 preload.split(QRegularExpression(QStringLiteral(R"([:\s]+)")),
+                               Qt::SkipEmptyParts))
+            {
+                if (!entry.contains(QStringLiteral("gameoverlayrenderer.so"),
+                                    Qt::CaseInsensitive))
+                {
+                    retained.append(entry);
+                }
+            }
+            if (retained.isEmpty())
+                environment.remove(QStringLiteral("LD_PRELOAD"));
+            else
+                environment.insert(QStringLiteral("LD_PRELOAD"),
+                                   retained.join(QLatin1Char(':')));
+        }
+        environment.insert(QStringLiteral("GAMEID"), QStringLiteral("umu-storyofalicia"));
+        environment.insert(QStringLiteral("STORE"), QStringLiteral("none"));
+        environment.insert(QStringLiteral("PROTONPATH"), proton_root);
+        // umu maps WINEPREFIX straight onto STEAM_COMPAT_DATA_PATH, and Proton
+        // builds its prefix at $STEAM_COMPAT_DATA_PATH/pfx. Passing prefix_root
+        // (which already ends in /pfx) therefore produced <root>/pfx/pfx while
+        // the launcher looked for the game under <root>/pfx/drive_c.
+        environment.insert(QStringLiteral("WINEPREFIX"),
+                           settings.proton_compat_data_root.isEmpty()
+                               ? settings.prefix_root
+                               : settings.proton_compat_data_root);
+        environment.insert(QStringLiteral("WINEDLLOVERRIDES"), QStringLiteral("winegstreamer="));
+        if (!settings.use_dxvk)
+            environment.insert(QStringLiteral("PROTON_USE_WINED3D"), QStringLiteral("1"));
+        apply_wine_environment_entries(environment, settings.wine_args);
+        const QString tmpdir = environment.value(QStringLiteral("TMPDIR"));
+        if (!tmpdir.isEmpty() && !QDir(tmpdir).exists())
+            environment.remove(QStringLiteral("TMPDIR"));
+        return environment;
+    }
+
     void RuntimeLocator::apply_wine_environment_entries(QProcessEnvironment& environment,
                                                         const QString& entries)
     {
@@ -44,7 +171,9 @@ namespace core::wine
                 upper == QStringLiteral("WINEDEBUG") ||
                 upper == QStringLiteral("WINEDLLOVERRIDES") ||
                 upper == QStringLiteral("LD_PRELOAD") || upper == QStringLiteral("GAMEID") ||
-                upper == QStringLiteral("STORE") || upper.startsWith(QStringLiteral("DYLD_")) ||
+                upper == QStringLiteral("STORE") || upper == QStringLiteral("STEAMAPPID") ||
+                upper == QStringLiteral("STEAMGAMEID") ||
+                upper.startsWith(QStringLiteral("DYLD_")) ||
                 upper.startsWith(QStringLiteral("CX_")) ||
                 upper.startsWith(QStringLiteral("PROTON_")) ||
                 upper.startsWith(QStringLiteral("STEAM_COMPAT_"));

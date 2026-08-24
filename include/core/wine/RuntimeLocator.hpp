@@ -8,6 +8,12 @@
 
 namespace core::wine
 {
+    // Repairs the <compat-root>/pfx/pfx layout produced by older builds that
+    // passed the wine prefix to umu as WINEPREFIX. A real prefix found inside
+    // is hoisted up one level; a failed stub is removed. Returns true if it
+    // changed anything on disk. Safe and cheap to call when nothing is wrong.
+    bool repair_doubled_proton_prefix(const QString& compat_data_root);
+
     struct RuntimeSettings
     {
         QString configured_runtime;
@@ -35,8 +41,10 @@ namespace core::wine
         [[nodiscard]] QString proton_wineserver_binary() const;
         [[nodiscard]] QString wineserver_binary() const;
         [[nodiscard]] QString steam_root() const;
-        [[nodiscard]] QProcessEnvironment proton_env() const;
+        [[nodiscard]] QProcessEnvironment umu_environment() const;
         [[nodiscard]] QProcessEnvironment winetricks_environment() const;
+        [[nodiscard]] static QProcessEnvironment make_umu_environment(
+            const RuntimeSettings& settings, const QString& proton_root);
         [[nodiscard]] QString resolved_executable(const QString& program) const;
         [[nodiscard]] bool is_wine_installed() const;
 

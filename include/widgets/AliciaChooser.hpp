@@ -59,6 +59,7 @@ private:
     void set_state(State state);
     void apply_state_visibility();
     void refresh_enter_enabled();
+    void refresh_acknowledgements();
     void refresh_keep_signed_in();
     void refresh_game_text();
     void refresh_session_banner();
@@ -90,4 +91,5 @@ private:
     QPushButton* reset_path_button {};
     QPointer<LauncherDialog> warning_dialog;
     QString displayed_warning;
+    bool rules_accepted_cached {};
 };

@@ -4,10 +4,14 @@
 #include "util/Layout.hpp"
 #include "util/Styles.hpp"
 
+#include <QColor>
 #include <QEvent>
 #include <QFontMetrics>
+#include <QHash>
 #include <QIcon>
+#include <QImage>
 #include <QPalette>
+#include <QPixmap>
 #include <QVariant>
 
 #include <initializer_list>
@@ -114,17 +118,21 @@ namespace util::simple_utils
             if (!label)
                 return;
 
+            constexpr int k_disabled_text_alpha = 140;
             QPalette palette = label->palette();
             for (const QPalette::ColorGroup group :
-                 {QPalette::Active, QPalette::Inactive, QPalette::Disabled})
+                 {QPalette::Active, QPalette::Inactive})
             {
                 palette.setColor(group, QPalette::WindowText, Qt::white);
                 palette.setColor(group, QPalette::Text, Qt::white);
             }
+            const QColor faded(255, 255, 255, k_disabled_text_alpha);
+            palette.setColor(QPalette::Disabled, QPalette::WindowText, faded);
+            palette.setColor(QPalette::Disabled, QPalette::Text, faded);
             label->setPalette(palette);
             label->setStyleSheet(QStringLiteral(
                 "QLabel { background: transparent; color: #FFFFFF; }"
-                "QLabel:disabled { color: #FFFFFF; }"));
+                "QLabel:disabled { color: rgba(255,255,255,140); }"));
         }
 
         void fit_button_text(QLabel* label)
@@ -167,12 +175,52 @@ namespace util::simple_utils
             return source.scaled(target, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
         }
 
+        // Desaturated, faded copy used for QIcon::Disabled. Qt would normally
+        // generate one, but every button here supplies its own pixmap, so the
+        // greyed variant has to be built explicitly or disabled buttons look
+        // identical to enabled ones. GUI thread only.
+        QPixmap disabled_button_pixmap(const QPixmap& source)
+        {
+            if (source.isNull())
+                return source;
+
+            static QHash<qint64, QPixmap> cache;
+            const qint64 key = source.cacheKey();
+            if (const auto found = cache.constFind(key); found != cache.constEnd())
+                return found.value();
+
+            QImage image = source.toImage().convertToFormat(QImage::Format_ARGB32);
+            for (int y = 0; y < image.height(); ++y)
+            {
+                auto* line = reinterpret_cast<QRgb*>(image.scanLine(y));
+                for (int x = 0; x < image.width(); ++x)
+                {
+                    const QRgb pixel = line[x];
+                    const int alpha = qAlpha(pixel);
+                    if (alpha == 0)
+                        continue;
+                    const int grey = qGray(pixel);
+                    line[x] = qRgba((qRed(pixel) + grey * 3) / 4,
+                                    (qGreen(pixel) + grey * 3) / 4,
+                                    (qBlue(pixel) + grey * 3) / 4,
+                                    alpha * 110 / 255);
+                }
+            }
+
+            QPixmap result = QPixmap::fromImage(image);
+            result.setDevicePixelRatio(source.devicePixelRatio());
+            if (cache.size() > 64)
+                cache.clear();
+            cache.insert(key, result);
+            return result;
+        }
+
         void set_button_icon(QPushButton* button, const QPixmap& source)
         {
             const QPixmap displayed = displayed_button_pixmap(button, source);
             QIcon icon;
             icon.addPixmap(displayed, QIcon::Normal);
-            icon.addPixmap(displayed, QIcon::Disabled);
+            icon.addPixmap(disabled_button_pixmap(displayed), QIcon::Disabled);
             button->setIcon(icon);
         }
     }
@@ -205,6 +253,14 @@ namespace util::simple_utils
             return;
         button->setProperty(k_asset_property, static_cast<int>(asset));
         refresh_button(button);
+    }
+
+    void set_button_enabled(QPushButton* button, const bool enabled)
+    {
+        if (!button)
+            return;
+        button->setEnabled(enabled);
+        button->setCursor(enabled ? Qt::PointingHandCursor : Qt::ArrowCursor);
     }
 
     void set_button_loading(QPushButton* button, const bool loading)

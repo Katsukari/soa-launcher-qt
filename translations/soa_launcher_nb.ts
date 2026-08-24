@@ -1601,6 +1601,11 @@ Missing: %1. %2, then restart the launcher.</source>
 Mangler: %1. %2, og start deretter launcheren på nytt.</translation>
         </message>
         <message>
+            <location filename="../src/widgets/PrerequisitesIntro.cpp" line="363" />
+            <source>The selected Proton build cannot use UMU Winetricks. Install GE-Proton or UMU-Proton, or install Winetricks on the host, then restart the launcher.</source>
+            <translation>Den valgte Proton-versjonen kan ikke bruke UMU Winetricks. Installer GE-Proton eller UMU-Proton, eller installer Winetricks på systemet, og start deretter launcheren på nytt.</translation>
+        </message>
+        <message>
             <source>Proton Not Available</source>
             <translation>Proton er ikke tilgjengelig</translation>
         </message>
@@ -2956,8 +2961,8 @@ Mangler: %1.</translation>
         </message>
         <message>
             <location filename="../src/widgets/WineSelectMenu.cpp" line="190" />
-            <source>winetricks not found - required components will be installed manually</source>
-            <translation>winetricks ble ikke funnet – nødvendige komponenter installeres manuelt</translation>
+            <source>winetricks not found - Wine requires it; GE/UMU Proton uses UMU</source>
+            <translation>winetricks ikke funnet – Wine krever det; GE/UMU Proton bruker UMU</translation>
         </message>
         <message>
             <location filename="../src/widgets/WineSelectMenu.cpp" line="188" />

@@ -83,54 +83,89 @@ namespace core::wine
         if (packages.isEmpty() && !install_optional_dxvk)
             return true;
 
-        const QString winetricks = winetricks_path();
-        if (winetricks.isEmpty() || !QFileInfo(winetricks).isExecutable())
+        const bool proton = runtime_.runtime_is_proton();
+        const bool umu_winetricks =
+            proton && WineRegistry::proton_supports_umu_winetricks(runtime_.proton_root());
+        QString installer;
+        QStringList package_arguments;
+        QProcessEnvironment package_environment;
+
+        if (umu_winetricks)
         {
-            if (!packages.isEmpty())
+            installer = umu_path();
+            if (installer.isEmpty() || !QFileInfo(installer).isExecutable())
             {
-                SPDLOG_ERROR("missing components require winetricks: {}",
-                             packages.join(QStringLiteral(", ")).toStdString());
+                SPDLOG_ERROR("Proton component setup requires umu-run");
+                return false;
+            }
+            package_arguments << QStringLiteral("winetricks");
+            package_arguments.append(packages);
+            package_environment = runtime_.umu_environment();
+            package_environment.insert(QStringLiteral("PROTON_VERB"),
+                                       QStringLiteral("runinprefix"));
+            SPDLOG_INFO("installing Proton components through umu-run winetricks: {}",
+                        packages.join(QStringLiteral(", ")).toStdString());
+        }
+        else
+        {
+            installer = winetricks_path();
+            if (installer.isEmpty() || !QFileInfo(installer).isExecutable())
+            {
+                if (!packages.isEmpty())
+                {
+                    if (proton)
+                    {
+                        SPDLOG_ERROR("selected Proton cannot use UMU Winetricks; install "
+                                     "GE-Proton or UMU-Proton, or install host winetricks: {}",
+                                     packages.join(QStringLiteral(", ")).toStdString());
+                    }
+                    else
+                    {
+                        SPDLOG_ERROR("missing components require winetricks: {}",
+                                     packages.join(QStringLiteral(", ")).toStdString());
+                    }
+                    return false;
+                }
+
+                Config::instance().set_use_dxvk(false);
+                SPDLOG_WARN("optional DXVK setup skipped because winetricks is unavailable");
+                if (callbacks_.user_notice)
+                {
+                    callbacks_.user_notice(
+                        QStringLiteral("Optional DXVK setup was skipped because "
+                                       "Winetricks is unavailable. DXVK has been "
+                                       "turned off and prefix setup will continue."));
+                }
+                return true;
+            }
+
+            if (proton && runtime_.proton_wine_binary().isEmpty())
+            {
+                SPDLOG_ERROR("selected Proton runtime does not expose a Wine binary for "
+                             "winetricks");
                 return false;
             }
 
-            Config::instance().set_use_dxvk(false);
-            SPDLOG_WARN("optional DXVK setup skipped because "
-                        "winetricks is unavailable");
-            if (callbacks_.user_notice)
-            {
-                callbacks_.user_notice(
-                    QStringLiteral("Optional DXVK setup was skipped because "
-                                   "Winetricks is unavailable. DXVK has been "
-                                   "turned off and prefix setup will continue."));
-            }
-            return true;
-        }
-
-        if (runtime_.runtime_is_proton() && runtime_.proton_wine_binary().isEmpty())
-        {
-            SPDLOG_ERROR("selected Proton runtime does not expose a "
-                         "Wine binary for winetricks");
-            return false;
+            package_arguments << QStringLiteral("-q");
+            package_arguments.append(packages);
+            package_environment = runtime_.winetricks_environment();
         }
 
         int insertion_index = index_ + 1;
         if (!packages.isEmpty())
         {
-            QStringList arguments {QStringLiteral("-q")};
-            arguments.append(packages);
             queue_.insert(insertion_index++,
-                          SetupCommand {k_installing_message, winetricks, arguments,
-                                        runtime_.winetricks_environment(), 30 * 60 * 1000, false,
-                                        false, false});
+                          SetupCommand {k_installing_message, installer, package_arguments,
+                                        package_environment, 30 * 60 * 1000, false, false, false});
         }
         if (install_optional_dxvk)
         {
             queue_.insert(
                 insertion_index,
                 SetupCommand {QStringLiteral("Installing optional DXVK..."),
-                              winetricks,
+                              installer,
                               {QStringLiteral("-q"), PrefixInspector::dxvk_winetricks_verb()},
-                              runtime_.winetricks_environment(),
+                              package_environment,
                               30 * 60 * 1000,
                               false,
                               false,
@@ -275,13 +310,22 @@ namespace core::wine
                     if (!result.ok())
                     {
                         const QString message = command_failure_message(command.message, result);
-                        if (command.optional_failure)
+                        if (command.succeeds_if_prefix_ready && prefix_structure_ready())
+                        {
+                            SPDLOG_INFO("prefix: \"{}\" exited non-zero but the prefix is "
+                                        "initialised; continuing",
+                                        command.message.toStdString());
+                        }
+                        else if (command.optional_failure)
                         {
                             skip_optional_command(message);
                             return;
                         }
-                        finish_failure(message);
-                        return;
+                        else
+                        {
+                            finish_failure(message);
+                            return;
+                        }
                     }
                     if (command.inspect_components_after && !queue_missing_components())
                     {
@@ -302,6 +346,16 @@ namespace core::wine
             }
             finish_failure(QStringLiteral("Could not start %1").arg(command.message));
         }
+    }
+
+    bool PrefixSetupJob::prefix_structure_ready() const
+    {
+        const QString runtime_identity = runtime_.runtime_is_proton()
+                                             ? Config::instance().wine_binary()
+                                             : runtime_.wine_binary();
+        return PrefixInspector::inspect(Config::instance().prefix_root(), runtime_identity,
+                                        runtime_.runtime_is_proton())
+            .structure_valid;
     }
 
     void PrefixSetupJob::finalize(const Kind completed_kind, const int attempts_remaining)
@@ -644,30 +698,43 @@ namespace core::wine
             return;
         }
 
-        if (runtime_.proton_wine_binary().isEmpty())
+        const QString umu = umu_path();
+        if (umu.isEmpty() || !QFileInfo(umu).isExecutable())
         {
             if (callbacks_.fail_user)
             {
-                callbacks_.fail_user(QStringLiteral("Invalid Proton Runtime"),
-                                     QStringLiteral("The selected Proton installation "
-                                                    "does not contain a runnable Wine "
-                                                    "binary."));
+                callbacks_.fail_user(QStringLiteral("Proton Not Available"),
+                                     QStringLiteral("Proton launch requires a working umu-run "
+                                                    "installation."));
             }
             if (callbacks_.setup_finished)
                 callbacks_.setup_finished(false);
             return;
         }
 
+        QProcessEnvironment environment = runtime_.umu_environment();
+        // No PROTON_VERB here. Creation needs Proton's default
+        // waitforexitandrun, which runs the full prefix setup; runinprefix is
+        // documented for *subsequent* runs and assumes the prefix exists, so
+        // using it here tells Proton to skip the work we are asking for.
+
+        repair_doubled_proton_prefix(Config::instance().proton_compat_data_root());
+
         QVector<SetupCommand> commands;
         commands.push_back(
             {QStringLiteral("Creating Proton prefix..."),
-             runtime_.proton_binary(),
-             {QStringLiteral("runinprefix"), QStringLiteral("wineboot"), QStringLiteral("--init")},
-             runtime_.proton_env(),
+             umu,
+             // umu-run's subcommand for building a prefix and stopping there.
+             // Passing "" instead builds the prefix but then asks Proton to
+             // ShellExecute an empty path, which fails with "Fant ikke filen"
+             // and exits 1 after the prefix is already good.
+             {QStringLiteral("createprefix")},
+             environment,
              5 * 60 * 1000,
              true,
              true,
-             false});
+             false,
+             true});
         run_setup(std::move(commands), Kind::Setup);
     }
 

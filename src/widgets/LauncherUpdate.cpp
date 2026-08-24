@@ -14,32 +14,34 @@
 #include <QLabel>
 #include <QPainter>
 #include <QPushButton>
-#include <QSignalBlocker>
-#include <QTimer>
 #include <QVersionNumber>
-
-namespace lu = util::layout::launcher_update;
 
 namespace
 {
-    void fit_label(QLabel* label, const int base_size, const int minimum_size,
-                   const bool word_wrap = true)
+    constexpr QSize k_box_size {620, 360};
+
+    QRect box_rect(const QSize window_size)
+    {
+        return util::layout::centered(k_box_size, window_size, 0, 0);
+    }
+
+    QRect local_rect(const QSize window_size, const QRect source)
+    {
+        return util::layout::scaled(source, window_size).translated(box_rect(window_size).topLeft());
+    }
+
+    void fit_label(QLabel* label, const int base_size, const int minimum_size)
     {
         if (!label)
             return;
         QFont font = label->font();
         const QRect available(0, 0, qMax(1, label->width()), qMax(1, label->height()));
-        int flags = Qt::AlignCenter;
-        if (word_wrap)
-            flags |= Qt::TextWordWrap;
-        else
-            flags |= Qt::TextSingleLine;
         int size = base_size;
         while (size > minimum_size)
         {
             font.setPixelSize(size);
             const QRect bounds = QFontMetrics(font).boundingRect(
-                available, flags, label->text());
+                available, Qt::AlignCenter | Qt::TextWordWrap, label->text());
             if (bounds.height() <= available.height() && bounds.width() <= available.width())
                 break;
             --size;
@@ -68,45 +70,42 @@ void LauncherUpdate::setup_controls()
     const QSize w = window()->size();
 
     title_label = new QLabel(this);
-    title_label->setGeometry(lu::title(w));
+    title_label->setGeometry(local_rect(w, {42, 26, 536, 40}));
     title_label->setAlignment(Qt::AlignCenter);
-    title_label->setWordWrap(false);
+    title_label->setWordWrap(true);
     QFont title_font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
-    title_font.setPixelSize(util::layout::scaled(
-        util::layout::text::k_modal_header, w));
+    title_font.setPixelSize(util::layout::scaled(25, w));
     title_font.setWeight(QFont::Black);
     title_label->setFont(title_font);
     title_label->setStyleSheet(QStringLiteral("color:#4F1717; background:transparent;"));
 
     message_label = new QLabel(this);
-    message_label->setGeometry(lu::message(w));
+    message_label->setGeometry(local_rect(w, {70, 78, 480, 56}));
     message_label->setAlignment(Qt::AlignCenter);
     message_label->setWordWrap(true);
     QFont message_font = util::assets::fonts[util::assets::Font::Inter];
-    message_font.setPixelSize(util::layout::scaled(
-        util::layout::text::k_version, w));
+    message_font.setPixelSize(util::layout::scaled(16, w));
     message_font.setWeight(QFont::Medium);
     message_label->setFont(message_font);
     message_label->setStyleSheet(QStringLiteral("color:#392518; background:transparent;"));
 
     details_label = new QLabel(this);
-    details_label->setGeometry(lu::details(w, false));
+    details_label->setGeometry(local_rect(w, {70, 136, 480, 46}));
     details_label->setAlignment(Qt::AlignCenter);
     details_label->setWordWrap(true);
     QFont details_font = util::assets::fonts[util::assets::Font::Inter];
-    details_font.setPixelSize(util::layout::scaled(
-        util::layout::text::k_desc, w));
+    details_font.setPixelSize(util::layout::scaled(14, w));
     details_font.setWeight(QFont::Medium);
     details_label->setFont(details_font);
     details_label->setStyleSheet(QStringLiteral("color:#A08C7B; background:transparent;"));
 
     version_combo = new QComboBox(this);
-    version_combo->setGeometry(lu::version_combo(w));
+    version_combo->setGeometry(local_rect(w, {100, 186, 420, 42}));
     version_combo->setCursor(Qt::PointingHandCursor);
     version_combo->setMaxVisibleItems(3);
     version_combo->setStyleSheet(QStringLiteral(
         "QComboBox { background:#F7F0EB; color:#4F1717; border:1px solid #A98678; "
-        "border-radius:7px; padding:5px 12px; }"
+        "border-radius:6px; padding:5px 12px; }"
         "QComboBox::drop-down { border:0; width:28px; }"
         "QComboBox QAbstractItemView { background:#F7F0EB; color:#4F1717; "
         "selection-background-color:#EBDCD3; selection-color:#4F1717; "
@@ -118,62 +117,59 @@ void LauncherUpdate::setup_controls()
     {
         if (!catalogue_mode || version.isEmpty())
             return;
+        release_version = version;
         emit version_selected(version);
+        retranslate_content();
     });
 
     progress_label = new QLabel(this);
-    progress_label->setGeometry(lu::progress_label(w));
+    progress_label->setGeometry(local_rect(w, {74, 218, 472, 22}));
     progress_label->setAlignment(Qt::AlignCenter);
     QFont progress_font = util::assets::fonts[util::assets::Font::Inter];
-    progress_font.setPixelSize(util::layout::scaled(
-        util::layout::text::k_status, w));
+    progress_font.setPixelSize(util::layout::scaled(12, w));
     progress_font.setWeight(QFont::DemiBold);
     progress_label->setFont(progress_font);
     progress_label->setStyleSheet(QStringLiteral("color:#4F1717; background:transparent;"));
 
     update_button = util::simple_utils::make_flat_button(this);
-    update_button->setGeometry(lu::update_button(w, false, true));
+    update_button->setGeometry(local_rect(w, {242, 254, 304, 56}));
     update_button->setIconSize(update_button->size());
     update_button->setProperty("soa_button_stretch_asset", true);
     update_button->installEventFilter(this);
     update_button->setAccessibleName(QStringLiteral("Update launcher now"));
 
+    update_button_label = new QLabel(update_button);
+    update_button_label->setGeometry(update_button->rect());
+    update_button_label->setAlignment(Qt::AlignCenter);
+    update_button_label->setAttribute(Qt::WA_TransparentForMouseEvents);
     QFont button_font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
-    button_font.setPixelSize(util::layout::scaled(
-        util::layout::text::k_row_title, w));
+    button_font.setPixelSize(util::layout::scaled(21, w));
     button_font.setWeight(QFont::Black);
-    update_button_label = util::simple_utils::add_button_text(
-        update_button, util::assets::Button::UpdateAvailable,
-        QStringLiteral("UPDATE NOW"), button_font);
+    update_button_label->setFont(button_font);
+    update_button_label->setStyleSheet(QStringLiteral(
+        "QLabel { color:#FFFFFF; background:transparent; }"
+        "QLabel:disabled { color:#FFFFFF; }"));
+    update_button_label->raise();
 
     cancel_button = util::simple_utils::make_flat_button(this);
-    cancel_button->setGeometry(lu::cancel_button(w, false, false));
+    cancel_button->setGeometry(local_rect(w, {86, 260, 174, 36}));
     cancel_button->setIconSize(cancel_button->size());
     cancel_button->setProperty("soa_button_stretch_asset", true);
     cancel_button->installEventFilter(this);
     QFont cancel_font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
-    cancel_font.setPixelSize(util::layout::scaled(
-        util::layout::text::k_status, w));
+    cancel_font.setPixelSize(util::layout::scaled(12, w));
     cancel_font.setWeight(QFont::Black);
     util::simple_utils::add_button_text(
         cancel_button, util::assets::Button::Cancel,
         QStringLiteral("CANCEL"), cancel_font);
 
     close_button = util::simple_utils::make_flat_button(this);
-    close_button->setGeometry(lu::close_button(w));
+    close_button->setGeometry(
+        local_rect(w, util::layout::modal_close::rect_in(
+                          {0, 0, k_box_size.width(), k_box_size.height()})));
     close_button->setIcon(QIcon(util::assets::images[util::assets::Image::CloseSettings]));
-    close_button->setIconSize(close_button->size());
+    close_button->setIconSize(util::layout::scaled(util::layout::modal_close::k_icon, w));
     close_button->setAccessibleName(QStringLiteral("Postpone launcher update"));
-
-    progress_timer = new QTimer(this);
-    progress_timer->setInterval(40);
-    connect(progress_timer, &QTimer::timeout, this, [this]()
-    {
-        progress_phase += 0.025;
-        if (progress_phase > 1.0)
-            progress_phase -= 1.0;
-        update();
-    });
 
     connect(update_button, &QPushButton::clicked, this, [this]()
     {
@@ -202,7 +198,7 @@ void LauncherUpdate::set_versions(const QString& installed_version,
 {
     current_version = installed_version;
     catalogue_mode = catalogue_visible && !versions.isEmpty();
-    const QSignalBlocker blocker(version_combo);
+    version_combo->blockSignals(true);
     version_combo->clear();
     version_combo->addItems(versions);
     const int selected = version_combo->findText(release_version);
@@ -213,6 +209,7 @@ void LauncherUpdate::set_versions(const QString& installed_version,
         version_combo->setCurrentIndex(0);
         release_version = version_combo->currentText();
     }
+    version_combo->blockSignals(false);
     refresh_layout();
     retranslate_content();
 }
@@ -223,13 +220,6 @@ void LauncherUpdate::set_release(const QString& version, const bool required,
     release_version = version.trimmed();
     if (release_version.isEmpty() && version_combo && version_combo->count() > 0)
         release_version = version_combo->currentText().trimmed();
-    if (version_combo && version_combo->count() > 0)
-    {
-        const QSignalBlocker blocker(version_combo);
-        const int selected = version_combo->findText(release_version);
-        if (selected >= 0)
-            version_combo->setCurrentIndex(selected);
-    }
     required_update = required;
     release_message = message.trimmed();
     downloading_update = false;
@@ -245,15 +235,7 @@ void LauncherUpdate::set_downloading(const bool downloading)
     if (downloading_update)
     {
         progress_fraction = 0.0;
-        progress_indeterminate = true;
-        progress_phase = 0.0;
-        progress_timer->start();
         progress_label->setText(util::i18n::translate("Preparing download..."));
-    }
-    else
-    {
-        progress_indeterminate = false;
-        progress_timer->stop();
     }
     refresh_layout();
     retranslate_content();
@@ -265,8 +247,6 @@ void LauncherUpdate::set_progress(const qint64 received, const qint64 total)
         return;
     if (total > 0)
     {
-        progress_indeterminate = false;
-        progress_timer->stop();
         progress_fraction = qBound(0.0,
                                    static_cast<double>(received) / static_cast<double>(total),
                                    1.0);
@@ -278,9 +258,7 @@ void LauncherUpdate::set_progress(const qint64 received, const qint64 total)
     }
     else
     {
-        progress_indeterminate = true;
-        if (!progress_timer->isActive())
-            progress_timer->start();
+        progress_fraction = 0.0;
         const double received_mb = static_cast<double>(received) / (1024.0 * 1024.0);
         progress_label->setText(util::i18n::translate("%1 MB downloaded")
                                     .arg(QString::number(received_mb, 'f', 1)));
@@ -293,8 +271,6 @@ void LauncherUpdate::set_starting_installer()
     downloading_update = false;
     starting_installer = true;
     progress_fraction = 1.0;
-    progress_indeterminate = false;
-    progress_timer->stop();
     progress_label->setText(util::i18n::translate("Starting installer..."));
     refresh_layout();
     retranslate_content();
@@ -304,24 +280,31 @@ void LauncherUpdate::refresh_layout()
 {
     const QSize w = window()->size();
     const bool progress_visible = downloading_update || starting_installer;
-    details_label->setGeometry(lu::details(w, catalogue_mode));
+    details_label->setGeometry(local_rect(w, catalogue_mode
+        ? QRect{70, 136, 480, 42}
+        : QRect{70, 136, 480, 46}));
     progress_label->setVisible(progress_visible);
     version_combo->setVisible(catalogue_mode && !progress_visible);
     const bool cancel_visible = !required_update && !starting_installer;
-    cancel_button->setGeometry(
-        lu::cancel_button(w, catalogue_mode, downloading_update));
+    const int button_y = catalogue_mode ? 258 : 228;
+    cancel_button->setGeometry(local_rect(w, downloading_update
+        ? QRect{223, 264, 174, 36}
+        : QRect{86, button_y + 4, 174, 36}));
     cancel_button->setIconSize(cancel_button->size());
     cancel_button->setVisible(cancel_visible);
     cancel_button->setEnabled(cancel_visible);
-    update_button->setGeometry(
-        lu::update_button(w, catalogue_mode, cancel_visible));
+    update_button->setGeometry(local_rect(w, cancel_visible
+        ? QRect{276, button_y, 258, 44}
+        : QRect{181, button_y, 258, 44}));
     update_button->setIconSize(update_button->size());
     update_button_label->setGeometry(update_button->rect());
     update_button->setVisible(!progress_visible);
     update_button->setEnabled(!progress_visible);
+    update_button_label->setVisible(!progress_visible);
+    update_button_label->setEnabled(true);
     close_button->setVisible(!required_update && !progress_visible);
     close_button->setEnabled(!progress_visible);
-    util::simple_utils::refresh_button(update_button);
+    set_button_pixmap(util::assets::translated_buttons[util::assets::Button::UpdateAvailable].normal);
     util::simple_utils::refresh_button(cancel_button);
     update_button_label->raise();
     cancel_button->raise();
@@ -399,18 +382,9 @@ void LauncherUpdate::retranslate_content()
             set_update_button_text(QStringLiteral("UPDATE NOW"));
     }
 
-    fit_label(title_label,
-              util::layout::scaled(util::layout::text::k_modal_header,
-                                   window()->size()),
-              14, false);
-    fit_label(message_label,
-              util::layout::scaled(util::layout::text::k_version,
-                                   window()->size()),
-              12);
-    fit_label(details_label,
-              util::layout::scaled(util::layout::text::k_desc,
-                                   window()->size()),
-              11);
+    fit_label(title_label, util::layout::scaled(25, window()->size()), 18);
+    fit_label(message_label, util::layout::scaled(16, window()->size()), 12);
+    fit_label(details_label, util::layout::scaled(14, window()->size()), 11);
     update_button->setAccessibleName(util::i18n::translate("Update launcher now"));
     util::simple_utils::set_button_text(cancel_button, QStringLiteral("CANCEL"));
     cancel_button->setAccessibleName(util::i18n::translate(
@@ -420,20 +394,31 @@ void LauncherUpdate::retranslate_content()
 
 void LauncherUpdate::set_update_button_text(const QString& source)
 {
-    util::simple_utils::set_button_text(update_button, source);
+    update_button_source = source;
+    update_button_label->setText(util::i18n::translate(source));
+    fit_label(update_button_label, util::layout::scaled(21, window()->size()), 14);
+}
+
+void LauncherUpdate::set_button_pixmap(const QPixmap& pixmap)
+{
+    const QPixmap scaled = pixmap.scaled(update_button->iconSize(), Qt::IgnoreAspectRatio,
+                                         Qt::SmoothTransformation);
+    QIcon icon;
+    icon.addPixmap(scaled, QIcon::Normal);
+    icon.addPixmap(scaled, QIcon::Disabled);
+    update_button->setIcon(icon);
 }
 
 void LauncherUpdate::paint_content(QPainter& painter)
 {
-    painter.drawPixmap(lu::box(window()->size()),
+    painter.drawPixmap(box_rect(window()->size()),
                        util::assets::images[util::assets::Image::BoxUpdate]);
     if (downloading_update || starting_installer)
     {
-        const QRect bar = lu::progress_bar(window()->size());
-        if (downloading_update && progress_indeterminate)
-            util::progress_bar::draw_indeterminate(painter, bar, progress_phase);
-        else
-            util::progress_bar::draw(painter, bar, progress_fraction);
+        util::progress_bar::draw(
+            painter,
+            local_rect(window()->size(), {74, 194, 472, 21}),
+            progress_fraction);
     }
 }
 
@@ -447,10 +432,24 @@ bool LauncherUpdate::eventFilter(QObject* object, QEvent* event)
     }
     else if (object == update_button && update_button->isEnabled())
     {
-        const auto& asset = util::assets::button(
-            util::assets::Button::UpdateAvailable);
-        util::simple_utils::apply_button_state(
-            event, update_button, asset.normal, asset.hover, asset.clicked);
+        const auto& assets = util::assets::translated_buttons[util::assets::Button::UpdateAvailable];
+        switch (event->type())
+        {
+            case QEvent::Enter:
+                set_button_pixmap(assets.hover);
+                break;
+            case QEvent::Leave:
+                set_button_pixmap(assets.normal);
+                break;
+            case QEvent::MouseButtonPress:
+                set_button_pixmap(assets.clicked);
+                break;
+            case QEvent::MouseButtonRelease:
+                set_button_pixmap(update_button->underMouse() ? assets.hover : assets.normal);
+                break;
+            default:
+                break;
+        }
     }
     return QWidget::eventFilter(object, event);
 }

@@ -1,4 +1,5 @@
 #include <QtTest>
+#include <QByteArray>
 #include <QDir>
 #include <QEventLoop>
 #include <QFile>
@@ -19,6 +20,33 @@
 #include "core/wine/WineProcess.hpp"
 #include "util/DesktopEntry.hpp"
 #include "util/LaunchArguments.hpp"
+
+
+namespace
+{
+    class EnvironmentOverride final
+    {
+    public:
+        EnvironmentOverride(const char* name, const QByteArray& value)
+            : name_(name), was_set_(qEnvironmentVariableIsSet(name)), previous_(qgetenv(name))
+        {
+            qputenv(name_, value);
+        }
+
+        ~EnvironmentOverride()
+        {
+            if (was_set_)
+                qputenv(name_, previous_);
+            else
+                qunsetenv(name_);
+        }
+
+    private:
+        QByteArray name_;
+        bool was_set_ {};
+        QByteArray previous_;
+    };
+}
 
 class RuntimeLocatorTests final : public QObject
 {
@@ -83,6 +111,103 @@ private slots:
         QCOMPARE(probe.executable, winePath);
         QCOMPARE(probe.version, QStringLiteral("wine-test-11.0"));
     }
+
+
+#if defined(Q_OS_LINUX)
+    void umu_environment_uses_prefix_without_direct_proton_compat_path()
+    {
+        QTemporaryDir directory;
+        QVERIFY(directory.isValid());
+        const QString proton = directory.filePath(QStringLiteral("proton"));
+        QFile protonFile(proton);
+        QVERIFY(protonFile.open(QIODevice::WriteOnly));
+        QVERIFY(protonFile.write("#!/bin/sh\nexit 0\n") > 0);
+        protonFile.close();
+        QVERIFY(protonFile.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner
+                                          | QFileDevice::ExeOwner));
+
+        const QString tmp = directory.filePath(QStringLiteral("tmp"));
+        QVERIFY(QDir().mkpath(tmp));
+        EnvironmentOverride compat_data("STEAM_COMPAT_DATA_PATH", QByteArray("/steam/compat"));
+        EnvironmentOverride compat_client("STEAM_COMPAT_CLIENT_INSTALL_PATH", QByteArray("/steam"));
+        EnvironmentOverride steam_app("SteamAppId", QByteArray("123"));
+        EnvironmentOverride steam_game("SteamGameId", QByteArray("456"));
+        EnvironmentOverride preload(
+            "LD_PRELOAD",
+            QByteArray("/steam/gameoverlayrenderer.so:/usr/lib/libgamemodeauto.so.0"));
+        EnvironmentOverride tmpdir("TMPDIR", tmp.toUtf8());
+
+        const QString prefix = directory.filePath(QStringLiteral("compat/pfx"));
+        const QString compat = directory.filePath(QStringLiteral("compat"));
+        core::wine::RuntimeSettings settings {proton, prefix, compat, QStringLiteral("win64"),
+                                               QString(), true};
+        const QProcessEnvironment environment =
+            core::wine::RuntimeLocator::make_umu_environment(settings, directory.path());
+
+        // umu treats WINEPREFIX as the compat-data root and builds the real
+        // prefix at <WINEPREFIX>/pfx, so it must receive the compat root.
+        QCOMPARE(environment.value(QStringLiteral("WINEPREFIX")), compat);
+        QCOMPARE(environment.value(QStringLiteral("PROTONPATH")), directory.path());
+        QCOMPARE(environment.value(QStringLiteral("GAMEID")), QStringLiteral("umu-storyofalicia"));
+        QCOMPARE(environment.value(QStringLiteral("SteamGameId")), QStringLiteral("456"));
+        QCOMPARE(environment.value(QStringLiteral("TMPDIR")), tmp);
+        QVERIFY(!environment.contains(QStringLiteral("STEAM_COMPAT_DATA_PATH")));
+        QVERIFY(!environment.contains(QStringLiteral("STEAM_COMPAT_CLIENT_INSTALL_PATH")));
+        QVERIFY(!environment.contains(QStringLiteral("SteamAppId")));
+        QCOMPARE(environment.value(QStringLiteral("LD_PRELOAD")),
+                 QStringLiteral("/usr/lib/libgamemodeauto.so.0"));
+    }
+
+    void umu_environment_drops_invalid_tmpdir()
+    {
+        QTemporaryDir directory;
+        QVERIFY(directory.isValid());
+        const QString invalid_tmp = directory.filePath(QStringLiteral("missing"));
+        EnvironmentOverride tmpdir("TMPDIR", invalid_tmp.toUtf8());
+
+        const QString prefix = directory.filePath(QStringLiteral("compat/pfx"));
+        core::wine::RuntimeSettings settings {QStringLiteral("proton"), prefix, QString(),
+                                               QStringLiteral("win64"), QString(), true};
+        const QProcessEnvironment environment =
+            core::wine::RuntimeLocator::make_umu_environment(settings, directory.path());
+
+        QVERIFY(!environment.contains(QStringLiteral("TMPDIR")));
+        // With no compat root configured we must still produce something usable.
+        QCOMPARE(environment.value(QStringLiteral("WINEPREFIX")), prefix);
+    }
+
+    void repairs_doubled_proton_prefix()
+    {
+        QTemporaryDir directory;
+        QVERIFY(directory.isValid());
+        const QDir root(directory.path());
+        const QString prefix = root.filePath(QStringLiteral("pfx"));
+        const QString inner = QDir(prefix).filePath(QStringLiteral("pfx"));
+        QVERIFY(QDir().mkpath(QDir(inner).filePath(QStringLiteral("drive_c/windows"))));
+        QVERIFY(QFile(QDir(prefix).filePath(QStringLiteral("version"))).open(
+            QIODevice::WriteOnly));
+
+        QVERIFY(core::wine::repair_doubled_proton_prefix(directory.path()));
+        QVERIFY(QFileInfo(QDir(prefix).filePath(QStringLiteral("drive_c/windows"))).isDir());
+        QVERIFY(!QFileInfo(inner).exists());
+        QVERIFY(!QFileInfo(root.filePath(QStringLiteral(".pfx-migrating"))).exists());
+
+        // Idempotent: a healthy layout is left alone.
+        QVERIFY(!core::wine::repair_doubled_proton_prefix(directory.path()));
+    }
+
+    void removes_doubled_proton_prefix_stub()
+    {
+        QTemporaryDir directory;
+        QVERIFY(directory.isValid());
+        const QString inner = QDir(directory.path())
+                                  .filePath(QStringLiteral("pfx/pfx"));
+        QVERIFY(QDir().mkpath(inner));
+
+        QVERIFY(core::wine::repair_doubled_proton_prefix(directory.path()));
+        QVERIFY(!QFileInfo(inner).exists());
+    }
+#endif
 
 #if defined(Q_OS_MACOS)
     void configures_crossover_runtime_root()

@@ -7,9 +7,9 @@
 #include "util/ModalOverlay.hpp"
 
 class QLabel;
+class QPixmap;
 class QPushButton;
 class QComboBox;
-class QTimer;
 
 class LauncherUpdate final : public util::modal_overlay::ModalOverlay
 {
@@ -40,6 +40,7 @@ private:
     void retranslate_content();
     void refresh_layout();
     void set_update_button_text(const QString& source);
+    void set_button_pixmap(const QPixmap& pixmap);
 
     QLabel* title_label {};
     QLabel* message_label {};
@@ -50,15 +51,13 @@ private:
     QPushButton* cancel_button {};
     QPushButton* close_button {};
     QComboBox* version_combo {};
-    QTimer* progress_timer {};
     QString release_version;
     QString current_version;
     QString release_message;
+    QString update_button_source {QStringLiteral("UPDATE NOW")};
     bool required_update {};
     bool downloading_update {};
     bool starting_installer {};
     bool catalogue_mode {};
-    bool progress_indeterminate {};
     double progress_fraction {};
-    double progress_phase {};
 };

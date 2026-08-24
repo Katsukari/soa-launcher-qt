@@ -54,6 +54,11 @@ namespace util::config
                     .arg(user, folder));
         }
 
+        // Watchdog cadence for the config-file integrity check. At file scope
+        // so the QTimer lambda can use them without capturing.
+        constexpr int k_integrity_interval_ms = 5000;
+        constexpr int k_integrity_max_ms = 300000;
+
         QByteArray file_digest(const QString& path)
         {
             const QFileInfo info(path);
@@ -165,6 +170,33 @@ namespace util::config
                 [this](const QString&) { schedule_reload(); });
         connect(watcher, &QFileSystemWatcher::directoryChanged, this,
                 [this](const QString&) { schedule_reload(); });
+
+        // QFileSystemWatcher drops a file watch the moment the file is deleted,
+        // and inotify events can be lost entirely on network or fuse mounts.
+        // One stat every few seconds is a cheap backstop for the case that
+        // actually matters: the file being gone.
+        integrity_timer = new QTimer(this);
+        integrity_timer->setInterval(k_integrity_interval_ms);
+        connect(integrity_timer, &QTimer::timeout, this, [this]()
+        {
+            if (writing || reloading)
+                return;
+            if (QFileInfo::exists(file_path()))
+            {
+                integrity_timer->setInterval(k_integrity_interval_ms);
+                return;
+            }
+            reload_from_disk(true);
+            if (!persistence_error().isEmpty())
+            {
+                const int next =
+                    qMin(integrity_timer->interval() * 4, k_integrity_max_ms);
+                integrity_timer->setInterval(next);
+                SPDLOG_WARN("config: recovery write failed, retrying in {} s", next / 1000);
+            }
+        });
+        integrity_timer->start();
+
         watch_files();
         remember_disk_state();
     }
@@ -202,6 +234,10 @@ namespace util::config
             return;
 
         const QString directory = QFileInfo(file_path()).absolutePath();
+        // If the directory was deleted, inotify dropped the watch with it, so
+        // recreate the directory and re-register before looking at the files.
+        if (!QFileInfo(directory).isDir())
+            QDir().mkpath(directory);
         if (QFileInfo(directory).isDir() && !watcher->directories().contains(directory))
             watcher->addPath(directory);
 
@@ -213,28 +249,66 @@ namespace util::config
         }
     }
 
-    bool Config::load()
+    QString Config::backup_path() const
+    {
+        return file_path() + QStringLiteral(".bak");
+    }
+
+    Config::LoadOutcome Config::load_document()
     {
         const QString path = file_path();
         if (!QFileInfo::exists(path))
         {
-            SPDLOG_DEBUG("config: no existing file at {}, will create", path.toStdString());
-            d->values.clear();
-            return true;
+            SPDLOG_DEBUG("config: no existing file at {}", path.toStdString());
+            return LoadOutcome::Missing;
         }
 
         QFile file(path);
         if (!file.open(QIODevice::ReadOnly))
         {
             SPDLOG_ERROR("config: could not open {} for reading", path.toStdString());
-            return false;
+            return LoadOutcome::Unreadable;
         }
+
+        const QByteArray raw = file.readAll();
+        file.close();
+
+        // A zero-byte file is what a truncate-then-write editor looks like
+        // mid-save, and what some crashes leave behind. Treat it as unreadable
+        // rather than as an empty-but-valid configuration.
+        if (raw.isEmpty())
+        {
+            SPDLOG_WARN("config: {} is empty", path.toStdString());
+            return LoadOutcome::Unreadable;
+        }
+
+        QJsonParseError error;
+        const QJsonDocument document = QJsonDocument::fromJson(raw, &error);
+        if (error.error != QJsonParseError::NoError || !document.isObject())
+        {
+            SPDLOG_ERROR("config: failed to parse config.json: {}", error.errorString().toStdString());
+            return LoadOutcome::Unreadable;
+        }
+
+        d->values = document.object().toVariantMap();
+        return LoadOutcome::Loaded;
+    }
+
+    bool Config::restore_from_backup()
+    {
+        const QString path = backup_path();
+        if (!QFileInfo::exists(path))
+            return false;
+
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly))
+            return false;
 
         QJsonParseError error;
         const QJsonDocument document = QJsonDocument::fromJson(file.readAll(), &error);
         if (error.error != QJsonParseError::NoError || !document.isObject())
         {
-            SPDLOG_ERROR("config: failed to parse config.json: {}", error.errorString().toStdString());
+            SPDLOG_WARN("config: backup at {} is unusable", path.toStdString());
             return false;
         }
 
@@ -242,9 +316,50 @@ namespace util::config
         return true;
     }
 
+    bool Config::write_backup(const QByteArray& contents) const
+    {
+        QSaveFile backup(backup_path());
+        if (!backup.open(QIODevice::WriteOnly))
+            return false;
+        return backup.write(contents) >= 0 && backup.commit();
+    }
+
+    // Startup path only: here "missing" legitimately means first run, so falling
+    // back to defaults is correct -- but try the backup first, because a file
+    // deleted while the launcher was closed is recoverable.
+    bool Config::load()
+    {
+        switch (load_document())
+        {
+        case LoadOutcome::Loaded:
+            return true;
+
+        case LoadOutcome::Missing:
+            if (restore_from_backup())
+            {
+                SPDLOG_WARN("config: config.json was missing at startup; recovered from {}",
+                            backup_path().toStdString());
+                return true;
+            }
+            d->values.clear();
+            return true;
+
+        case LoadOutcome::Unreadable:
+            if (restore_from_backup())
+            {
+                SPDLOG_WARN("config: config.json was unreadable at startup; recovered from {}",
+                            backup_path().toStdString());
+                return true;
+            }
+            return false;
+        }
+        return false;
+    }
+
     bool Config::save()
     {
         const QJsonDocument document(QJsonObject::fromVariantMap(d->values));
+        const QByteArray payload = document.toJson(QJsonDocument::Indented);
         writing = true;
         if (watcher)
         {
@@ -252,21 +367,35 @@ namespace util::config
             watcher->removePath(env_path());
         }
 
+        // The whole state directory can go away with the file (rm -rf of the
+        // config dir, a synced folder being pruned). QSaveFile will not create
+        // parent directories, so recreate it before writing.
+        const QString directory = QFileInfo(file_path()).absolutePath();
+        if (!QFileInfo(directory).isDir() && !QDir().mkpath(directory))
+            SPDLOG_ERROR("config: could not recreate config directory {}", directory.toStdString());
+
         QSaveFile file(file_path());
         bool ok = file.open(QIODevice::WriteOnly);
         if (ok)
         {
-            ok = file.write(document.toJson(QJsonDocument::Indented)) >= 0 && file.commit();
+            ok = file.write(payload) >= 0 && file.commit();
         }
         if (!ok)
         {
             d->persistence_error = file.errorString();
             SPDLOG_ERROR("config: failed to save {}", file_path().toStdString());
-            emit persistence_failed(file_path(), d->persistence_error);
+            // A recovery write is not something the user just asked for, and the
+            // dialog this drives says "your on-screen change is active only for
+            // this session" -- wrong text, and it would reappear on every retry.
+            // Log it and stay quiet; the next real edit will surface the problem.
+            if (!recovering)
+                emit persistence_failed(file_path(), d->persistence_error);
         }
         else
         {
             d->persistence_error.clear();
+            if (!write_backup(payload))
+                SPDLOG_DEBUG("config: could not refresh {}", backup_path().toStdString());
         }
 
         writing = false;
@@ -717,14 +846,49 @@ namespace util::config
         const bool hadSessionCredentials = !sessionUser.isEmpty() && !sessionToken.isEmpty();
 
         SPDLOG_INFO("config: files changed externally, reloading");
-        if (!load())
+
+        // How many times we tolerate an unparseable file before deciding it is
+        // genuinely corrupt rather than an editor mid-write. At the reload
+        // timer's 150 ms this is a little under half a second.
+        constexpr int k_unreadable_tolerance = 3;
+
+        const LoadOutcome outcome = load_document();
+        bool recovered = false;
+
+        if (outcome == LoadOutcome::Unreadable)
         {
             d->values = previousValues;
-            reloading = false;
-            watch_files();
-            SPDLOG_WARN("config: ignored incomplete or unreadable external config change");
-            return;
+            ++consecutive_unreadable;
+            if (consecutive_unreadable < k_unreadable_tolerance)
+            {
+                // Almost certainly a truncate-then-write in progress. Leave the
+                // file alone, keep the stale digest so the next tick re-checks,
+                // and look again shortly.
+                reloading = false;
+                watch_files();
+                SPDLOG_WARN("config: config.json unreadable, retrying ({}/{})",
+                            consecutive_unreadable, k_unreadable_tolerance);
+                if (reload_timer)
+                    reload_timer->start();
+                return;
+            }
+            SPDLOG_ERROR("config: config.json stayed unreadable; rewriting it from the "
+                         "running configuration");
+            recovered = true;
         }
+        else if (outcome == LoadOutcome::Missing)
+        {
+            // The running process holds the user's real configuration. Rewrite
+            // the file from memory instead of letting apply_defaults() manufacture
+            // a fresh one -- that would silently reset wine paths, the install
+            // location, runtime selection and the accepted-rules flag.
+            d->values = previousValues;
+            SPDLOG_WARN("config: config.json disappeared while running; rewriting it from the "
+                        "running configuration");
+            recovered = true;
+        }
+
+        consecutive_unreadable = 0;
         apply_defaults();
         normalize_schema();
 
@@ -771,8 +935,12 @@ namespace util::config
             || sessionToken != d->token
             || sessionDisplayName != d->display_name;
 
-        if (valuesChanged)
+        if (recovered || valuesChanged)
+        {
+            recovering = recovered;
             (void)save();
+            recovering = false;
+        }
         else
         {
             watch_files();
@@ -781,6 +949,8 @@ namespace util::config
         reloading = false;
         if (valuesChanged || credentialsChanged)
             emit changed();
+        else if (recovered)
+            SPDLOG_INFO("config: file restored with no change to the running configuration");
         else
             SPDLOG_DEBUG("config: external rewrite contained no effective changes");
     }
@@ -1289,6 +1459,10 @@ namespace util::config
         }
 
         const bool configRemoved = !QFileInfo::exists(file_path()) || QFile::remove(file_path());
+        // Drop the backup too: a deliberate reset must not be undoable by the
+        // startup recovery path. save() writes a fresh one from the defaults.
+        if (QFileInfo::exists(backup_path()))
+            (void)QFile::remove(backup_path());
         d->values.clear();
         d->username.clear();
         d->token.clear();

@@ -38,5 +38,6 @@ namespace core::wine
             static bool inspect_path(const QString& path, WineInstall& install,
                                      QString* error = nullptr);
             static QString resolve_wine_executable(const QString& path);
+            static bool proton_supports_umu_winetricks(const QString& path);
     };
 }

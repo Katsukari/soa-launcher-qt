@@ -2,6 +2,7 @@
 
 #include "util/Assets.hpp"
 #include "util/LanguageManager.hpp"
+#include "util/Layout.hpp"
 
 #include <QApplication>
 #include <QColor>
@@ -52,23 +53,26 @@ void LauncherDialog::build_ui()
         "QFrame#launcherDialogPanel {"
         "background: rgba(249,244,240,252);"
         "border: 1px solid rgba(79,23,23,86);"
-        "border-radius: 15px;"
+        "border-radius: 0px;"
         "}"
         "QFrame#launcherDialogDetails {"
         "background: rgba(238,224,215,178);"
         "border: 1px solid rgba(79,23,23,45);"
-        "border-radius: 9px;"
+        "border-radius: 0px;"
         "}"
         "QLabel { background: transparent; }"
         "QPushButton#launcherDialogClose {"
-        "background: rgba(255,255,255,170);"
-        "border: 1px solid rgba(79,23,23,54);"
-        "border-radius: 9px;"
+        "background: transparent;"
+        "border: none;"
         "padding: 0px;"
         "}"
         "QPushButton#launcherDialogClose:hover {"
-        "background: rgba(235,220,211,242);"
-        "border-color: rgba(79,23,23,110);"
+        "background: transparent;"
+        "border: none;"
+        "}"
+        "QPushButton#launcherDialogClose:pressed {"
+        "background: transparent;"
+        "border: none;"
         "}"));
 
     auto* shadow = new QGraphicsDropShadowEffect(panel);
@@ -79,11 +83,15 @@ void LauncherDialog::build_ui()
     outer->addWidget(panel);
 
     auto* root = new QVBoxLayout(panel);
-    root->setContentsMargins(32, 24, 32, 30);
-    root->setSpacing(15);
+    root->setContentsMargins(28, 20, 28, 24);
+    root->setSpacing(12);
 
     auto* top = new QHBoxLayout;
-    top->setContentsMargins(0, 0, 0, 0);
+    // Clearance for the close button, which now sits further in from the
+    // corner: its hit area starts 59px from the panel edge.
+    // Clearance for the close button, whose 40x40 hit area now starts 67px
+    // in from the panel edge (was 30px with the old hand-placed 24x24).
+    top->setContentsMargins(0, 0, 52, 0);
     top->setSpacing(12);
 
     tone_badge = new QLabel(panel);
@@ -120,12 +128,13 @@ void LauncherDialog::build_ui()
 
     close_button = new QPushButton(panel);
     close_button->setObjectName(QStringLiteral("launcherDialogClose"));
-    close_button->setFixedSize(40, 40);
+    close_button->setFixedSize(util::layout::modal_close::k_hit);
     close_button->setCursor(Qt::PointingHandCursor);
+    close_button->setFlat(true);
+    close_button->setAttribute(Qt::WA_TranslucentBackground);
     close_button->setIcon(QIcon(util::assets::images[util::assets::Image::CloseSettings]));
-    close_button->setIconSize(QSize(16, 16));
+    close_button->setIconSize(util::layout::modal_close::k_icon);
     connect(close_button, &QPushButton::clicked, this, &QDialog::reject);
-    top->addWidget(close_button, 0, Qt::AlignTop);
     root->addLayout(top);
 
     message_label = new QLabel(panel);
@@ -245,6 +254,10 @@ void LauncherDialog::retranslate()
     layout()->activate();
     const int required_height = qMax(220, layout()->sizeHint().height());
     setFixedSize(required_width, required_height);
+    layout()->activate();
+    panel->layout()->activate();
+    close_button->setGeometry(util::layout::modal_close::rect_in(panel->rect()));
+    close_button->raise();
 }
 
 QPushButton* LauncherDialog::add_action(const Action& action)
@@ -265,21 +278,21 @@ QPushButton* LauncherDialog::add_action(const Action& action)
         case ActionStyle::Primary:
             button->setStyleSheet(QStringLiteral(
                 "QPushButton { background: #20ACDA; color: #FFFFFF;"
-                "border: 1px solid #1198C5; border-radius: 8px; padding: 9px 18px; }"
+                "border: 1px solid #1198C5; border-radius: 6px; padding: 9px 18px; }"
                 "QPushButton:hover { background: #39BCE7; border-color: #168BB0; }"
                 "QPushButton:pressed { background: #168EB8; }"));
             break;
         case ActionStyle::Neutral:
             button->setStyleSheet(QStringLiteral(
                 "QPushButton { background: rgba(255,255,255,210); color: #4F1717;"
-                "border: 1px solid rgba(79,23,23,72); border-radius: 8px; padding: 9px 18px; }"
+                "border: 1px solid rgba(79,23,23,72); border-radius: 6px; padding: 9px 18px; }"
                 "QPushButton:hover { background: #EEE0D7; border-color: rgba(79,23,23,125); }"
                 "QPushButton:pressed { background: #DDC9BD; }"));
             break;
         case ActionStyle::Destructive:
             button->setStyleSheet(QStringLiteral(
                 "QPushButton { background: #E84B24; color: #FFFFFF;"
-                "border: 1px solid #C83515; border-radius: 8px; padding: 9px 18px; }"
+                "border: 1px solid #C83515; border-radius: 6px; padding: 9px 18px; }"
                 "QPushButton:hover { background: #F15F38; border-color: #B92D10; }"
                 "QPushButton:pressed { background: #C93616; }"));
             break;

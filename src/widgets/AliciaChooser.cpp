@@ -24,7 +24,7 @@ namespace
         "{"
         "    background: rgba(246, 231, 223, 0.92);"
         "    border: 1px solid rgba(160, 119, 98, 0.42);"
-        "    border-radius: 5px;"
+        "    border-radius: 0px;"
         "    color: #5A4636;"
         "    font-family: 'Inter';"
         "    font-size: 12px;"
@@ -35,7 +35,7 @@ namespace
         "QLabel"
         "{"
         "    background: rgba(196, 150, 128, 0.12);"
-        "    border-radius: 8px;"
+        "    border-radius: 0px;"
         "    color: #4F1717;"
         "    font-family: 'Eurostile';"
         "    font-weight: 800;"
@@ -134,6 +134,8 @@ AliciaChooser::AliciaChooser(AuthHandler* auth_, core::wine::Shell* shell_,
             this, &AliciaChooser::refresh_keep_signed_in);
     connect(&Config::instance(), &Config::changed,
             this, &AliciaChooser::refresh_session_banner);
+    connect(&Config::instance(), &Config::changed,
+            this, &AliciaChooser::refresh_acknowledgements);
     connect(auth, &AuthHandler::authenticated, this,
             [this](const QString&, const QString&, const QString&)
     {
@@ -245,7 +247,7 @@ void AliciaChooser::on_stage_changed(const Stage stage)
     const bool actionable = stage == Stage::NeedsRuntime || stage == Stage::NeedsPrefix
         || stage == Stage::PrefixBroken || stage == Stage::NeedsDownload
         || stage == Stage::NeedsUpdate;
-    download_button->setEnabled(actionable);
+    util::simple_utils::set_button_enabled(download_button, actionable);
     const auto action = stage == Stage::NeedsUpdate
         ? util::assets::Button::UpdateAvailable
         : util::assets::Button::DownloadGame;
@@ -455,18 +457,20 @@ void AliciaChooser::setup_signedin_state()
         "QCheckBox::indicator:unchecked { image: url(:/assets/checkbox.png); }"
         "QCheckBox::indicator:checked { image: url(:/assets/checkbox-ticked.png); }");
 
-    const auto configure_checked_box = [&checkbox_style](QCheckBox* checkbox)
+    const auto configure_acknowledgement_box = [this, &checkbox_style](QCheckBox* checkbox)
     {
-        checkbox->setChecked(true);
-        checkbox->setFocusPolicy(Qt::NoFocus);
-        checkbox->setAttribute(Qt::WA_TransparentForMouseEvents);
+        checkbox->setFocusPolicy(Qt::StrongFocus);
         checkbox->setStyleSheet(checkbox_style);
+        connect(checkbox, &QCheckBox::toggled, this, [this]()
+        {
+            refresh_enter_enabled();
+        });
     };
 
     signed_bug_checkbox = new QCheckBox(this);
     signed_bug_checkbox->setGeometry(util::layout::alicia_chooser::signed_bug_checkbox(w));
     signed_bug_checkbox->setAccessibleName(QStringLiteral("Playtest status acknowledged"));
-    configure_checked_box(signed_bug_checkbox);
+    configure_acknowledgement_box(signed_bug_checkbox);
 
     signed_bug_label = new QLabel(this);
     signed_bug_label->setTextFormat(Qt::PlainText);
@@ -478,7 +482,7 @@ void AliciaChooser::setup_signedin_state()
     signed_rules_checkbox = new QCheckBox(this);
     signed_rules_checkbox->setGeometry(util::layout::alicia_chooser::signed_rules_checkbox(w));
     signed_rules_checkbox->setAccessibleName(QStringLiteral("Server rules acknowledged"));
-    configure_checked_box(signed_rules_checkbox);
+    configure_acknowledgement_box(signed_rules_checkbox);
 
     signed_rules_label = new QLabel(this);
     signed_rules_label->setTextFormat(Qt::RichText);
@@ -516,10 +520,21 @@ void AliciaChooser::setup_signedin_state()
     enter_button->setEnabled(false);
     enter_button->setAccessibleName(QStringLiteral("Enter the playtest"));
     enter_button->installEventFilter(this);
+    refresh_acknowledgements();
     connect(enter_button, &QPushButton::clicked, this, [this]()
     {
-        if (enter_button->isEnabled())
-            shell->run_game(Config::instance().username(), Config::instance().token());
+        if (!enter_button->isEnabled())
+            return;
+
+        auto& config = Config::instance();
+        if (!config.rules_accepted())
+        {
+            if (!signed_bug_checkbox->isChecked() || !signed_rules_checkbox->isChecked())
+                return;
+            config.set_rules_accepted(true);
+        }
+
+        shell->run_game(config.username(), config.token());
     });
 }
 
@@ -555,9 +570,14 @@ void AliciaChooser::apply_state_visibility()
     signed_in_label->setVisible(signedin);
     enter_button->setVisible(signedin);
 
+    const bool game_active =
+        current_stage == Stage::Launching || current_stage == Stage::Running;
+    settings_button->setEnabled(true);
+    settings_button->setCursor(Qt::PointingHandCursor);
+    settings_button->setToolTip(QString());
+
     reset_path_button->setVisible(!download);
-    reset_path_button->setEnabled(
-        current_stage != Stage::Launching && current_stage != Stage::Running);
+    reset_path_button->setEnabled(!game_active);
     reset_path_button->setToolTip(reset_path_button->isEnabled()
         ? util::i18n::translate(
               "Reset launcher settings and sign-in without deleting the shared prefix or either game")
@@ -566,13 +586,47 @@ void AliciaChooser::apply_state_visibility()
 
 void AliciaChooser::refresh_enter_enabled()
 {
-    const bool ready = current_stage == Stage::Ready;
-    enter_button->setEnabled(ready);
+    if (!enter_button)
+        return;
+
+    const bool acknowledged = Config::instance().rules_accepted()
+        || (signed_bug_checkbox && signed_bug_checkbox->isChecked()
+            && signed_rules_checkbox && signed_rules_checkbox->isChecked());
+    const bool ready = current_stage == Stage::Ready && acknowledged;
+    util::simple_utils::set_button_enabled(enter_button, ready);
     enter_button->setToolTip(current_stage == Stage::Running
         ? util::i18n::translate("Alicia is already running")
         : current_stage == Stage::Launching
             ? util::i18n::translate("Alicia is starting")
             : QString());
+}
+
+void AliciaChooser::refresh_acknowledgements()
+{
+    if (!signed_bug_checkbox || !signed_rules_checkbox)
+        return;
+
+    const bool accepted = Config::instance().rules_accepted();
+    const QSignalBlocker bug_blocker(signed_bug_checkbox);
+    const QSignalBlocker rules_blocker(signed_rules_checkbox);
+
+    if (accepted)
+    {
+        signed_bug_checkbox->setChecked(true);
+        signed_rules_checkbox->setChecked(true);
+    }
+    else if (rules_accepted_cached)
+    {
+        signed_bug_checkbox->setChecked(false);
+        signed_rules_checkbox->setChecked(false);
+    }
+    rules_accepted_cached = accepted;
+
+    signed_bug_checkbox->setAttribute(Qt::WA_TransparentForMouseEvents, accepted);
+    signed_rules_checkbox->setAttribute(Qt::WA_TransparentForMouseEvents, accepted);
+    signed_bug_checkbox->setFocusPolicy(accepted ? Qt::NoFocus : Qt::StrongFocus);
+    signed_rules_checkbox->setFocusPolicy(accepted ? Qt::NoFocus : Qt::StrongFocus);
+    refresh_enter_enabled();
 }
 
 void AliciaChooser::refresh_session_banner()
@@ -728,8 +782,8 @@ void AliciaChooser::refresh_game_text()
     const bool alicia_2 = game_version == core::game::GameVersion::Alicia2;
 
     title_label->setText(alicia_2
-        ? util::i18n::translate("Story Of Alicia 2.0 Playtest")
-        : util::i18n::translate("Story Of Alicia Playtest"));
+        ? util::i18n::translate("STORY OF ALICIA 2.0 PLAYTEST")
+        : util::i18n::translate("PLAYTEST"));
 }
 
 void AliciaChooser::paintEvent(QPaintEvent* event)

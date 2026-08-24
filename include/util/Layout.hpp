@@ -39,6 +39,19 @@ namespace util::layout
         QRect rect(QSize win);
     }
 
+    // Corner-radius scale in use: hard-edged surfaces, softened controls.
+    // Panels, cards and popup backgrounds stay square; buttons, menu items,
+    // combo boxes and badges get k_control. True pills (scrollbar handles,
+    // status chips) are half their own height by construction and are NOT
+    // part of this scale. The stylesheets carry literals, not these names --
+    // run tools/set-radii.sh to retune them all at once.
+    namespace radius
+    {
+        inline constexpr int k_panel   = 0;  // dialog panels, popup menus
+        inline constexpr int k_card    = 0;  // inset cards, note boxes, list surfaces
+        inline constexpr int k_control = 6;  // buttons, menu items, combo boxes, badges
+    }
+
     constexpr QRect center_in_region(const QSize box, const int dx = 0, const int dy = 0)
     {
         return
@@ -81,6 +94,35 @@ namespace util::layout
 
     QRect centered(QSize box, QSize win, int dx = 0, int dy = 0);
 
+    // Close-button placement, taken from the Settings panel: a 16x16 glyph
+    // sitting 39 in from the right edge and 34 down from the top of the panel
+    // it closes. The constants describe the glyph, not the hit area, because
+    // the glyph is what has to line up; rect_in() adds the padding.
+    namespace modal_close
+    {
+        inline constexpr QSize k_icon {16, 16};
+        inline constexpr QSize k_hit  {40, 40};
+        inline constexpr int   k_icon_from_right = 39;
+        inline constexpr int   k_icon_from_top   = 34;
+
+        constexpr QRect rect_in(const QRect panel)
+        {
+            return anchor_top_right(panel,
+                                    k_icon_from_right - (k_hit.width() - k_icon.width()) / 2,
+                                    k_icon_from_top - (k_hit.height() - k_icon.height()) / 2,
+                                    k_hit);
+        }
+
+        // A companion control sitting immediately left of the close button,
+        // e.g. the pause button on the prefix progress modal.
+        constexpr QRect rect_left_of(const QRect panel, const int steps = 1)
+        {
+            const QRect close_rect = rect_in(panel);
+            return {close_rect.x() - steps * k_hit.width(), close_rect.y(),
+                    k_hit.width(), k_hit.height()};
+        }
+    }
+
     namespace text
     {
         inline constexpr int k_modal_header = 25;
@@ -95,7 +137,7 @@ namespace util::layout
 
     namespace chrome
     {
-        inline constexpr QRect k_menu          {38, 34, 48, 44};
+        inline constexpr QRect k_menu          {55, 34, 48, 44};
         inline constexpr QRect k_close         {1315, 40, 40, 40};
         inline constexpr QSize k_close_icon    {35, 35};
         inline constexpr QRect k_minimize      {1270, 37, 50, 50};
@@ -108,6 +150,8 @@ namespace util::layout
 
         inline constexpr QRect k_version =
             anchor_bottom_right(region::k_default, 35, 33, {245, 20});
+        inline constexpr QRect k_version_art =
+            anchor_bottom_right(region::k_default, 35, 58, {150, 125});
 
         QRect  menu(QSize win);
         QRect  close(QSize win);
@@ -121,6 +165,7 @@ namespace util::layout
         QPoint alicia_2_icon_offset(QSize win);
 
         QRect  version(QSize win);
+        QRect  version_art(QSize win);
     }
 
     namespace alicia_chooser
@@ -188,8 +233,8 @@ namespace util::layout
     {
         inline constexpr QSize k_box {630, 570};
         inline constexpr QSize k_box_expanded {630, 620};
-        inline constexpr QSize k_close_icon {16, 16};
-        inline constexpr QSize k_close_hit {40, 40};
+        inline constexpr QSize k_close_icon = modal_close::k_icon;
+        inline constexpr QSize k_close_hit  = modal_close::k_hit;
         inline constexpr int   k_margin_top = 45;
         inline constexpr int   k_margin_top_expanded = 25;
         inline constexpr int   k_header_gap = 60;
@@ -197,7 +242,7 @@ namespace util::layout
         inline constexpr int   k_padding = 37;
 
         inline constexpr QSize k_tab        {150, 44};
-        inline constexpr int   k_tab_radius = 8;
+        inline constexpr int   k_tab_radius = 12;
         inline constexpr int   k_tab_gap    = 6;
         inline constexpr int   k_tab_inset  = 40;
         inline constexpr int   k_tab_overlap = 4;
@@ -273,23 +318,7 @@ namespace util::layout
     namespace advanced_settings
     {
         inline constexpr int k_row_single = 78;
-        inline constexpr int k_row_top = 96;
-        inline constexpr int k_row_gap = 100;
         int row(int i = 0, int count = 3);
-    }
-
-    namespace launcher_update
-    {
-        QRect box(QSize win);
-        QRect title(QSize win);
-        QRect message(QSize win);
-        QRect details(QSize win, bool catalogue);
-        QRect version_combo(QSize win);
-        QRect progress_label(QSize win);
-        QRect progress_bar(QSize win);
-        QRect cancel_button(QSize win, bool catalogue, bool downloading);
-        QRect update_button(QSize win, bool catalogue, bool cancel_visible);
-        QRect close_button(QSize win);
     }
 
     namespace dropdown
@@ -339,9 +368,10 @@ namespace util::layout
         inline constexpr int   k_button_gap   = 35;
 
         inline constexpr QRect k_rect  = center_in_region(k_box, 0, k_margin_top);
-        inline constexpr QSize k_close_icon {16, 16};
-        inline constexpr QSize k_close_hit  {40, 40};
-        inline constexpr QRect k_close = anchor_top_right({0, 0, k_box.width(), k_box.height()}, 19, 17, k_close_hit);
+        inline constexpr QSize k_close_icon = modal_close::k_icon;
+        inline constexpr QSize k_close_hit  = modal_close::k_hit;
+        inline constexpr QRect k_close =
+            modal_close::rect_in({0, 0, k_box.width(), k_box.height()});
 
         inline constexpr QRect k_title {0, k_title_y, k_box.width(), k_title_h};
         inline constexpr QRect k_body  {k_text_x, k_body_y, k_box.width() - 2 * k_text_x, k_body_h};
@@ -385,11 +415,15 @@ namespace util::layout
         inline constexpr int   k_under_h     = 20;
 
         inline constexpr QRect k_rect = center_in_region(k_box, 0, k_margin_top);
-        inline constexpr QSize k_close_icon {16, 16};
-        inline constexpr QSize k_close_hit  {40, 40};
-        inline constexpr QRect k_close = anchor_top_right({0, 0, k_box.width(), k_box.height()}, 16, 11, k_close_hit);
-        inline constexpr QSize k_pause_hit  {40, 40};
-        inline constexpr QRect k_pause = anchor_top_right({0, 0, k_box.width(), k_box.height()}, 56, 11, k_pause_hit);
+        inline constexpr QSize k_close_icon = modal_close::k_icon;
+        inline constexpr QSize k_close_hit  = modal_close::k_hit;
+        inline constexpr QRect k_close =
+            modal_close::rect_in({0, 0, k_box.width(), k_box.height()});
+        inline constexpr QSize k_pause_hit  = modal_close::k_hit;
+        // Sits immediately left of the close button, derived from it so the
+        // two can never drift apart.
+        inline constexpr QRect k_pause =
+            modal_close::rect_left_of({0, 0, k_box.width(), k_box.height()});
 
         inline constexpr QRect k_title {0, k_title_y, k_box.width(), k_title_h};
         inline constexpr QRect k_info  {k_pad_x, k_info_y,  k_box.width() - 2 * k_pad_x, k_info_h};

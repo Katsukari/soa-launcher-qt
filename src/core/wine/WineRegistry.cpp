@@ -93,6 +93,36 @@ namespace core::wine
 #endif
     }
 
+    bool WineRegistry::proton_supports_umu_winetricks(const QString& path)
+    {
+#if defined(Q_OS_MACOS)
+        Q_UNUSED(path);
+        return false;
+#else
+        if (path.trimmed().isEmpty())
+            return false;
+        QFileInfo supplied(path);
+        const QString root = supplied.isFile() ? supplied.dir().absolutePath()
+                                               : supplied.absoluteFilePath();
+        if (root.isEmpty())
+            return false;
+
+        const QDir runtime(root);
+        if (QFileInfo(runtime.filePath(QStringLiteral("protonfixes"))).isDir())
+            return true;
+
+        QString identity = QFileInfo(root).fileName();
+        QFile version_file(runtime.filePath(QStringLiteral("version")));
+        if (version_file.open(QIODevice::ReadOnly | QIODevice::Text))
+            identity += QLatin1Char(' ') + QString::fromUtf8(version_file.readLine()).trimmed();
+
+        identity = identity.toLower();
+        return identity.contains(QStringLiteral("ge-proton"))
+            || identity.contains(QStringLiteral("proton-ge"))
+            || identity.contains(QStringLiteral("umu-proton"));
+#endif
+    }
+
     bool WineRegistry::inspect_path(const QString& path, WineInstall& install,
                                     QString* error)
     {

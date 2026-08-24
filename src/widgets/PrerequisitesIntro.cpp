@@ -33,11 +33,11 @@ namespace
 
     const char* k_recommendation_style =
         "QLabel { background:rgba(255,255,255,0.76); border:1px solid rgba(201,187,170,205);"
-        " border-radius:10px; color:#392518; padding:24px 26px 16px 26px; }";
+        " border-radius:0px; color:#392518; padding:24px 26px 16px 26px; }";
 
     const char* k_error_style =
         "QLabel { background:rgba(255,245,242,0.94); border:1px solid rgba(192,111,91,205);"
-        " border-radius:10px; color:#7F2929; padding:24px 26px 16px 26px; }";
+        " border-radius:0px; color:#7F2929; padding:24px 26px 16px 26px; }";
 
     const char* k_primary_style =
         "QPushButton { background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #54D8FF,stop:1 #08A9D8);"
@@ -96,10 +96,10 @@ namespace
         if (requirements.isEmpty()) return {};
         if (requirements.size() == 1) return requirements.front();
         if (requirements.size() == 2)
-            return util::i18n::translate("%1 and %2").arg(requirements.front(), requirements.back());
+            return requirements.front() + util::i18n::translate(" and ") + requirements.back();
         QStringList leading = requirements;
         const QString last = leading.takeLast();
-        return util::i18n::translate("%1, and %2").arg(leading.join(QStringLiteral(", ")), last);
+        return leading.join(QStringLiteral(", ")) + util::i18n::translate(", and ") + last;
     }
 }
 
@@ -107,7 +107,7 @@ PrerequisitesIntro::PrerequisitesIntro(QWidget* parent)
     : ModalOverlay(parent),
       detector(new QFutureWatcher<DetectionResult>(this))
 {
-    set_keeps_chrome(false);
+    set_keeps_chrome(true);
     setup_controls();
     connect(detector, &QFutureWatcher<DetectionResult>::finished,
             this, &PrerequisitesIntro::finish_detection);

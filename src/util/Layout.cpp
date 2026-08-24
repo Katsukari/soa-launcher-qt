@@ -60,6 +60,7 @@ namespace util::layout
         QPoint alicia_2_icon_offset(const QSize win) { return scaled(k_alicia_2_icon_offset, win); }
 
         QRect version(const QSize win) { return scaled(k_version, win); }
+        QRect version_art(const QSize win) { return scaled(k_version_art, win); }
     }
 
     namespace alicia_chooser
@@ -114,7 +115,7 @@ namespace util::layout
 
         QRect close(const QSize win, const bool expanded)
         {
-            return scaled(anchor_top_right(base_box_rect(expanded), 27, 22, k_close_hit), win);
+            return scaled(modal_close::rect_in(base_box_rect(expanded)), win);
         }
 
         QSize close_icon(const QSize win) { return scaled(k_close_icon, win); }
@@ -240,104 +241,15 @@ namespace util::layout
     {
         int row(const int i, const int count)
         {
-            if (count <= 1)
-                return k_row_single;
-            return k_row_top + qBound(0, i, count - 1) * k_row_gap;
+            static constexpr int ys_three[3] = {104, 218, 332};
+            static constexpr int ys_four[4] = {82, 176, 270, 364};
+            if (count == 3)
+                return (i >= 0 && i < 3) ? ys_three[i] : ys_three[0];
+            if (count == 4)
+                return (i >= 0 && i < 4) ? ys_four[i] : ys_four[0];
+            return settings::row_y(qBound(0, i, qMax(0, count - 1)),
+                                   qMax(1, count), false);
         }
-    }
-
-    namespace launcher_update
-    {
-        namespace
-        {
-            constexpr QSize k_box {620, 360};
-            constexpr QRect k_title {49, 24, 522, 44};
-            constexpr QRect k_message {70, 76, 480, 56};
-            constexpr QRect k_details {70, 136, 480, 46};
-            constexpr QRect k_catalogue_details {70, 136, 480, 42};
-            constexpr QRect k_version_combo {100, 186, 420, 42};
-            constexpr QRect k_progress_label {74, 218, 472, 22};
-            constexpr QRect k_progress_bar {74, 194, 472, 21};
-            constexpr QSize k_cancel_button {222, 40};
-            constexpr QSize k_update_button {222, 40};
-            constexpr int k_button_gap = 24;
-            constexpr int k_standard_button_y = 228;
-            constexpr int k_catalogue_button_y = 250;
-            constexpr int k_downloading_button_y = 258;
-            constexpr QRect k_close_button {576, 18, 26, 26};
-
-            QRect local(const QSize win, const QRect rect)
-            {
-                return scaled(rect, win).translated(box(win).topLeft());
-            }
-        }
-
-        QRect box(const QSize win)
-        {
-            return centered(k_box, win);
-        }
-
-        QRect title(const QSize win) { return local(win, k_title); }
-        QRect message(const QSize win) { return local(win, k_message); }
-
-        QRect details(const QSize win, const bool catalogue)
-        {
-            return local(win, catalogue ? k_catalogue_details : k_details);
-        }
-
-        QRect version_combo(const QSize win) { return local(win, k_version_combo); }
-        QRect progress_label(const QSize win) { return local(win, k_progress_label); }
-        QRect progress_bar(const QSize win) { return local(win, k_progress_bar); }
-
-        QRect cancel_button(const QSize win, const bool catalogue,
-                            const bool downloading)
-        {
-            if (downloading)
-            {
-                return local(win, {
-                    (k_box.width() - k_cancel_button.width()) / 2,
-                    k_downloading_button_y,
-                    k_cancel_button.width(),
-                    k_cancel_button.height()
-                });
-            }
-
-            const int pair_width = k_cancel_button.width()
-                + k_button_gap + k_update_button.width();
-            return local(win, {
-                (k_box.width() - pair_width) / 2,
-                catalogue ? k_catalogue_button_y : k_standard_button_y,
-                k_cancel_button.width(),
-                k_cancel_button.height()
-            });
-        }
-
-        QRect update_button(const QSize win, const bool catalogue,
-                            const bool cancel_visible)
-        {
-            const int y = catalogue ? k_catalogue_button_y : k_standard_button_y;
-            if (!cancel_visible)
-            {
-                return local(win, {
-                    (k_box.width() - k_update_button.width()) / 2,
-                    y,
-                    k_update_button.width(),
-                    k_update_button.height()
-                });
-            }
-
-            const int pair_width = k_cancel_button.width()
-                + k_button_gap + k_update_button.width();
-            return local(win, {
-                (k_box.width() - pair_width) / 2
-                    + k_cancel_button.width() + k_button_gap,
-                y,
-                k_update_button.width(),
-                k_update_button.height()
-            });
-        }
-
-        QRect close_button(const QSize win) { return local(win, k_close_button); }
     }
 
     namespace dropdown

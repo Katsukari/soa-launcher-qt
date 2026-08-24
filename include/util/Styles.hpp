@@ -11,6 +11,12 @@ namespace util::styles
         "    padding: 0 8px;"
         "    color: #4F1717;"
         "    font-family: 'Inter';"
+        "}"
+        "QLineEdit:disabled"
+        "{"
+        "    background: rgba(231,224,216,0.60);"
+        "    border-color: #D8CDC0;"
+        "    color: #9E8E7E;"
         "}";
 
     inline constexpr const char* k_neutral_button =

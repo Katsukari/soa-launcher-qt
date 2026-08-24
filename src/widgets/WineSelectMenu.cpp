@@ -53,7 +53,7 @@ namespace
 
     const char* k_scroll =
         "QScrollArea { background:rgba(255,255,255,0.34); border:1px solid #D8C8B6;"
-        " border-radius:10px; }"
+        " border-radius:0px; }"
         "QScrollArea > QWidget > QWidget { background:transparent; }"
         "QScrollBar:vertical { width:12px; background:rgba(236,226,215,0.72);"
         " border-radius:6px; margin:4px 3px 4px 1px; }"
@@ -63,7 +63,7 @@ namespace
         "QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background:transparent; }";
     const char* k_status =
         "QLabel { color:#6B5B4D; background:rgba(244,236,227,0.66);"
-        " border:1px solid rgba(201,187,170,0.74); border-radius:8px; padding:5px 10px; }";
+        " border:1px solid rgba(201,187,170,0.74); border-radius:6px; padding:5px 10px; }";
     const char* k_empty =
         "QLabel { color:#8A7A6B; padding:28px; background:transparent; }";
 
@@ -96,7 +96,7 @@ namespace
             painter.setRenderHint(QPainter::TextAntialiasing);
 
             const QRectF card = QRectF(rect()).adjusted(1.0, 1.0, -1.0, -1.0);
-            const qreal radius = util::layout::scaled(9, host);
+            const qreal radius = 0.0;
 
             QColor top;
             QColor bottom;
@@ -656,8 +656,11 @@ void WineSelectMenu::relayout()
 {
     const QSize w = window()->size();
     const QRect box = runtime_box_rect(w);
-    close_button->setIconSize(util::layout::scaled(QSize(16, 16), w));
-    close_button->setGeometry(runtime_local_rect(w, {642, 18, 40, 40}));
+    close_button->setIconSize(util::layout::scaled(util::layout::modal_close::k_icon, w));
+    close_button->setGeometry(
+        runtime_local_rect(w, util::layout::modal_close::rect_in(
+                                  {0, 0, k_runtime_box_size.width(),
+                                   k_runtime_box_size.height()})));
 
     list->setGeometry(runtime_local_rect(w, {46, 145, 608, 244}));
 

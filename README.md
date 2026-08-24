@@ -44,7 +44,7 @@ Download the newest package from the project's **Releases** page.
    ./Story_Of_Alicia-<version>-x86_64.AppImage
    ```
 
-Linux users can choose between Wine and Proton through UMU.
+Linux users can choose between Wine and Proton through UMU. Wine uses the system Winetricks installation for required prefix components. GE-Proton and UMU-Proton use their bundled Winetricks support through `umu-run`, so a separate Winetricks installation is not required for those Proton runtimes.
 
 ### macOS
 
