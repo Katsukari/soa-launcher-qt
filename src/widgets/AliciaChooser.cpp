@@ -19,48 +19,75 @@ using core::state::Stage;
 
 namespace
 {
-    const char* k_note_box =
-        "QLabel"
-        "{"
-        "    background: rgba(246, 231, 223, 0.92);"
-        "    border: 1px solid rgba(160, 119, 98, 0.42);"
-        "    border-radius: 0px;"
-        "    color: #5A4636;"
-        "    font-family: 'Inter';"
-        "    font-size: 12px;"
-        "    padding: 8px 12px;"
-        "}";
+    QString note_box_style(const QSize window_size)
+    {
+        return QStringLiteral(
+            "QLabel {"
+            "background: rgba(246, 231, 223, 0.92);"
+            "border: 1px solid rgba(160, 119, 98, 0.42);"
+            "border-radius: 0px;"
+            "color: #5A4636;"
+            "font-family: 'Inter';"
+            "font-size: %1px;"
+            "padding: %2px %3px;"
+            "}")
+            .arg(qMax(8, util::layout::scaled(12, window_size)))
+            .arg(util::layout::scaled(8, window_size))
+            .arg(util::layout::scaled(12, window_size));
+    }
 
-    const char* k_banner_box =
-        "QLabel"
-        "{"
-        "    background: rgba(196, 150, 128, 0.12);"
-        "    border-radius: 0px;"
-        "    color: #4F1717;"
-        "    font-family: 'Eurostile';"
-        "    font-weight: 800;"
-        "    font-size: 14px;"
-        "    padding: 0px 16px;"
-        "}";
+    QString banner_box_style(const QSize window_size)
+    {
+        return QStringLiteral(
+            "QLabel {"
+            "background: rgba(196, 150, 128, 0.12);"
+            "border-radius: 0px;"
+            "color: #4F1717;"
+            "font-family: 'Eurostile';"
+            "font-weight: 800;"
+            "font-size: %1px;"
+            "padding: 0px %2px;"
+            "}")
+            .arg(qMax(9, util::layout::scaled(14, window_size)))
+            .arg(util::layout::scaled(16, window_size));
+    }
 
-    const char* k_reset_link =
-        "QPushButton"
-        "{"
-        "    background: transparent;"
-        "    border: none;"
-        "    color: #9E8E7E;"
-        "    font-family: 'Inter';"
-        "    font-weight: 700;"
-        "    font-size: 15px;"
-        "}"
-        "QPushButton:hover { color: #7E6E5E; }";
+    QString reset_link_style(const QSize window_size)
+    {
+        return QStringLiteral(
+            "QPushButton {"
+            "background: transparent;"
+            "border: none;"
+            "color: #9E8E7E;"
+            "font-family: 'Inter';"
+            "font-weight: 700;"
+            "font-size: %1px;"
+            "}"
+            "QPushButton:hover { color: #7E6E5E; }")
+            .arg(qMax(9, util::layout::scaled(15, window_size)));
+    }
+
+    QString checkbox_style(const QSize window_size, const int spacing)
+    {
+        return QStringLiteral(
+            "QCheckBox { background: transparent; color: #4F1717; spacing: %1px; }"
+            "QCheckBox:hover { color: #321010; }"
+            "QCheckBox::indicator { width: %2px; height: %3px; }"
+            "QCheckBox::indicator:unchecked { border-image: url(:/assets/checkbox.png) 0 0 0 0 stretch stretch; }"
+            "QCheckBox::indicator:checked { border-image: url(:/assets/checkbox-ticked.png) 0 0 0 0 stretch stretch; }")
+            .arg(util::layout::scaled(spacing, window_size))
+            .arg(qMax(12, util::layout::scaled(19, window_size)))
+            .arg(qMax(11, util::layout::scaled(18, window_size)));
+    }
 
     void add_soft_shadow(QWidget* widget, const qreal blur = 22.0, const qreal y = 7.0,
                          const QColor& color = QColor(65, 39, 25, 72))
     {
+        const QSize window_size = widget && widget->window()
+            ? widget->window()->size() : util::layout::win::k_default;
         auto* effect = new QGraphicsDropShadowEffect(widget);
-        effect->setBlurRadius(blur);
-        effect->setOffset(0.0, y);
+        effect->setBlurRadius(util::layout::scaled(qRound(blur), window_size));
+        effect->setOffset(0.0, util::layout::scaled(qRound(y), window_size));
         effect->setColor(color);
         widget->setGraphicsEffect(effect);
     }
@@ -72,8 +99,8 @@ namespace
             return;
 
         QFont font = util::assets::fonts[util::assets::Font::Inter];
-        int pixel_size = qMax(11, util::layout::scaled(13, window_size));
-        while (pixel_size > 10)
+        int pixel_size = qMax(8, util::layout::scaled(13, window_size));
+        while (pixel_size > qMax(8, util::layout::scaled(10, window_size)))
         {
             font.setPixelSize(pixel_size);
             font.setWeight(QFont::Medium);
@@ -150,7 +177,7 @@ AliciaChooser::AliciaChooser(AuthHandler* auth_, core::wine::Shell* shell_,
     reset_path_button = new QPushButton("RESET LAUNCHER SETTINGS", this);
     reset_path_button->setCursor(Qt::PointingHandCursor);
     reset_path_button->setAccessibleName(QStringLiteral("Reset launcher settings"));
-    reset_path_button->setStyleSheet(k_reset_link);
+    reset_path_button->setStyleSheet(reset_link_style(w));
     reset_path_button->setGeometry(util::layout::alicia_chooser::reset(w));
     reset_path_button->setToolTip(util::i18n::translate("Reset launcher settings and sign-in without deleting the shared prefix or either game"));
     connect(reset_path_button, &QPushButton::clicked, this, [this]()
@@ -308,7 +335,9 @@ void AliciaChooser::setup_download_state()
     msg_font.setPixelSize(util::layout::scaled(util::layout::text::k_body, w));
     msg_font.setWeight(QFont::Medium);
     message_label->setFont(msg_font);
-    message_label->setStyleSheet("color: #4F1717; background: transparent; padding: 0px 12px;");
+    message_label->setStyleSheet(QStringLiteral(
+        "color: #4F1717; background: transparent; padding: 0px %1px;")
+        .arg(util::layout::scaled(12, w)));
     message_label->setGeometry(util::layout::alicia_chooser::message(w));
 
     download_button = new QPushButton(this);
@@ -373,15 +402,10 @@ void AliciaChooser::setup_login_state()
     keep_signed_button->setAccessibleName(QStringLiteral("Keep me signed in after the launcher closes"));
     keep_signed_button->setGeometry(util::layout::alicia_chooser::keep_signed_in(w));
     QFont keep_font = util::assets::fonts[util::assets::Font::Inter];
-    keep_font.setPixelSize(qMax(11, util::layout::scaled(13, w)));
+    keep_font.setPixelSize(qMax(8, util::layout::scaled(13, w)));
     keep_font.setWeight(QFont::Medium);
     keep_signed_button->setFont(keep_font);
-    keep_signed_button->setStyleSheet(
-        "QCheckBox { background: transparent; color: #4F1717; spacing: 5px; }"
-        "QCheckBox:hover { color: #321010; }"
-        "QCheckBox::indicator { width: 19px; height: 18px; }"
-        "QCheckBox::indicator:unchecked { image: url(:/assets/checkbox.png); }"
-        "QCheckBox::indicator:checked { image: url(:/assets/checkbox-ticked.png); }");
+    keep_signed_button->setStyleSheet(checkbox_style(w, 5));
     connect(keep_signed_button, &QCheckBox::toggled, this, [](const bool checked)
     {
         Config::instance().set_keep_signed_in(checked);
@@ -398,7 +422,7 @@ void AliciaChooser::setup_login_state()
             "and service purposes. This data can be removed upon request by emailing %1.")
             .arg(QStringLiteral("<a href=\"mailto:dev@storyofalicia.com\" "
                                 "style=\"color:#2FB4E0;\">dev@storyofalicia.com</a>")));
-    disclaimer_label->setStyleSheet(k_note_box);
+    disclaimer_label->setStyleSheet(note_box_style(w));
     disclaimer_label->setGeometry(util::layout::alicia_chooser::disclaimer(w));
     add_soft_shadow(disclaimer_label, 18.0, 6.0, QColor(64, 40, 27, 62));
 }
@@ -428,7 +452,7 @@ void AliciaChooser::setup_waiting_state()
                  util::i18n::translate("Click %1 when prompted.")
                      .arg(QStringLiteral("<b>“Open Story of Alicia Launcher”</b>")),
                  util::i18n::translate("If login did not work, cancel and try again.")));
-    steps_label->setStyleSheet(k_note_box);
+    steps_label->setStyleSheet(note_box_style(w));
     steps_label->setGeometry(util::layout::alicia_chooser::steps(w));
     add_soft_shadow(steps_label, 18.0, 6.0, QColor(64, 40, 27, 62));
 
@@ -437,7 +461,7 @@ void AliciaChooser::setup_waiting_state()
     try_again_button->setAccessibleName(QStringLiteral("Cancel Discord login and try again"));
     try_again_button->setGeometry(util::layout::alicia_chooser::try_again(w));
     QFont retry_font = util::assets::fonts[util::assets::Font::Inter];
-    retry_font.setPixelSize(qMax(11, util::layout::scaled(11, w)));
+    retry_font.setPixelSize(qMax(8, util::layout::scaled(11, w)));
     retry_font.setWeight(QFont::Medium);
     retry_font.setUnderline(true);
     try_again_button->setFont(retry_font);
@@ -451,16 +475,12 @@ void AliciaChooser::setup_signedin_state()
 {
     const QSize w = window()->size();
 
-    const QString checkbox_style = QStringLiteral(
-        "QCheckBox { background: transparent; spacing: 0px; }"
-        "QCheckBox::indicator { width: 19px; height: 18px; }"
-        "QCheckBox::indicator:unchecked { image: url(:/assets/checkbox.png); }"
-        "QCheckBox::indicator:checked { image: url(:/assets/checkbox-ticked.png); }");
+    const QString acknowledgement_style = checkbox_style(w, 0);
 
-    const auto configure_acknowledgement_box = [this, &checkbox_style](QCheckBox* checkbox)
+    const auto configure_acknowledgement_box = [this, &acknowledgement_style](QCheckBox* checkbox)
     {
         checkbox->setFocusPolicy(Qt::StrongFocus);
-        checkbox->setStyleSheet(checkbox_style);
+        checkbox->setStyleSheet(acknowledgement_style);
         connect(checkbox, &QCheckBox::toggled, this, [this]()
         {
             refresh_enter_enabled();
@@ -496,7 +516,7 @@ void AliciaChooser::setup_signedin_state()
 
     signed_in_label = new QLabel("  SIGNED IN", this);
     signed_in_label->setTextFormat(Qt::PlainText);
-    signed_in_label->setStyleSheet(k_banner_box);
+    signed_in_label->setStyleSheet(banner_box_style(w));
     signed_in_label->setGeometry(util::layout::alicia_chooser::signed_in_banner(w));
 
     const QRect er = util::layout::alicia_chooser::enter_button(w);

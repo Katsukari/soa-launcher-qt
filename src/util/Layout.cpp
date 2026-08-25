@@ -4,7 +4,9 @@ namespace util::layout
 {
     double scale(const QSize win)
     {
-        return static_cast<double>(win.width()) / win::k_default.width();
+        const double sx = static_cast<double>(win.width()) / win::k_default.width();
+        const double sy = static_cast<double>(win.height()) / win::k_default.height();
+        return qMin(sx, sy);
     }
 
     int scaled(const int v, const QSize win)

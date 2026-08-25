@@ -31,26 +31,41 @@ namespace
         return util::layout::scaled(source, window_size).translated(box_rect(window_size).topLeft());
     }
 
-    const char* k_recommendation_style =
-        "QLabel { background:rgba(255,255,255,0.76); border:1px solid rgba(201,187,170,205);"
-        " border-radius:0px; color:#392518; padding:24px 26px 16px 26px; }";
+    QString recommendation_style(const QSize window_size, const bool error = false)
+    {
+        return QStringLiteral(
+            "QLabel { background:%1; border:1px solid %2; border-radius:0px; color:%3; "
+            "padding:%4px %5px %6px %5px; }")
+            .arg(error ? QStringLiteral("rgba(255,245,242,0.94)")
+                       : QStringLiteral("rgba(255,255,255,0.76)"),
+                 error ? QStringLiteral("rgba(192,111,91,205)")
+                       : QStringLiteral("rgba(201,187,170,205)"),
+                 error ? QStringLiteral("#7F2929") : QStringLiteral("#392518"))
+            .arg(util::layout::scaled(24, window_size))
+            .arg(util::layout::scaled(26, window_size))
+            .arg(util::layout::scaled(16, window_size));
+    }
 
-    const char* k_error_style =
-        "QLabel { background:rgba(255,245,242,0.94); border:1px solid rgba(192,111,91,205);"
-        " border-radius:0px; color:#7F2929; padding:24px 26px 16px 26px; }";
+    QString primary_style(const QSize window_size)
+    {
+        return QStringLiteral(
+            "QPushButton { background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #54D8FF,stop:1 #08A9D8);"
+            " border:1px solid #159FC8; border-radius:%1px; color:white; }"
+            "QPushButton:hover { background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #77E2FF,stop:1 #18B9E8); }"
+            "QPushButton:pressed { background:#0798C5; }"
+            "QPushButton:disabled { background:#D8CDC0; border-color:#C9BBAA; color:#9E8E7E; }")
+            .arg(util::layout::scaled(6, window_size));
+    }
 
-    const char* k_primary_style =
-        "QPushButton { background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #54D8FF,stop:1 #08A9D8);"
-        " border:1px solid #159FC8; border-radius:6px; color:white; }"
-        "QPushButton:hover { background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #77E2FF,stop:1 #18B9E8); }"
-        "QPushButton:pressed { background:#0798C5; }"
-        "QPushButton:disabled { background:#D8CDC0; border-color:#C9BBAA; color:#9E8E7E; }";
-
-    const char* k_secondary_style =
-        "QPushButton { background:rgba(255,255,255,0.72); border:1px solid #C9BBAA;"
-        " border-radius:6px; color:#4F1717; }"
-        "QPushButton:hover { border-color:#2FB4E0; background:rgba(255,255,255,0.94); }"
-        "QPushButton:pressed { background:#EAF7FC; }";
+    QString secondary_style(const QSize window_size)
+    {
+        return QStringLiteral(
+            "QPushButton { background:rgba(255,255,255,0.72); border:1px solid #C9BBAA;"
+            " border-radius:%1px; color:#4F1717; }"
+            "QPushButton:hover { border-color:#2FB4E0; background:rgba(255,255,255,0.94); }"
+            "QPushButton:pressed { background:#EAF7FC; }")
+            .arg(util::layout::scaled(6, window_size));
+    }
 
     int runtime_score(const core::wine::WineInstall& runtime)
     {
@@ -140,7 +155,7 @@ void PrerequisitesIntro::setup_controls()
     recommendation_body->setTextFormat(Qt::PlainText);
     recommendation_body->setWordWrap(true);
     recommendation_body->setAlignment(Qt::AlignHCenter | Qt::AlignVCenter);
-    recommendation_body->setStyleSheet(k_recommendation_style);
+    recommendation_body->setStyleSheet(recommendation_style(window()->size()));
     QFont recommendation_font = util::assets::fonts[util::assets::Font::Inter];
     recommendation_font.setPixelSize(util::layout::scaled(14, w));
     recommendation_font.setWeight(QFont::Medium);
@@ -155,9 +170,12 @@ void PrerequisitesIntro::setup_controls()
     recommendation_title = new QLabel(this);
     recommendation_title->setTextFormat(Qt::PlainText);
     recommendation_title->setAlignment(Qt::AlignCenter);
-    recommendation_title->setStyleSheet(
+    recommendation_title->setStyleSheet(QStringLiteral(
         "color:#4F1717; background:rgba(247,239,230,0.96); border:1px solid #D8C8B6;"
-        " border-radius:12px; padding:2px 14px;");
+        " border-radius:%1px; padding:%2px %3px;")
+        .arg(util::layout::scaled(12, w))
+        .arg(util::layout::scaled(2, w))
+        .arg(util::layout::scaled(14, w)));
     QFont recommendation_title_font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
     recommendation_title_font.setPixelSize(util::layout::scaled(15, w));
     recommendation_title_font.setWeight(QFont::Black);
@@ -167,7 +185,7 @@ void PrerequisitesIntro::setup_controls()
 
     continue_button = new QPushButton(QStringLiteral("CHECKING..."), this);
     continue_button->setCursor(Qt::PointingHandCursor);
-    continue_button->setStyleSheet(k_primary_style);
+    continue_button->setStyleSheet(primary_style(w));
     QFont primary_font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
     primary_font.setPixelSize(util::layout::scaled(16, w));
     primary_font.setWeight(QFont::Black);
@@ -180,7 +198,7 @@ void PrerequisitesIntro::setup_controls()
 
     choose_own_button = new QPushButton(QStringLiteral("CHOOSE MY OWN"), this);
     choose_own_button->setCursor(Qt::PointingHandCursor);
-    choose_own_button->setStyleSheet(k_secondary_style);
+    choose_own_button->setStyleSheet(secondary_style(w));
     QFont secondary_font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
     secondary_font.setPixelSize(util::layout::scaled(13, w));
     secondary_font.setWeight(QFont::Black);
@@ -196,7 +214,7 @@ void PrerequisitesIntro::start_detection()
     if (detector->isRunning()) return;
     detection_complete = false;
     recommendation_title->setText(util::i18n::translate("CHECKING"));
-    recommendation_body->setStyleSheet(k_recommendation_style);
+    recommendation_body->setStyleSheet(recommendation_style(window()->size()));
 #if defined(Q_OS_MACOS)
     recommendation_body->setText(util::i18n::translate(
         "Looking for a usable Wine setup. Nothing will be installed automatically."));
@@ -370,7 +388,7 @@ void PrerequisitesIntro::update_recommendation()
     if (!profile_ready(&blocker))
     {
         recommendation_title->setText(util::i18n::translate("%1 NEEDED").arg(runtime_label));
-        recommendation_body->setStyleSheet(k_error_style);
+        recommendation_body->setStyleSheet(recommendation_style(window()->size(), true));
         recommendation_body->setText(util::i18n::translate(blocker));
         continue_button->setText(util::i18n::translate("USE THIS SETUP"));
         continue_button->setEnabled(false);
@@ -381,7 +399,7 @@ void PrerequisitesIntro::update_recommendation()
     const auto* runtime = best_runtime(runtime_type);
     choose_own_button->show();
     recommendation_title->setText(util::i18n::translate("%1 READY").arg(runtime_label));
-    recommendation_body->setStyleSheet(k_recommendation_style);
+    recommendation_body->setStyleSheet(recommendation_style(window()->size()));
 #if defined(Q_OS_MACOS)
     recommendation_body->setText(util::i18n::translate(
         "%1 is the recommended Wine setup for this Mac. Alicia will use "
@@ -404,7 +422,7 @@ void PrerequisitesIntro::apply_recommendation()
     QString blocker;
     if (!profile_ready(&blocker))
     {
-        recommendation_body->setStyleSheet(k_error_style);
+        recommendation_body->setStyleSheet(recommendation_style(window()->size(), true));
         recommendation_body->setText(util::i18n::translate(blocker));
         return;
     }

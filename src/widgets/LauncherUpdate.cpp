@@ -105,12 +105,20 @@ void LauncherUpdate::setup_controls()
     version_combo->setMaxVisibleItems(3);
     version_combo->setStyleSheet(QStringLiteral(
         "QComboBox { background:#F7F0EB; color:#4F1717; border:1px solid #A98678; "
-        "border-radius:6px; padding:5px 12px; }"
-        "QComboBox::drop-down { border:0; width:28px; }"
+        "border-radius:%1px; padding:%2px %3px; font-size:%4px; }"
+        "QComboBox::drop-down { border:0; width:%5px; }"
         "QComboBox QAbstractItemView { background:#F7F0EB; color:#4F1717; "
         "selection-background-color:#EBDCD3; selection-color:#4F1717; "
-        "border:1px solid #A98678; outline:0; }"
-        "QComboBox QAbstractItemView::item { min-height:34px; padding:3px 10px; }"));
+        "border:1px solid #A98678; outline:0; font-size:%4px; }"
+        "QComboBox QAbstractItemView::item { min-height:%6px; padding:%7px %8px; }")
+        .arg(util::layout::scaled(6, w))
+        .arg(util::layout::scaled(5, w))
+        .arg(util::layout::scaled(12, w))
+        .arg(qMax(9, util::layout::scaled(13, w)))
+        .arg(util::layout::scaled(28, w))
+        .arg(util::layout::scaled(34, w))
+        .arg(util::layout::scaled(3, w))
+        .arg(util::layout::scaled(10, w)));
     version_combo->hide();
     connect(version_combo, &QComboBox::currentTextChanged, this,
             [this](const QString& version)
@@ -382,9 +390,9 @@ void LauncherUpdate::retranslate_content()
             set_update_button_text(QStringLiteral("UPDATE NOW"));
     }
 
-    fit_label(title_label, util::layout::scaled(25, window()->size()), 18);
-    fit_label(message_label, util::layout::scaled(16, window()->size()), 12);
-    fit_label(details_label, util::layout::scaled(14, window()->size()), 11);
+    fit_label(title_label, util::layout::scaled(25, window()->size()), qMax(12, util::layout::scaled(18, window()->size())));
+    fit_label(message_label, util::layout::scaled(16, window()->size()), qMax(9, util::layout::scaled(12, window()->size())));
+    fit_label(details_label, util::layout::scaled(14, window()->size()), qMax(8, util::layout::scaled(11, window()->size())));
     update_button->setAccessibleName(util::i18n::translate("Update launcher now"));
     util::simple_utils::set_button_text(cancel_button, QStringLiteral("CANCEL"));
     cancel_button->setAccessibleName(util::i18n::translate(
@@ -396,7 +404,7 @@ void LauncherUpdate::set_update_button_text(const QString& source)
 {
     update_button_source = source;
     update_button_label->setText(util::i18n::translate(source));
-    fit_label(update_button_label, util::layout::scaled(21, window()->size()), 14);
+    fit_label(update_button_label, util::layout::scaled(21, window()->size()), qMax(10, util::layout::scaled(14, window()->size())));
 }
 
 void LauncherUpdate::set_button_pixmap(const QPixmap& pixmap)

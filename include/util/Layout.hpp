@@ -113,6 +113,17 @@ namespace util::layout
                                     k_hit);
         }
 
+        inline QRect rect_in(const QRect panel, const QSize win)
+        {
+            const QSize hit = scaled(k_hit, win);
+            const QSize icon = scaled(k_icon, win);
+            const int from_right = scaled(k_icon_from_right, win)
+                - (hit.width() - icon.width()) / 2;
+            const int from_top = scaled(k_icon_from_top, win)
+                - (hit.height() - icon.height()) / 2;
+            return anchor_top_right(panel, from_right, from_top, hit);
+        }
+
         // A companion control sitting immediately left of the close button,
         // e.g. the pause button on the prefix progress modal.
         constexpr QRect rect_left_of(const QRect panel, const int steps = 1)

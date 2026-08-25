@@ -120,7 +120,7 @@ void DownloadProgress::setup_buttons()
 
     retry_button = new QPushButton(QStringLiteral("RETRY"), this);
     retry_button->setCursor(Qt::PointingHandCursor);
-    retry_button->setStyleSheet(util::styles::k_primary_button);
+    retry_button->setStyleSheet(util::styles::primary_button(window_size));
     retry_button->setGeometry(dl::retry_button(window_size));
     retry_button->setAccessibleName(mode == Mode::Repair
         ? QStringLiteral("Retry repair")
@@ -131,7 +131,7 @@ void DownloadProgress::setup_buttons()
 
     details_button = new QPushButton(QStringLiteral("SHOW ERROR"), this);
     details_button->setCursor(Qt::PointingHandCursor);
-    details_button->setStyleSheet(util::styles::k_neutral_button);
+    details_button->setStyleSheet(util::styles::neutral_button(window_size));
     details_button->setGeometry(dl::details_button(window_size));
     details_button->setAccessibleName(QStringLiteral("Show full error"));
     details_button->setVisible(false);

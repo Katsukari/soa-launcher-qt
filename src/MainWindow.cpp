@@ -358,11 +358,12 @@ void MainWindow::setup_launcher_menu()
     launcher_menu_button->setFont(menu_icon_font);
     launcher_menu_button->setStyleSheet(QStringLiteral(
         "QToolButton { background: rgba(247,240,235,232); color: #4F1717; "
-        "border: 1px solid rgba(79,23,23,72); border-radius: 6px; padding: 0px; }"
+        "border: 1px solid rgba(79,23,23,72); border-radius: %1px; padding: 0px; }"
         "QToolButton:hover { background: rgba(255,250,247,246); "
         "border-color: rgba(79,23,23,125); }"
         "QToolButton:pressed, QToolButton:checked { background: rgba(232,216,206,246); "
-        "border-color: rgba(79,23,23,150); }"));
+        "border-color: rgba(79,23,23,150); }")
+        .arg(util::layout::scaled(6, window_size)));
 
     launcher_menu_panel = new QFrame(this);
     launcher_menu_panel->setObjectName(QStringLiteral("launcherMenuPanel"));
@@ -372,12 +373,14 @@ void MainWindow::setup_launcher_menu()
         "QFrame#launcherMenuPanel { background: rgba(247,240,235,248); "
         "border: 1px solid rgba(79,23,23,85); border-radius: 0px; }"
         "QPushButton { background: rgba(255,255,255,132); color: #4F1717; "
-        "border: 1px solid rgba(79,23,23,38); border-radius: 6px; "
-        "padding-left: 17px; text-align: left; }"
+        "border: 1px solid rgba(79,23,23,38); border-radius: %1px; "
+        "padding-left: %2px; text-align: left; }"
         "QPushButton:hover { background: rgba(235,220,211,224); "
         "border-color: rgba(79,23,23,92); }"
         "QPushButton:pressed { background: rgba(219,198,186,236); "
-        "border-color: rgba(79,23,23,125); }"));
+        "border-color: rgba(79,23,23,125); }")
+        .arg(util::layout::scaled(6, window_size))
+        .arg(util::layout::scaled(17, window_size)));
     auto* menu_shadow = new QGraphicsDropShadowEffect(launcher_menu_panel);
     menu_shadow->setBlurRadius(util::layout::scaled(28, window_size));
     menu_shadow->setOffset(0, util::layout::scaled(6, window_size));
@@ -411,11 +414,19 @@ void MainWindow::setup_launcher_menu()
     language_menu = new QMenu(this);
     language_menu->setStyleSheet(QStringLiteral(
         "QMenu { background: #F7F0EB; color: #4F1717; border: 1px solid #A98678; "
-        "border-radius: 0px; padding: 6px; }"
-        "QMenu::item { min-width: 170px; padding: 9px 28px 9px 12px; "
-        "border-radius: 6px; }"
+        "border-radius: 0px; padding: %1px; font-size: %2px; }"
+        "QMenu::item { min-width: %3px; padding: %4px %5px %4px %6px; "
+        "border-radius: %7px; }"
         "QMenu::item:selected { background: #EBDCD3; }"
-        "QMenu::indicator { width: 14px; height: 14px; }"));
+        "QMenu::indicator { width: %8px; height: %8px; }")
+        .arg(util::layout::scaled(6, window_size))
+        .arg(qMax(9, util::layout::scaled(13, window_size)))
+        .arg(util::layout::scaled(170, window_size))
+        .arg(util::layout::scaled(9, window_size))
+        .arg(util::layout::scaled(28, window_size))
+        .arg(util::layout::scaled(12, window_size))
+        .arg(util::layout::scaled(6, window_size))
+        .arg(util::layout::scaled(14, window_size)));
     language_action_group = new QActionGroup(this);
     language_action_group->setExclusive(true);
     for (const auto& language : util::i18n::LanguageManager::instance().languages())

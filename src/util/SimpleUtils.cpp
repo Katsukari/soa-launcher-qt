@@ -42,16 +42,17 @@ namespace util::simple_utils
 
         const int title_base_size = title_font.pixelSize();
         const int description_base_size = description_font.pixelSize();
-        const auto refit = [title_label, description_label,
+        const auto refit = [title_label, description_label, window_size,
                             title_base_size, description_base_size]()
         {
             QFont fitted_title = title_label->font();
-            int title_size = qMax(12, title_base_size);
-            while (title_size > 12)
+            const int title_min = qMax(9, layout::scaled(12, window_size));
+            int title_size = qMax(title_min, title_base_size);
+            while (title_size > title_min)
             {
                 fitted_title.setPixelSize(title_size);
                 if (QFontMetrics(fitted_title).horizontalAdvance(title_label->text())
-                    <= qMax(1, title_label->width() - 4))
+                    <= qMax(1, title_label->width() - layout::scaled(4, window_size)))
                 {
                     break;
                 }
@@ -62,10 +63,11 @@ namespace util::simple_utils
             title_label->setToolTip(title_label->text());
 
             QFont fitted_description = description_label->font();
-            int description_size = qMax(11, description_base_size);
+            const int description_min = qMax(8, layout::scaled(10, window_size));
+            int description_size = qMax(description_min, description_base_size);
             const QRect available(0, 0, qMax(1, description_label->width()),
                                   qMax(1, description_label->height()));
-            while (description_size > 11)
+            while (description_size > description_min)
             {
                 fitted_description.setPixelSize(description_size);
                 const QRect bounds = QFontMetrics(fitted_description).boundingRect(
@@ -142,8 +144,8 @@ namespace util::simple_utils
 
             QFont font = label->font();
             const int base_size = label->property(k_base_pixel_size_property).toInt();
-            const int maximum_width = qMax(1, label->width() - 12);
-            constexpr int minimum_pixel_size = 10;
+            const int maximum_width = qMax(1, label->width() - layout::scaled(12, label->window()->size()));
+            const int minimum_pixel_size = qMax(8, layout::scaled(9, label->window()->size()));
             int pixel_size = qMax(minimum_pixel_size, base_size);
             while (pixel_size > minimum_pixel_size)
             {

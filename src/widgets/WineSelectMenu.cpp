@@ -51,21 +51,42 @@ namespace
             .translated(runtime_box_rect(window_size).topLeft());
     }
 
-    const char* k_scroll =
-        "QScrollArea { background:rgba(255,255,255,0.34); border:1px solid #D8C8B6;"
-        " border-radius:0px; }"
-        "QScrollArea > QWidget > QWidget { background:transparent; }"
-        "QScrollBar:vertical { width:12px; background:rgba(236,226,215,0.72);"
-        " border-radius:6px; margin:4px 3px 4px 1px; }"
-        "QScrollBar::handle:vertical { background:#BFAE9B; border-radius:5px; min-height:34px; }"
-        "QScrollBar::handle:vertical:hover { background:#2FB4E0; }"
-        "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0; }"
-        "QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background:transparent; }";
-    const char* k_status =
-        "QLabel { color:#6B5B4D; background:rgba(244,236,227,0.66);"
-        " border:1px solid rgba(201,187,170,0.74); border-radius:6px; padding:5px 10px; }";
-    const char* k_empty =
-        "QLabel { color:#8A7A6B; padding:28px; background:transparent; }";
+    QString scroll_style(const QSize window_size)
+    {
+        return QStringLiteral(
+            "QScrollArea { background:rgba(255,255,255,0.34); border:1px solid #D8C8B6;"
+            " border-radius:0px; }"
+            "QScrollArea > QWidget > QWidget { background:transparent; }"
+            "QScrollBar:vertical { width:%1px; background:rgba(236,226,215,0.72);"
+            " border-radius:%2px; margin:%3px %4px %3px %5px; }"
+            "QScrollBar::handle:vertical { background:#BFAE9B; border-radius:%6px; min-height:%7px; }"
+            "QScrollBar::handle:vertical:hover { background:#2FB4E0; }"
+            "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0; }"
+            "QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background:transparent; }")
+            .arg(util::layout::scaled(12, window_size))
+            .arg(util::layout::scaled(6, window_size))
+            .arg(util::layout::scaled(4, window_size))
+            .arg(util::layout::scaled(3, window_size))
+            .arg(util::layout::scaled(1, window_size))
+            .arg(util::layout::scaled(5, window_size))
+            .arg(util::layout::scaled(34, window_size));
+    }
+
+    QString status_style(const QSize window_size)
+    {
+        return QStringLiteral(
+            "QLabel { color:#6B5B4D; background:rgba(244,236,227,0.66);"
+            " border:1px solid rgba(201,187,170,0.74); border-radius:%1px; padding:%2px %3px; }")
+            .arg(util::layout::scaled(6, window_size))
+            .arg(util::layout::scaled(5, window_size))
+            .arg(util::layout::scaled(10, window_size));
+    }
+
+    QString empty_style(const QSize window_size)
+    {
+        return QStringLiteral("QLabel { color:#8A7A6B; padding:%1px; background:transparent; }")
+            .arg(util::layout::scaled(28, window_size));
+    }
 
     class RuntimeRow final : public QAbstractButton
     {
@@ -326,14 +347,14 @@ void WineSelectMenu::build_ui()
     connect(close_button, &QPushButton::clicked, this, [this]() { hide(); emit closed(); });
 
     runtime_status = new QLabel(this);
-    runtime_status->setStyleSheet(k_status);
+    runtime_status->setStyleSheet(status_style(window()->size()));
     runtime_status->setWordWrap(true);
 
     list = new QScrollArea(this);
     list->setWidgetResizable(true);
     list->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     list->setFrameShape(QFrame::NoFrame);
-    list->setStyleSheet(k_scroll);
+    list->setStyleSheet(scroll_style(window()->size()));
     list->viewport()->setAutoFillBackground(false);
     list->viewport()->setAttribute(Qt::WA_StyledBackground, false);
 
@@ -438,7 +459,7 @@ void WineSelectMenu::populate()
                      : util::i18n::translate(missingText);
 #endif
         auto* empty = new QLabel(emptyText, content);
-        empty->setStyleSheet(k_empty);
+        empty->setStyleSheet(empty_style(window()->size()));
         QFont empty_font = util::assets::fonts[util::assets::Font::Inter];
         empty_font.setPixelSize(util::layout::scaled(13, window()->size()));
         empty_font.setWeight(QFont::Medium);

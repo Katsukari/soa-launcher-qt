@@ -105,7 +105,7 @@ void GameInstall::setup_buttons()
     change_path_button = new QPushButton("Change path", this);
     change_path_button->setFlat(true);
     change_path_button->setCursor(Qt::PointingHandCursor);
-    change_path_button->setStyleSheet(util::styles::k_link_blue_lg);
+    change_path_button->setStyleSheet(util::styles::link_blue_lg(w));
     change_path_button->setGeometry(util::layout::install_modal::change_path_button(w));
     change_path_button->setAccessibleName(QStringLiteral("Change game installation path"));
 
@@ -226,7 +226,7 @@ void GameInstall::paint_content(QPainter& painter)
     caption_font.setWeight(QFont::Normal);
     painter.setFont(caption_font);
     painter.setPen(util::colors::k_text_caption);
-    painter.drawText(path_rect.adjusted(10, 8, -10, 0), Qt::AlignTop | Qt::AlignLeft, util::i18n::translate("GAME INSTALLATION PATH"));
+    painter.drawText(path_rect.adjusted(util::layout::scaled(10, w), util::layout::scaled(8, w), -util::layout::scaled(10, w), 0), Qt::AlignTop | Qt::AlignLeft, util::i18n::translate("GAME INSTALLATION PATH"));
 
     QFont path_font = util::assets::fonts[util::assets::Font::EurostileBold];
     path_font.setPixelSize(util::layout::scaled(16, w));
@@ -234,8 +234,8 @@ void GameInstall::paint_content(QPainter& painter)
     painter.setFont(path_font);
     painter.setPen(util::colors::k_text_maroon);
     const QString elided = painter.fontMetrics().elidedText(
-        game_path, Qt::ElideMiddle, path_rect.width() - 28);
-    painter.drawText(path_rect.adjusted(14, 34, -14, 0), Qt::AlignTop | Qt::AlignLeft, elided);
+        game_path, Qt::ElideMiddle, path_rect.width() - util::layout::scaled(28, w));
+    painter.drawText(path_rect.adjusted(util::layout::scaled(14, w), util::layout::scaled(34, w), -util::layout::scaled(14, w), 0), Qt::AlignTop | Qt::AlignLeft, elided);
 
     QFont note_font = util::assets::fonts[util::assets::Font::Inter];
     note_font.setPixelSize(util::layout::scaled(util::layout::text::k_desc, w));

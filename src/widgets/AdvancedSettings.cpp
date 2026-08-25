@@ -58,12 +58,12 @@ void AdvancedSettings::setup_game_path_option()
                             "Where the game is installed. Leave blank to use the default location.");
     game_path_field = new QLineEdit(this);
     game_path_field->setText(Config::instance().game_install_path());
-    game_path_field->setStyleSheet(util::styles::k_field);
+    game_path_field->setStyleSheet(util::styles::field(w));
     game_path_field->setGeometry(ls::field_rect(w, y));
 
     auto* browse = new QPushButton("...", this);
     browse->setCursor(Qt::PointingHandCursor);
-    browse->setStyleSheet(util::styles::k_neutral_button);
+    browse->setStyleSheet(util::styles::neutral_button(w));
     browse->setGeometry(ls::browse_rect(w, y));
     browse->setAccessibleName(QStringLiteral("Choose game installation folder"));
     connect(browse, &QPushButton::clicked, this, [this]()
@@ -127,7 +127,7 @@ void AdvancedSettings::setup_game_args_option()
     auto* field = new QLineEdit(this);
     field->setPlaceholderText(util::i18n::translate("%1 (default)").arg(QStringLiteral("Alicia.exe")));
     field->setAccessibleName(QStringLiteral("Game launch arguments"));
-    field->setStyleSheet(util::styles::k_field);
+    field->setStyleSheet(util::styles::field(w));
     field->setGeometry(ls::ctrl_pos(w, y).x(), ls::ctrl_pos(w, y).y(),
                        ls::ctrl_w(w), util::layout::scaled(34, w));
     field->setText(Config::instance().game_args());
@@ -260,12 +260,12 @@ void AdvancedSettings::setup_umu_runner_option()
     umu_path_field->setPlaceholderText(util::i18n::translate("Auto-detect umu-run"));
     umu_path_field->setProperty("soa_i18n_placeholder_source", QStringLiteral("Auto-detect umu-run"));
     umu_path_field->setAccessibleName(QStringLiteral("Custom umu-run executable"));
-    umu_path_field->setStyleSheet(util::styles::k_field);
+    umu_path_field->setStyleSheet(util::styles::field(w));
     umu_path_field->setGeometry(ls::field_rect(w, y));
 
     auto* browse = new QPushButton("...", this);
     browse->setCursor(Qt::PointingHandCursor);
-    browse->setStyleSheet(util::styles::k_neutral_button);
+    browse->setStyleSheet(util::styles::neutral_button(w));
     browse->setGeometry(ls::browse_rect(w, y));
     browse->setAccessibleName(QStringLiteral("Choose custom umu-run executable"));
 
