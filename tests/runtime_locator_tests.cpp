@@ -144,8 +144,8 @@ private slots:
         const QProcessEnvironment environment =
             core::wine::RuntimeLocator::make_umu_environment(settings, directory.path());
 
-        // umu treats WINEPREFIX as the compat-data root and builds the real
-        // prefix at <WINEPREFIX>/pfx, so it must receive the compat root.
+
+
         QCOMPARE(environment.value(QStringLiteral("WINEPREFIX")), compat);
         QCOMPARE(environment.value(QStringLiteral("PROTONPATH")), directory.path());
         QCOMPARE(environment.value(QStringLiteral("GAMEID")), QStringLiteral("umu-storyofalicia"));
@@ -172,7 +172,7 @@ private slots:
             core::wine::RuntimeLocator::make_umu_environment(settings, directory.path());
 
         QVERIFY(!environment.contains(QStringLiteral("TMPDIR")));
-        // With no compat root configured we must still produce something usable.
+
         QCOMPARE(environment.value(QStringLiteral("WINEPREFIX")), prefix);
     }
 
@@ -192,7 +192,7 @@ private slots:
         QVERIFY(!QFileInfo(inner).exists());
         QVERIFY(!QFileInfo(root.filePath(QStringLiteral(".pfx-migrating"))).exists());
 
-        // Idempotent: a healthy layout is left alone.
+
         QVERIFY(!core::wine::repair_doubled_proton_prefix(directory.path()));
     }
 

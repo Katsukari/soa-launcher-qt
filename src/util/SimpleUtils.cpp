@@ -177,10 +177,10 @@ namespace util::simple_utils
             return source.scaled(target, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
         }
 
-        // Desaturated, faded copy used for QIcon::Disabled. Qt would normally
-        // generate one, but every button here supplies its own pixmap, so the
-        // greyed variant has to be built explicitly or disabled buttons look
-        // identical to enabled ones. GUI thread only.
+
+
+
+
         QPixmap disabled_button_pixmap(const QPixmap& source)
         {
             if (source.isNull())

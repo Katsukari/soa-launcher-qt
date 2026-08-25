@@ -121,8 +121,8 @@ rm -f "$ARCHIVE"
 /usr/bin/ditto -c -k --keepParent "$OUT_DIR" "$ARCHIVE"
 printf 'Created diagnostic bundle:\n  %s\n\nReview it before sharing.\n' "$ARCHIVE"
 
-# Run the analyser over the newest diagnostic run, so the bundle carries a
-# verdict and not just raw logs. Mirrors collect-linux.sh.
+
+
 ANALYSER="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/soa-log-analyze.py"
 NEWEST_RUN="$(ls -dt "$HOME/Library/Application Support/Story of Alicia/logs/diagnostics/"*/ 2>/dev/null | head -1)"
 if [ -n "$NEWEST_RUN" ] && [ -f "$ANALYSER" ] && command -v python3 >/dev/null 2>&1; then

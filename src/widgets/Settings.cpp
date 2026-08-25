@@ -251,9 +251,9 @@ void Settings::paint_content(QPainter& painter)
         const char* labels[] = {"LAUNCHER", runtimeLabel, "ADVANCED"};
         const QRect r = util::layout::settings::tab_rect(w, i, expanded);
         const bool  on = i == active_tab;
-        // Round the top corners only: the tab tucks under the settings panel
-        // by settings::k_tab_overlap, so a rounded bottom would show a notch
-        // where the tab meets a square-edged panel.
+
+
+
         const QRectF rf(r);
         const qreal corner =
             qMin<qreal>(radius, qMin(rf.width(), rf.height()) / 2.0);

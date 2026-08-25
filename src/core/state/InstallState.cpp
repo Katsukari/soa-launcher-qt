@@ -102,9 +102,9 @@ namespace core::state
 
         auto& config = util::config::Config::instance();
 #if !defined(Q_OS_MACOS)
-        // Older builds passed the wine prefix to umu as WINEPREFIX, so Proton
-        // built at <compat-root>/pfx/pfx. Repair that before probing, otherwise
-        // an existing install looks missing.
+
+
+
         if (core::wine::WineRegistry::identify(config.wine_binary())
             == core::wine::RuntimeType::Proton)
         {

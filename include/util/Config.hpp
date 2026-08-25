@@ -116,13 +116,13 @@ namespace util::config
 
         enum class LoadOutcome
         {
-            Loaded,      // file existed and parsed
-            Missing,     // file is not there at all
-            Unreadable   // file exists but is empty, locked, or not valid JSON
+            Loaded,
+            Missing,
+            Unreadable
         };
 
-        // Reads config.json into d->values. On Missing or Unreadable it leaves
-        // d->values untouched so the caller can decide what the authority is.
+
+
         LoadOutcome load_document();
         bool load();
         bool save();

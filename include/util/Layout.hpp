@@ -39,17 +39,17 @@ namespace util::layout
         QRect rect(QSize win);
     }
 
-    // Corner-radius scale in use: hard-edged surfaces, softened controls.
-    // Panels, cards and popup backgrounds stay square; buttons, menu items,
-    // combo boxes and badges get k_control. True pills (scrollbar handles,
-    // status chips) are half their own height by construction and are NOT
-    // part of this scale. The stylesheets carry literals, not these names --
-    // run tools/set-radii.sh to retune them all at once.
+
+
+
+
+
+
     namespace radius
     {
-        inline constexpr int k_panel   = 0;  // dialog panels, popup menus
-        inline constexpr int k_card    = 0;  // inset cards, note boxes, list surfaces
-        inline constexpr int k_control = 6;  // buttons, menu items, combo boxes, badges
+        inline constexpr int k_panel   = 0;
+        inline constexpr int k_card    = 0;
+        inline constexpr int k_control = 6;
     }
 
     constexpr QRect center_in_region(const QSize box, const int dx = 0, const int dy = 0)
@@ -94,10 +94,10 @@ namespace util::layout
 
     QRect centered(QSize box, QSize win, int dx = 0, int dy = 0);
 
-    // Close-button placement, taken from the Settings panel: a 16x16 glyph
-    // sitting 39 in from the right edge and 34 down from the top of the panel
-    // it closes. The constants describe the glyph, not the hit area, because
-    // the glyph is what has to line up; rect_in() adds the padding.
+
+
+
+
     namespace modal_close
     {
         inline constexpr QSize k_icon {16, 16};
@@ -124,8 +124,8 @@ namespace util::layout
             return anchor_top_right(panel, from_right, from_top, hit);
         }
 
-        // A companion control sitting immediately left of the close button,
-        // e.g. the pause button on the prefix progress modal.
+
+
         constexpr QRect rect_left_of(const QRect panel, const int steps = 1)
         {
             const QRect close_rect = rect_in(panel);
@@ -431,8 +431,8 @@ namespace util::layout
         inline constexpr QRect k_close =
             modal_close::rect_in({0, 0, k_box.width(), k_box.height()});
         inline constexpr QSize k_pause_hit  = modal_close::k_hit;
-        // Sits immediately left of the close button, derived from it so the
-        // two can never drift apart.
+
+
         inline constexpr QRect k_pause =
             modal_close::rect_left_of({0, 0, k_box.width(), k_box.height()});
 

@@ -80,8 +80,8 @@ while IFS= read -r -d '' item; do
     continue
   fi
 
-  # Never let the developer machine's Swift toolchain satisfy AppImage
-  # dependencies while validating the bundle.
+
+
   dependencies="$(env -u LD_PRELOAD LD_LIBRARY_PATH="$BUNDLE_LIBRARY_PATH" ldd "$item" 2>&1 || true)"
   while IFS= read -r dependency; do
     [ -n "$dependency" ] || continue

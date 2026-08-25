@@ -713,10 +713,10 @@ namespace core::wine
         }
 
         QProcessEnvironment environment = runtime_.umu_environment();
-        // No PROTON_VERB here. Creation needs Proton's default
-        // waitforexitandrun, which runs the full prefix setup; runinprefix is
-        // documented for *subsequent* runs and assumes the prefix exists, so
-        // using it here tells Proton to skip the work we are asking for.
+
+
+
+
 
         repair_doubled_proton_prefix(Config::instance().proton_compat_data_root());
 
@@ -724,10 +724,10 @@ namespace core::wine
         commands.push_back(
             {QStringLiteral("Creating Proton prefix..."),
              umu,
-             // umu-run's subcommand for building a prefix and stopping there.
-             // Passing "" instead builds the prefix but then asks Proton to
-             // ShellExecute an empty path, which fails with "Fant ikke filen"
-             // and exits 1 after the prefix is already good.
+
+
+
+
              {QStringLiteral("createprefix")},
              environment,
              5 * 60 * 1000,

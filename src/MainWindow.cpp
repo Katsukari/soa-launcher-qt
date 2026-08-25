@@ -525,9 +525,9 @@ void MainWindow::raise_persistent_controls()
         launcher_menu_panel->hide();
     if (!chrome_hidden)
     {
-        // The version art and label deliberately stay below any overlay so
-        // they blur into the background with the rest of the launcher; only
-        // the window controls stay crisp and clickable on top.
+
+
+
         if (close_button) close_button->raise();
         if (minimize_button) minimize_button->raise();
     }

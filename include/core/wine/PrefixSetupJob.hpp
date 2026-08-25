@@ -59,10 +59,10 @@ namespace core::wine
             bool inspect_components_after {};
             bool invalidates_marker {};
             bool optional_failure {};
-            // umu-run reports the exit status of the program it launched.
-            // During prefix creation there is no program, so a non-zero exit
-            // says nothing about whether the prefix was built. When this is
-            // set, the prefix on disk decides.
+
+
+
+
             bool succeeds_if_prefix_ready {};
         };
 

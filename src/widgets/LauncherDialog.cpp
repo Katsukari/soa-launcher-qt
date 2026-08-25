@@ -105,10 +105,10 @@ void LauncherDialog::build_ui()
     root->setSpacing(ui_scaled(this, 12));
 
     auto* top = new QHBoxLayout;
-    // Clearance for the close button, which now sits further in from the
-    // corner: its hit area starts 59px from the panel edge.
-    // Clearance for the close button, whose 40x40 hit area now starts 67px
-    // in from the panel edge (was 30px with the old hand-placed 24x24).
+
+
+
+
     top->setContentsMargins(0, 0, ui_scaled(this, 52), 0);
     top->setSpacing(ui_scaled(this, 12));
 

@@ -21,8 +21,8 @@ namespace core::wine
         if (!QFileInfo(inner).isDir())
             return false;
 
-        // If the outer directory is already a real prefix, an inner pfx is not
-        // ours to touch -- leave it alone.
+
+
         if (QFileInfo(QDir(prefix).filePath(QStringLiteral("drive_c"))).isDir())
             return false;
 
@@ -31,15 +31,15 @@ namespace core::wine
 
         if (!innerIsRealPrefix)
         {
-            // A stub from a failed setup: no drive_c, nothing to preserve.
+
             SPDLOG_INFO("prefix: removing empty doubled prefix at {}", inner.toStdString());
             return QDir(inner).removeRecursively();
         }
 
-        // Hoist the real prefix up one level and discard the wrapper, which only
-        // holds Proton's compat-data bookkeeping (version, config_info,
-        // tracked_files). Staged through a sibling name so a failure at any step
-        // leaves the original tree intact.
+
+
+
+
         const QString staging = root.filePath(QStringLiteral(".pfx-migrating"));
         if (QFileInfo::exists(staging))
         {
@@ -116,10 +116,10 @@ namespace core::wine
         environment.insert(QStringLiteral("GAMEID"), QStringLiteral("umu-storyofalicia"));
         environment.insert(QStringLiteral("STORE"), QStringLiteral("none"));
         environment.insert(QStringLiteral("PROTONPATH"), proton_root);
-        // umu maps WINEPREFIX straight onto STEAM_COMPAT_DATA_PATH, and Proton
-        // builds its prefix at $STEAM_COMPAT_DATA_PATH/pfx. Passing prefix_root
-        // (which already ends in /pfx) therefore produced <root>/pfx/pfx while
-        // the launcher looked for the game under <root>/pfx/drive_c.
+
+
+
+
         environment.insert(QStringLiteral("WINEPREFIX"),
                            settings.proton_compat_data_root.isEmpty()
                                ? settings.prefix_root

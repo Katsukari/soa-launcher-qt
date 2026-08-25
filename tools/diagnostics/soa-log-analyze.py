@@ -27,12 +27,12 @@ import re
 import sys
 from collections import Counter, OrderedDict, defaultdict, deque
 
-# ---------------------------------------------------------------- constants
 
-# Wine probes every audio backend in turn and uses whichever exists. The others
-# are simply not built on this platform. Reporting them as failures is the
-# single most common false lead in this project's history, so they are named
-# explicitly rather than guessed at.
+
+
+
+
+
 EXPECTED_MISSING = {
     "darwin": {
         "winepulse.drv", "winealsa.drv", "wineoss.drv", "wineandroid.drv",
@@ -42,7 +42,7 @@ EXPECTED_MISSING = {
         "winecoreaudio.drv", "wineandroid.drv", "winemac.drv", "wineps.drv",
     },
 }
-# Never platform-specific: these are probed and optional everywhere.
+
 EXPECTED_MISSING_ANY = {
     "wineps.drv", "winebus.sys", "winehid.sys", "mscoree", "mscoree.dll",
 }
@@ -83,10 +83,10 @@ WIN32_ERROR = {
     "1114": "ERROR_DLL_INIT_FAILED",
 }
 
-# Wine emits four different line shapes depending on which of +timestamp, +pid
-# and +tid are enabled. Handling only the richest one means a default-configured
-# log parses as zero events and the tool reports "nothing wrong" — the worst
-# possible failure for a diagnostic. All four are accepted.
+
+
+
+
 _TAIL = r"(?P<cls>trace|warn|err|fixme):(?P<chan>[a-z0-9_]+):(?P<fn>\S+)\s*(?P<msg>.*)$"
 LINE_FORMS = (
     re.compile(r"^(?P<ts>\d+\.\d+):(?P<pid>[0-9a-f]+):(?P<tid>[0-9a-f]+):" + _TAIL),
@@ -107,11 +107,11 @@ RE_LOAD_FOUND = re.compile(r'Found L"(?P<path>[^"]+)" for L"(?P<name>[^"]+)" at 
 RE_LOAD_FAIL = re.compile(r'Failed to load module L"(?P<name>[^"]+)"; status=(?P<status>[0-9a-f]+)')
 RE_BUILTIN_MISS = re.compile(r'cannot find builtin library for L"(?P<name>[^"]+)"')
 RE_EXC = re.compile(r"code=(?P<code>[0-9a-f]+)")
-# Wine writes debug output unbuffered. When two threads write at once — and
-# especially when the launcher captures stderr through a pipe, where only
-# PIPE_BUF bytes are atomic — one message lands in the middle of another. Those
-# lines are real log corruption, not a parse failure, so they get counted and
-# truncated at the splice rather than reported as fact.
+
+
+
+
+
 RE_SPLICE = re.compile(r"(trace|warn|err|fixme):[a-z0-9_]+:\S+\s")
 
 RE_HOOK = re.compile(r"^\[(?P<ts>[0-9:.]+)\]\s+\[(?P<tag>[^\]]+)\]\s+(?P<msg>.*)$")
@@ -153,7 +153,7 @@ def scan_wine_log(path: str, report: Report) -> None:
             report.total += 1
             line = raw.rstrip("\n")
 
-            # Assertions and libc aborts are printed without the Wine prefix.
+
             if line.startswith("Assertion failed:") or "libc++abi:" in line:
                 report.assertions.append({"line": report.total, "text": line.strip()})
                 continue
@@ -180,7 +180,7 @@ def scan_wine_log(path: str, report: Report) -> None:
                     report.first_ts = ts
                 report.last_ts = ts
             else:
-                ts = f"#{report.total}"   # no timestamps enabled; use line order
+                ts = f"#{report.total}"
             report.channels[f"{cls}:{chan}"] += 1
             report.thread_lines[f"{pid}:{tid}"] += 1
 
@@ -193,7 +193,7 @@ def scan_wine_log(path: str, report: Report) -> None:
             report.last_per_thread[f"{pid}:{tid}"] = entry
             report.tail_per_thread[f"{pid}:{tid}"].append(entry)
 
-            # ---- module inventory
+
             found = RE_LOAD_FOUND.search(msg)
             if found:
                 name = base_name(found.group("name"))
@@ -227,7 +227,7 @@ def scan_wine_log(path: str, report: Report) -> None:
                 report.builtin_misses.append(base_name(builtin.group("name")))
                 continue
 
-            # ---- exceptions
+
             if chan == "seh" and "dispatch_exception" in fn:
                 code = RE_EXC.search(msg)
                 if code:
@@ -239,7 +239,7 @@ def scan_wine_log(path: str, report: Report) -> None:
                     })
                 continue
 
-            # ---- anything the developers flagged
+
             if cls in ("err", "fixme", "warn"):
                 key = f"{cls}:{chan}:{fn}"
                 report.diagnostics[key] += 1
@@ -258,9 +258,9 @@ def scan_wine_log(path: str, report: Report) -> None:
                 report.audio_driver = f"wine{chan}"
 
 
-# Milestones the launcher writes to timeline.jsonl. How far the run got is a
-# different question from what the Wine log says went wrong, and answering both
-# in one place is why this absorbed the old analyze-macos-launch.py.
+
+
+
 TIMELINE_STAGES = [
     ("rendering_started", "d3d9_draw_observed"),
     ("after_present_before_draw", "d3d9_present_observed"),
@@ -359,7 +359,7 @@ def emit(report: Report, alicia: dict | None, timeline: dict | None, stream) -> 
         out(f"audio driver     : {report.audio_driver}")
         summary["audio"] = report.audio_driver
 
-    # ---- the question that keeps getting asked
+
     out()
     out("-" * 78)
     out("MODULES LOADED  (%d)" % len(report.modules))
@@ -391,7 +391,7 @@ def emit(report: Report, alicia: dict | None, timeline: dict | None, stream) -> 
         out("  'no builtin library' notices — normal for the game's own DLLs:")
         out("     " + ", ".join(sorted(set(report.builtin_misses))))
 
-    # ---- what died
+
     out()
     out("-" * 78)
     out("EXCEPTIONS AND ASSERTIONS")
@@ -411,7 +411,7 @@ def emit(report: Report, alicia: dict | None, timeline: dict | None, stream) -> 
     if not report.assertions and not report.exceptions:
         out("  none recorded.")
 
-    # ---- who stopped first
+
     out()
     out("-" * 78)
     out("LAST ACTIVITY PER THREAD  (latest first — the quiet ones died earliest)")
@@ -433,7 +433,7 @@ def emit(report: Report, alicia: dict | None, timeline: dict | None, stream) -> 
         out(f"    {quietest[1]['text'][:150]}")
         summary["first_silent_thread"] = quietest[0]
 
-    # ---- developer complaints
+
     if report.diagnostics:
         out()
         out("-" * 78)
@@ -469,7 +469,7 @@ def emit(report: Report, alicia: dict | None, timeline: dict | None, stream) -> 
         out(f"  last line: {alicia['last']}")
         summary["alicia_last"] = alicia["last"]
 
-    # ---- verdict
+
     out()
     out("=" * 78)
     out("VERDICT")
@@ -517,7 +517,7 @@ def main() -> int:
     if platform_hint == "auto":
         platform_hint = "darwin" if sys.platform == "darwin" else "linux"
 
-    # A whole run directory is the common case; find the pieces inside it.
+
     wine_log = args.wine_log
     alicia_log = args.alicia
     timeline_path = args.timeline
@@ -534,7 +534,7 @@ def main() -> int:
     report = Report(platform_hint)
     scan_wine_log(wine_log, report)
 
-    # A macOS log gives itself away; trust the content over the host.
+
     if any("winemac" in n or "coreaudio" in n for n in list(report.modules) + list(report.failed)):
         report.platform = "darwin"
     elif any("winex11" in n or "winealsa" in n for n in report.modules):

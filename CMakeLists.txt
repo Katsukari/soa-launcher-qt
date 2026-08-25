@@ -359,9 +359,9 @@ if(SOA_MINGW_C_COMPILER AND SOA_MINGW_CXX_COMPILER)
             "${SOA_ALICIA_LOG_HOOK_INJECTOR}"
             "${SOA_ALICIA_LOG_HOOK_DLL}"
             COMMAND
-            # Invoked through bash rather than executed directly: zip archives
-            # do not always carry the executable bit, and a stripped +x here
-            # fails the whole build with a bare "Permission denied" (exit 126).
+
+
+
             "${SOA_ALICIA_LOG_HOOK_BASH}"
             "${SOA_ALICIA_LOG_HOOK_SOURCE_DIR}/build-x86.sh"
             "${SOA_ALICIA_LOG_HOOK_OUTPUT_DIR}"
