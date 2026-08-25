@@ -17,6 +17,7 @@
 #include <utility>
 
 #include "core/Log.hpp"
+#include "core/wine/WineProcess.hpp"
 #include "core/wine/WineRegistry.hpp"
 #include "core/wine/MacWineRuntime.hpp"
 #include "util/CredentialStore.hpp"
@@ -31,17 +32,32 @@ namespace util::config
             return QDir::cleanPath(QFileInfo(path).absoluteFilePath());
         }
 
-        QString canonical_or_absolute(const QString& path)
-        {
-            const QFileInfo info(path);
-            const QString canonical = info.canonicalFilePath();
-            return canonical.isEmpty() ? absolute_clean_path(path) : QDir::cleanPath(canonical);
-        }
-
         bool path_has_prefix(const QString& candidate, const QString& root)
         {
             return candidate == root || candidate.startsWith(root + QDir::separator());
         }
+
+        QString host_wine_user()
+        {
+            return qEnvironmentVariable(
+                "USER", QDir::homePath().section(QLatin1Char('/'), -1));
+        }
+
+        QString game_path_for_user(const QString& prefix,
+                                   const core::game::GameVersion version,
+                                   const QString& user)
+        {
+            const QString folder = QString::fromLatin1(
+                core::game::profile(version).default_install_directory);
+            return QDir(prefix).filePath(
+                QStringLiteral("drive_c/users/%1/AppData/Roaming/%2/game")
+                    .arg(user, folder));
+        }
+
+
+
+        constexpr int k_integrity_interval_ms = 5000;
+        constexpr int k_integrity_max_ms = 300000;
 
         QByteArray file_digest(const QString& path)
         {
@@ -55,24 +71,6 @@ namespace util::config
             return QCryptographicHash::hash(file.readAll(), QCryptographicHash::Sha256);
         }
 
-        bool existing_chain_has_symlink(const QString& root, const QString& candidate)
-        {
-            const QString relative = QDir(root).relativeFilePath(candidate);
-            if (relative == QStringLiteral("..") || relative.startsWith(QStringLiteral("../")))
-                return true;
-
-            QString current = root;
-            for (const QString& component : relative.split(QDir::separator(), Qt::SkipEmptyParts))
-            {
-                if (component == QStringLiteral("."))
-                    continue;
-                current = QDir(current).filePath(component);
-                const QFileInfo info(current);
-                if (info.exists() && info.isSymLink())
-                    return true;
-            }
-            return false;
-        }
     }
 
         QString normalized_launcher_size(const QString& value)
@@ -172,6 +170,33 @@ namespace util::config
                 [this](const QString&) { schedule_reload(); });
         connect(watcher, &QFileSystemWatcher::directoryChanged, this,
                 [this](const QString&) { schedule_reload(); });
+
+
+
+
+
+        integrity_timer = new QTimer(this);
+        integrity_timer->setInterval(k_integrity_interval_ms);
+        connect(integrity_timer, &QTimer::timeout, this, [this]()
+        {
+            if (writing || reloading)
+                return;
+            if (QFileInfo::exists(file_path()))
+            {
+                integrity_timer->setInterval(k_integrity_interval_ms);
+                return;
+            }
+            reload_from_disk(true);
+            if (!persistence_error().isEmpty())
+            {
+                const int next =
+                    qMin(integrity_timer->interval() * 4, k_integrity_max_ms);
+                integrity_timer->setInterval(next);
+                SPDLOG_WARN("config: recovery write failed, retrying in {} s", next / 1000);
+            }
+        });
+        integrity_timer->start();
+
         watch_files();
         remember_disk_state();
     }
@@ -209,6 +234,10 @@ namespace util::config
             return;
 
         const QString directory = QFileInfo(file_path()).absolutePath();
+
+
+        if (!QFileInfo(directory).isDir())
+            QDir().mkpath(directory);
         if (QFileInfo(directory).isDir() && !watcher->directories().contains(directory))
             watcher->addPath(directory);
 
@@ -220,28 +249,66 @@ namespace util::config
         }
     }
 
-    bool Config::load()
+    QString Config::backup_path() const
+    {
+        return file_path() + QStringLiteral(".bak");
+    }
+
+    Config::LoadOutcome Config::load_document()
     {
         const QString path = file_path();
         if (!QFileInfo::exists(path))
         {
-            SPDLOG_DEBUG("config: no existing file at {}, will create", path.toStdString());
-            d->values.clear();
-            return true;
+            SPDLOG_DEBUG("config: no existing file at {}", path.toStdString());
+            return LoadOutcome::Missing;
         }
 
         QFile file(path);
         if (!file.open(QIODevice::ReadOnly))
         {
             SPDLOG_ERROR("config: could not open {} for reading", path.toStdString());
-            return false;
+            return LoadOutcome::Unreadable;
         }
+
+        const QByteArray raw = file.readAll();
+        file.close();
+
+
+
+
+        if (raw.isEmpty())
+        {
+            SPDLOG_WARN("config: {} is empty", path.toStdString());
+            return LoadOutcome::Unreadable;
+        }
+
+        QJsonParseError error;
+        const QJsonDocument document = QJsonDocument::fromJson(raw, &error);
+        if (error.error != QJsonParseError::NoError || !document.isObject())
+        {
+            SPDLOG_ERROR("config: failed to parse config.json: {}", error.errorString().toStdString());
+            return LoadOutcome::Unreadable;
+        }
+
+        d->values = document.object().toVariantMap();
+        return LoadOutcome::Loaded;
+    }
+
+    bool Config::restore_from_backup()
+    {
+        const QString path = backup_path();
+        if (!QFileInfo::exists(path))
+            return false;
+
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly))
+            return false;
 
         QJsonParseError error;
         const QJsonDocument document = QJsonDocument::fromJson(file.readAll(), &error);
         if (error.error != QJsonParseError::NoError || !document.isObject())
         {
-            SPDLOG_ERROR("config: failed to parse config.json: {}", error.errorString().toStdString());
+            SPDLOG_WARN("config: backup at {} is unusable", path.toStdString());
             return false;
         }
 
@@ -249,9 +316,50 @@ namespace util::config
         return true;
     }
 
+    bool Config::write_backup(const QByteArray& contents) const
+    {
+        QSaveFile backup(backup_path());
+        if (!backup.open(QIODevice::WriteOnly))
+            return false;
+        return backup.write(contents) >= 0 && backup.commit();
+    }
+
+
+
+
+    bool Config::load()
+    {
+        switch (load_document())
+        {
+        case LoadOutcome::Loaded:
+            return true;
+
+        case LoadOutcome::Missing:
+            if (restore_from_backup())
+            {
+                SPDLOG_WARN("config: config.json was missing at startup; recovered from {}",
+                            backup_path().toStdString());
+                return true;
+            }
+            d->values.clear();
+            return true;
+
+        case LoadOutcome::Unreadable:
+            if (restore_from_backup())
+            {
+                SPDLOG_WARN("config: config.json was unreadable at startup; recovered from {}",
+                            backup_path().toStdString());
+                return true;
+            }
+            return false;
+        }
+        return false;
+    }
+
     bool Config::save()
     {
         const QJsonDocument document(QJsonObject::fromVariantMap(d->values));
+        const QByteArray payload = document.toJson(QJsonDocument::Indented);
         writing = true;
         if (watcher)
         {
@@ -259,21 +367,35 @@ namespace util::config
             watcher->removePath(env_path());
         }
 
+
+
+
+        const QString directory = QFileInfo(file_path()).absolutePath();
+        if (!QFileInfo(directory).isDir() && !QDir().mkpath(directory))
+            SPDLOG_ERROR("config: could not recreate config directory {}", directory.toStdString());
+
         QSaveFile file(file_path());
         bool ok = file.open(QIODevice::WriteOnly);
         if (ok)
         {
-            ok = file.write(document.toJson(QJsonDocument::Indented)) >= 0 && file.commit();
+            ok = file.write(payload) >= 0 && file.commit();
         }
         if (!ok)
         {
             d->persistence_error = file.errorString();
             SPDLOG_ERROR("config: failed to save {}", file_path().toStdString());
-            emit persistence_failed(file_path(), d->persistence_error);
+
+
+
+
+            if (!recovering)
+                emit persistence_failed(file_path(), d->persistence_error);
         }
         else
         {
             d->persistence_error.clear();
+            if (!write_backup(payload))
+                SPDLOG_DEBUG("config: could not refresh {}", backup_path().toStdString());
         }
 
         writing = false;
@@ -515,12 +637,9 @@ namespace util::config
     {
         const bool proton = core::wine::WineRegistry::identify(wine_binary())
             == core::wine::RuntimeType::Proton;
-        const QString user = proton
-            ? QStringLiteral("steamuser")
-            : qEnvironmentVariable("USER", QDir::homePath().section(QLatin1Char('/'), -1));
-        const QString folder = QString::fromLatin1(core::game::profile(version).default_install_directory);
-        return QDir(prefix).filePath(
-            QStringLiteral("drive_c/users/%1/AppData/Roaming/%2/game").arg(user, folder));
+        return game_path_for_user(prefix, version,
+                                  proton ? QStringLiteral("steamuser")
+                                         : host_wine_user());
     }
 
     void Config::probe_system_paths()
@@ -654,14 +773,28 @@ namespace util::config
             d->values.value(QStringLiteral("proton_compat_data_root")).toString());
 
         const QString activePrefix = absolute_clean_path(prefix_root());
+        const bool proton = runtime_is_proton();
         for (const auto version : {core::game::GameVersion::Playtest,
                                    core::game::GameVersion::Alicia2})
         {
             const QString key = game_install_path_key(version);
             const QString stored = d->values.value(key).toString().trimmed();
-            const QString normalized = stored.isEmpty()
+            QString normalized = stored.isEmpty()
                 ? derive_game_path(activePrefix, version)
                 : normalize_game_path(stored);
+            const QString fallback = derive_game_path(activePrefix, version);
+
+            if (proton && host_wine_user() != QStringLiteral("steamuser"))
+            {
+                const QString preselectionDefault = absolute_clean_path(
+                    game_path_for_user(activePrefix, version, host_wine_user()));
+                if (absolute_clean_path(normalized) == preselectionDefault)
+                {
+                    SPDLOG_INFO("config: migrated pre-Proton game path {} to {}",
+                                normalized.toStdString(), fallback.toStdString());
+                    normalized = fallback;
+                }
+            }
 
             if (path_has_prefix(normalized, activePrefix))
             {
@@ -669,7 +802,6 @@ namespace util::config
                 continue;
             }
 
-            const QString fallback = derive_game_path(activePrefix, version);
             SPDLOG_WARN("config: replacing game path {} outside active prefix {} with {}",
                         normalized.toStdString(), activePrefix.toStdString(),
                         fallback.toStdString());
@@ -714,14 +846,49 @@ namespace util::config
         const bool hadSessionCredentials = !sessionUser.isEmpty() && !sessionToken.isEmpty();
 
         SPDLOG_INFO("config: files changed externally, reloading");
-        if (!load())
+
+
+
+
+        constexpr int k_unreadable_tolerance = 3;
+
+        const LoadOutcome outcome = load_document();
+        bool recovered = false;
+
+        if (outcome == LoadOutcome::Unreadable)
         {
             d->values = previousValues;
-            reloading = false;
-            watch_files();
-            SPDLOG_WARN("config: ignored incomplete or unreadable external config change");
-            return;
+            ++consecutive_unreadable;
+            if (consecutive_unreadable < k_unreadable_tolerance)
+            {
+
+
+
+                reloading = false;
+                watch_files();
+                SPDLOG_WARN("config: config.json unreadable, retrying ({}/{})",
+                            consecutive_unreadable, k_unreadable_tolerance);
+                if (reload_timer)
+                    reload_timer->start();
+                return;
+            }
+            SPDLOG_ERROR("config: config.json stayed unreadable; rewriting it from the "
+                         "running configuration");
+            recovered = true;
         }
+        else if (outcome == LoadOutcome::Missing)
+        {
+
+
+
+
+            d->values = previousValues;
+            SPDLOG_WARN("config: config.json disappeared while running; rewriting it from the "
+                        "running configuration");
+            recovered = true;
+        }
+
+        consecutive_unreadable = 0;
         apply_defaults();
         normalize_schema();
 
@@ -768,8 +935,12 @@ namespace util::config
             || sessionToken != d->token
             || sessionDisplayName != d->display_name;
 
-        if (valuesChanged)
+        if (recovered || valuesChanged)
+        {
+            recovering = recovered;
             (void)save();
+            recovering = false;
+        }
         else
         {
             watch_files();
@@ -778,6 +949,8 @@ namespace util::config
         reloading = false;
         if (valuesChanged || credentialsChanged)
             emit changed();
+        else if (recovered)
+            SPDLOG_INFO("config: file restored with no change to the running configuration");
         else
             SPDLOG_DEBUG("config: external rewrite contained no effective changes");
     }
@@ -963,22 +1136,7 @@ namespace util::config
             return false;
 
         const QString rootAbsolute = absolute_clean_path(prefix_root());
-        if (!path_has_prefix(candidate, rootAbsolute))
-            return false;
-        if (existing_chain_has_symlink(rootAbsolute, candidate))
-            return false;
-
-        const QString rootCanonical = canonical_or_absolute(rootAbsolute);
-        QString ancestor = candidate;
-        while (!QFileInfo::exists(ancestor))
-        {
-            const QString parent = QFileInfo(ancestor).dir().absolutePath();
-            if (parent == ancestor)
-                break;
-            ancestor = parent;
-        }
-        const QString ancestorCanonical = canonical_or_absolute(ancestor);
-        return path_has_prefix(ancestorCanonical, rootCanonical);
+        return core::wine::host_path_is_inside_prefix(rootAbsolute, candidate);
     }
 
     QString Config::username() const { return d->username; }
@@ -991,12 +1149,34 @@ namespace util::config
         if (wine_binary() == value)
             return;
 
+        const bool oldProton = runtime_is_proton();
         const QString oldPrefix = prefix_root();
         const QString oldPlaytestPath = game_install_path(core::game::GameVersion::Playtest);
         const QString oldAlicia2Path = game_install_path(core::game::GameVersion::Alicia2);
+        const QString oldPlaytestDefault = derive_game_path(
+            oldPrefix, core::game::GameVersion::Playtest);
+        const QString oldAlicia2Default = derive_game_path(
+            oldPrefix, core::game::GameVersion::Alicia2);
 
         d->values[QStringLiteral("wine_binary")] = value;
         rebase_game_install_paths(oldPrefix, oldPlaytestPath, oldAlicia2Path);
+
+        if (oldProton != runtime_is_proton())
+        {
+            const auto updateDefault = [this](const core::game::GameVersion version,
+                                              const QString& oldPath,
+                                              const QString& oldDefault)
+            {
+                if (absolute_clean_path(oldPath) != absolute_clean_path(oldDefault))
+                    return;
+                d->values[game_install_path_key(version)] =
+                    derive_game_path(prefix_root(), version);
+            };
+            updateDefault(core::game::GameVersion::Playtest,
+                          oldPlaytestPath, oldPlaytestDefault);
+            updateDefault(core::game::GameVersion::Alicia2,
+                          oldAlicia2Path, oldAlicia2Default);
+        }
         persist_change();
     }
     void Config::set_winetricks_binary(const QString& value)
@@ -1279,6 +1459,10 @@ namespace util::config
         }
 
         const bool configRemoved = !QFileInfo::exists(file_path()) || QFile::remove(file_path());
+
+
+        if (QFileInfo::exists(backup_path()))
+            (void)QFile::remove(backup_path());
         d->values.clear();
         d->username.clear();
         d->token.clear();

@@ -1,4 +1,5 @@
 #include <QApplication>
+#include <QByteArray>
 #include <QCryptographicHash>
 #include <QDataStream>
 #include <QDir>
@@ -35,6 +36,47 @@
 namespace
 {
     constexpr quint32 k_max_ipc_payload = 64 * 1024;
+
+#ifdef Q_OS_LINUX
+    bool restore_appimage_host_environment()
+    {
+        if (qgetenv("SOA_APPIMAGE_ENV_ACTIVE") != QByteArrayLiteral("1"))
+            return false;
+
+        const auto restore_variable = [](const char* target, const char* saved, const char* was_set)
+        {
+            if (qgetenv(was_set) == QByteArrayLiteral("1"))
+                qputenv(target, qgetenv(saved));
+            else
+                qunsetenv(target);
+
+            qunsetenv(saved);
+            qunsetenv(was_set);
+        };
+
+        restore_variable(
+            "LD_LIBRARY_PATH",
+            "SOA_HOST_LD_LIBRARY_PATH",
+            "SOA_HOST_LD_LIBRARY_PATH_SET");
+        restore_variable(
+            "QT_PLUGIN_PATH",
+            "SOA_HOST_QT_PLUGIN_PATH",
+            "SOA_HOST_QT_PLUGIN_PATH_SET");
+        restore_variable(
+            "QT_QPA_PLATFORM_PLUGIN_PATH",
+            "SOA_HOST_QT_QPA_PLATFORM_PLUGIN_PATH",
+            "SOA_HOST_QT_QPA_PLATFORM_PLUGIN_PATH_SET");
+
+        qunsetenv("SOA_APPIMAGE_ENV_ACTIVE");
+        qunsetenv("SOA_BUNDLED_QT_RUNTIME");
+        return true;
+    }
+#else
+    bool restore_appimage_host_environment()
+    {
+        return false;
+    }
+#endif
 
     bool is_auth_url(const QString& value)
     {
@@ -191,6 +233,8 @@ namespace
 int main(int argc, char* argv[])
 {
     LauncherApplication app(argc, argv);
+    const bool restored_appimage_environment = restore_appimage_host_environment();
+
     app.setApplicationName(QStringLiteral("Story Of Alicia Launcher"));
     app.setApplicationVersion(QString::fromLatin1(SOA_LAUNCHER_VERSION));
     app.setOrganizationName(QStringLiteral("Story Of Alicia"));
@@ -244,6 +288,8 @@ int main(int argc, char* argv[])
 
     core::log::init();
     LauncherLog* launcher_log = LauncherLog::instance();
+    if (restored_appimage_environment)
+        SPDLOG_DEBUG("restored host environment after AppImage Qt bootstrap");
     SPDLOG_INFO("Running Story Of Alicia for Linux and macOS");
     SPDLOG_INFO("Version: {}", SOA_LAUNCHER_VERSION);
     util::assets::load_all();

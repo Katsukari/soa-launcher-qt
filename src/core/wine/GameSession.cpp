@@ -483,7 +483,7 @@ namespace core::wine
             return;
         const bool proton = runtime_.runtime_is_proton();
         QProcessEnvironment environment =
-            proton ? runtime_.proton_env() : QProcessEnvironment::systemEnvironment();
+            proton ? runtime_.umu_environment() : QProcessEnvironment::systemEnvironment();
         environment.insert(QStringLiteral("WINEPREFIX"), Config::instance().prefix_root());
         environment.insert(QStringLiteral("WINEDEBUG"), QStringLiteral("-all"));
 #if defined(Q_OS_MACOS)
@@ -532,7 +532,7 @@ namespace core::wine
         const QString server = runtime_.wineserver_binary();
         const bool proton = runtime_.runtime_is_proton();
         QProcessEnvironment environment =
-            proton ? runtime_.proton_env() : QProcessEnvironment::systemEnvironment();
+            proton ? runtime_.umu_environment() : QProcessEnvironment::systemEnvironment();
         environment.insert(QStringLiteral("WINEPREFIX"), Config::instance().prefix_root());
         environment.insert(QStringLiteral("WINEDEBUG"), QStringLiteral("-all"));
 #if defined(Q_OS_MACOS)
@@ -605,21 +605,31 @@ namespace core::wine
 
         const bool proton = runtime_.runtime_is_proton();
         QProcessEnvironment environment =
-            proton ? runtime_.proton_env() : QProcessEnvironment::systemEnvironment();
-        if (!proton)
+            proton ? runtime_.umu_environment() : QProcessEnvironment::systemEnvironment();
+        QString program;
+        if (proton)
         {
+            program = umu_path();
+            if (program.isEmpty() || !QFileInfo(program).isExecutable())
+            {
+                fail_game_launch(QStringLiteral("Proton launch requires a working umu-run installation."));
+                return;
+            }
+            environment.insert(QStringLiteral("PROTON_VERB"), QStringLiteral("runinprefix"));
+        }
+        else
+        {
+            program = runtime_.wine_binary();
             environment.insert(QStringLiteral("WINEPREFIX"), Config::instance().prefix_root());
             runtime_.apply_wine_environment(environment);
         }
 
         QStringList arguments;
-        if (proton)
-            arguments << QStringLiteral("run");
         arguments << QStringLiteral("reg.exe") << QStringLiteral("query")
                   << QStringLiteral("HKCU\\Software\\Story of Alicia\\Launcher");
 
         ProcessRunner::Request request;
-        request.program = proton ? runtime_.proton_binary() : runtime_.wine_binary();
+        request.program = program;
         request.arguments = arguments;
         request.environment = environment;
         request.timeout_ms = k_registry_timeout_ms;
@@ -769,21 +779,33 @@ namespace core::wine
         pending_registry_file_ = registry_file;
         const bool proton = runtime_.runtime_is_proton();
         QProcessEnvironment environment =
-            proton ? runtime_.proton_env() : QProcessEnvironment::systemEnvironment();
-        if (!proton)
+            proton ? runtime_.umu_environment() : QProcessEnvironment::systemEnvironment();
+        QString program;
+        if (proton)
         {
+            program = umu_path();
+            if (program.isEmpty() || !QFileInfo(program).isExecutable())
+            {
+                QFile::remove(pending_registry_file_);
+                pending_registry_file_.clear();
+                fail_game_launch(QStringLiteral("Proton launch requires a working umu-run installation."));
+                return;
+            }
+            environment.insert(QStringLiteral("PROTON_VERB"), QStringLiteral("runinprefix"));
+        }
+        else
+        {
+            program = runtime_.wine_binary();
             environment.insert(QStringLiteral("WINEPREFIX"), Config::instance().prefix_root());
             runtime_.apply_wine_environment(environment);
         }
 
         QStringList arguments;
-        if (proton)
-            arguments << QStringLiteral("run");
         arguments << QStringLiteral("regedit.exe") << QStringLiteral("/S")
                   << QStringLiteral("C:\\.soa-first-launch.reg");
 
         ProcessRunner::Request request;
-        request.program = proton ? runtime_.proton_binary() : runtime_.wine_binary();
+        request.program = program;
         request.arguments = arguments;
         request.environment = environment;
         request.timeout_ms = k_registry_timeout_ms;
@@ -839,7 +861,7 @@ namespace core::wine
         QProcessEnvironment environment =
             probe_context_valid_
                 ? probe_environment_snapshot_
-                : (proton ? runtime_.proton_env() : QProcessEnvironment::systemEnvironment());
+                : (proton ? runtime_.umu_environment() : QProcessEnvironment::systemEnvironment());
         environment.insert(QStringLiteral("WINEPREFIX"), probe_context_valid_
                                                              ? probe_prefix_snapshot_
                                                              : Config::instance().prefix_root());
@@ -877,7 +899,7 @@ namespace core::wine
         probe_program_snapshot_ = proton ? runtime_.proton_wine_binary() : runtime_.wine_binary();
         probe_prefix_snapshot_ = Config::instance().prefix_root();
         probe_environment_snapshot_ =
-            proton ? runtime_.proton_env() : QProcessEnvironment::systemEnvironment();
+            proton ? runtime_.umu_environment() : QProcessEnvironment::systemEnvironment();
         probe_environment_snapshot_.insert(QStringLiteral("WINEPREFIX"), probe_prefix_snapshot_);
         probe_environment_snapshot_.insert(QStringLiteral("WINEDEBUG"), QStringLiteral("-all"));
 #if defined(Q_OS_MACOS)
@@ -1879,22 +1901,15 @@ namespace core::wine
                 return;
             }
 
-            QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
-            environment.insert(QStringLiteral("GAMEID"), QStringLiteral("0"));
-            environment.insert(QStringLiteral("STORE"), QStringLiteral("none"));
-            environment.insert(QStringLiteral("PROTONPATH"), runtime_.proton_root());
-            environment.insert(QStringLiteral("WINEPREFIX"), prefix);
-            environment.insert(QStringLiteral("STEAM_COMPAT_DATA_PATH"),
-                               Config::instance().proton_compat_data_root());
+            QProcessEnvironment environment = runtime_.umu_environment();
             environment.insert(QStringLiteral("STEAM_COMPAT_LIBRARY_PATHS"),
                                launch_->game_directory + QLatin1Char(':') + prefix);
-            environment.insert(QStringLiteral("WINEDLLOVERRIDES"),
-                               QStringLiteral("winegstreamer="));
-            if (!effective_dxvk)
-            {
+            if (effective_dxvk)
+                environment.remove(QStringLiteral("PROTON_USE_WINED3D"));
+            else
                 environment.insert(QStringLiteral("PROTON_USE_WINED3D"), QStringLiteral("1"));
-            }
-            runtime_.apply_wine_environment(environment);
+            RuntimeLocator::apply_runtime_environment_entries(
+                environment, custom_arguments.environment_entries);
 
             if (alicia_log_hook.available)
             {
@@ -2101,6 +2116,8 @@ namespace core::wine
                                           : QStringLiteral("d3d9,d3d10core,d3d11,dxgi=b"));
 #endif
         runtime_.apply_wine_environment(environment);
+        RuntimeLocator::apply_runtime_environment_entries(
+            environment, custom_arguments.environment_entries);
         if (alicia_log_hook.available)
         {
             if (!alicia_log_hook.log_windows_path.isEmpty())

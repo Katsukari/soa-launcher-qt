@@ -26,7 +26,7 @@ import xml.etree.ElementTree as ET
 from collections import Counter, defaultdict
 from pathlib import Path
 
-# Environment variables and runtime constants the launcher passes around.
+
 MACHINE_NAMES = {
     "WINEPREFIX", "WINEARCH", "WINEDEBUG", "WINEDLLOVERRIDES", "WINESERVER",
     "WINETRICKS", "WINEESYNC", "WINEMSYNC", "WINE_FULLSCREEN_FSR", "LD_PRELOAD",
@@ -40,7 +40,7 @@ MACHINE_NAMES = {
     "Direct3DCreate9", "CreateDevice",
 }
 
-# Wine and macOS log markers that are matched against text, never shown.
+
 LOG_MARKERS = {
     "Backtrace", "Register dump", "Stack dump", "Unhandled exception",
     "Exception frame is not in stack limits", "[REDACTED]",
@@ -49,9 +49,9 @@ LOG_MARKERS = {
     "Apple GPU",
 }
 
-# Looks like a constant but is UI text. All-caps button and section labels are
-# the reason this list exists: a naive "all caps means constant" rule deletes
-# ADVANCED, CANCEL and CHECKING along with WINEPREFIX.
+
+
+
 KEEP = {
     "ABOUT", "ADVANCED", "CANCEL", "CHECKING", "CONFIRMATION", "COPIED",
     "CREDITS", "DOWNLOADING", "ERROR", "FAILED", "HOME", "INFORMATION",
@@ -87,7 +87,7 @@ def classify(source: str) -> str | None:
     if text in LOG_MARKERS:
         return "log marker matched in text, never displayed"
 
-    # Nothing left to translate once markup and placeholders are removed.
+
     bare = PLACEHOLDER.sub("", TAG.sub("", text))
     if not WORD.search(bare):
         return "no translatable words"
@@ -105,8 +105,8 @@ def classify(source: str) -> str | None:
     if re.fullmatch(r"[\w.\-]+\.(exe|dll|log|json|sh|app|drv|so|dylib|png|"
                     r"icns|plist|reg|bat|jsonl)", text, re.I):
         return "filename"
-    # Qt file-dialog filters look like globs but the labels around them are
-    # user-visible: "Applications (*.app);;All Files (*)".
+
+
     if ";;" not in text and not re.search(r"\)\s*$", text):
         if re.search(r"\*\.[a-z]+|[\w.\-]+-\*", text):
             return "glob pattern"
@@ -116,12 +116,12 @@ def classify(source: str) -> str | None:
         return "path fragment"
     if text.startswith(("<?xml", "<!DOCTYPE")):
         return "xml"
-    # Inline CSS or block-level markup should never reach a translator: one
-    # mangled tag breaks the layout, and the styling is not theirs to change.
-    # Build the markup in the source and pass the prose through %1 instead.
+
+
+
     if "style=" in text or re.search(r"<(h[1-6]|div|table|tr|td|p)\b", text, re.I):
         return "markup with styling - split it out of the source"
-    # key=value diagnostic payloads: two or more pairs and no prose
+
     pairs = re.findall(r"\b\w+=(?:%\d+|[\w./\-]*)", text)
     if len(pairs) >= 2 and len(WORD.findall(re.sub(r"\b\w+=\S*", "", text))) == 0:
         return "diagnostic key=value payload"
@@ -197,7 +197,7 @@ def main() -> int:
 
     catalogues = {p: p.read_text(encoding="utf-8") for p in args.files}
 
-    # Catalogues must already agree, or pruning would push them further apart.
+
     sets = {p: set(sources(t)) for p, t in catalogues.items()}
     reference = next(iter(sets.values()))
     for path, entries in sets.items():

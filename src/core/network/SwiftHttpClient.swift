@@ -296,6 +296,7 @@ final class SwiftHttpClient: @unchecked Sendable
         }
         defer { freeaddrinfo(first) }
 
+        var ipv6Fallback: String?
         var current: UnsafeMutablePointer<addrinfo>? = first
         while let entry = current {
             var buffer = [CChar](repeating: 0, count: Int(NI_MAXHOST))
@@ -307,9 +308,18 @@ final class SwiftHttpClient: @unchecked Sendable
                                      0,
                                      NI_NUMERICHOST)
             if status == 0 {
-                return String(cString: buffer)
+                let address = String(cString: buffer)
+                if entry.pointee.ai_family == AF_INET {
+                    return address
+                }
+                if ipv6Fallback == nil {
+                    ipv6Fallback = address
+                }
             }
             current = entry.pointee.ai_next
+        }
+        if let ipv6Fallback {
+            return ipv6Fallback
         }
         throw NetworkFailure("DNS lookup returned no usable address")
     }

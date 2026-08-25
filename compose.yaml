@@ -1,0 +1,23 @@
+name: soa-launcher
+
+services:
+  dev:
+    image: soa-launcher-ubuntu22:qt6.8.3-swift6.3.2
+    build:
+      context: docker/ubuntu22
+      args:
+        SOA_UID: "${SOA_DOCKER_UID:-1000}"
+        SOA_GID: "${SOA_DOCKER_GID:-1000}"
+    init: true
+    stdin_open: true
+    tty: true
+    working_dir: /workspace/soa-launcher-qt
+    volumes:
+      - .:/workspace/soa-launcher-qt
+      - soa-builder-cache:/home/soa/.cache
+    environment:
+      CCACHE_DIR: /home/soa/.cache/ccache
+    command: /bin/bash
+
+volumes:
+  soa-builder-cache:

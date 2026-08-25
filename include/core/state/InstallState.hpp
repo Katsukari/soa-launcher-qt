@@ -26,6 +26,8 @@ namespace core::state
 
         void probe();
         void dismiss_error();
+        void confirm_rules_reviewed();
+        void clear_rules_reviewed();
 
 
     signals:
@@ -48,6 +50,7 @@ namespace core::state
         bool probed {};
         bool prerequisites_confirmed {};
         bool rules_accepted {};
+        bool rules_reviewed {};
         bool runtime_chosen {};
         bool prefix_exists {};
         bool prefix_ready {};

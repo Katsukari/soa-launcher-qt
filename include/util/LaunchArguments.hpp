@@ -10,6 +10,7 @@ namespace util::launch_arguments
         bool valid {};
         QString error;
         QStringList arguments;
+        QStringList environment_entries;
     };
 
     ValidationResult validate(const QString& raw);

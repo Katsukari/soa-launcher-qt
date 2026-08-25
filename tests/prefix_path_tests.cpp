@@ -86,6 +86,41 @@ private slots:
         QVERIFY(error.contains(QStringLiteral("outside"), Qt::CaseInsensitive));
     }
 
+    void allows_user_alias_that_resolves_inside_prefix()
+    {
+        QTemporaryDir directory;
+        QVERIFY(directory.isValid());
+        const QString prefix = directory.filePath(QStringLiteral("prefix"));
+        const QString users = QDir(prefix).filePath(QStringLiteral("drive_c/users"));
+        const QString steamUser = QDir(users).filePath(QStringLiteral("steamuser"));
+        const QString roaming = QDir(steamUser).filePath(QStringLiteral("AppData/Roaming"));
+        QVERIFY(QDir().mkpath(roaming));
+
+        const QString alias = QDir(users).filePath(QStringLiteral("fennavb"));
+        QVERIFY(QFile::link(steamUser, alias));
+        const QString gameDirectory = QDir(alias).filePath(
+            QStringLiteral("AppData/Roaming/Story Of Alicia/game"));
+
+        QVERIFY(core::wine::host_path_is_inside_prefix(prefix, gameDirectory));
+    }
+
+    void rejects_directory_alias_that_resolves_outside_prefix()
+    {
+        QTemporaryDir directory;
+        QVERIFY(directory.isValid());
+        const QString prefix = directory.filePath(QStringLiteral("prefix"));
+        const QString users = QDir(prefix).filePath(QStringLiteral("drive_c/users"));
+        QVERIFY(QDir().mkpath(users));
+
+        const QString outside = directory.filePath(QStringLiteral("outside"));
+        QVERIFY(QDir().mkpath(outside));
+        const QString alias = QDir(users).filePath(QStringLiteral("escape"));
+        QVERIFY(QFile::link(outside, alias));
+
+        QVERIFY(!core::wine::host_path_is_inside_prefix(
+            prefix, QDir(alias).filePath(QStringLiteral("game"))));
+    }
+
 };
 
 QTEST_MAIN(PrefixPathTests)

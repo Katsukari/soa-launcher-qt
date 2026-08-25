@@ -226,6 +226,7 @@ void ImageDropdown::paintEvent(QPaintEvent*)
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
     painter.setRenderHint(QPainter::SmoothPixmapTransform);
+    painter.setOpacity(isEnabled() ? 1.0 : 0.48);
 
     const QPixmap& dropdown_px = util::assets::images[util::assets::Image::MenuDropdown];
     const int lip = dd::pad_bottom(w);

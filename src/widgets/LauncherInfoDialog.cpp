@@ -2,6 +2,7 @@
 
 #include "util/Assets.hpp"
 #include "util/LanguageManager.hpp"
+#include "util/Layout.hpp"
 
 #include <QApplication>
 #include <QDesktopServices>
@@ -15,8 +16,20 @@
 #include <QPushButton>
 #include <QScreen>
 #include <QShowEvent>
+#include <QSize>
+#include <QSizePolicy>
 #include <QUrl>
 #include <QVBoxLayout>
+
+namespace
+{
+    QSize launcher_reference_size(const QWidget* widget)
+    {
+        if (widget && widget->parentWidget())
+            return widget->parentWidget()->window()->size();
+        return util::layout::win::k_default;
+    }
+}
 
 LauncherInfoDialog::LauncherInfoDialog(const Page page_, QWidget* parent)
     : QDialog(parent),
@@ -25,7 +38,9 @@ LauncherInfoDialog::LauncherInfoDialog(const Page page_, QWidget* parent)
     setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
     setWindowModality(Qt::ApplicationModal);
     setAttribute(Qt::WA_TranslucentBackground);
-    setFixedSize(page == Page::Credits ? QSize(610, 460) : QSize(680, 500));
+    const QSize reference = parent ? parent->window()->size() : util::layout::win::k_default;
+    setFixedSize(util::layout::scaled(
+        page == Page::Credits ? QSize(610, 425) : QSize(680, 400), reference));
     setup_ui();
     retranslate();
 
@@ -40,26 +55,33 @@ LauncherInfoDialog::LauncherInfoDialog(const Page page_, QWidget* parent)
 
 void LauncherInfoDialog::setup_ui()
 {
+    const QSize reference = launcher_reference_size(this);
+    const auto scaled = [&reference](const int value)
+    {
+        return util::layout::scaled(value, reference);
+    };
+
     auto* panel = new QFrame(this);
     panel->setObjectName(QStringLiteral("launcherInfoPanel"));
-    panel->setGeometry(rect().adjusted(18, 18, -18, -18));
+    const int panel_inset = scaled(18);
+    panel->setGeometry(rect().adjusted(panel_inset, panel_inset, -panel_inset, -panel_inset));
     panel->setStyleSheet(QStringLiteral(
         "QFrame#launcherInfoPanel {"
         "background: rgba(249,244,240,252);"
         "border: 1px solid rgba(79,23,23,78);"
-        "border-radius: 15px;"
+        "border-radius: 0px;"
         "}"
         "QFrame#launcherInfoCard {"
         "background: rgba(238,224,215,150);"
         "border: 1px solid rgba(79,23,23,38);"
-        "border-radius: 10px;"
+        "border-radius: 0px;"
         "}"
         "QPushButton#launcherInfoLink {"
         "background: rgba(255,255,255,156);"
         "color: #4F1717;"
         "border: 1px solid rgba(79,23,23,52);"
-        "border-radius: 8px;"
-        "padding: 9px 12px;"
+        "border-radius: %1px;"
+        "padding: %2px %3px;"
         "}"
         "QPushButton#launcherInfoLink:hover {"
         "background: rgba(235,220,211,235);"
@@ -68,45 +90,53 @@ void LauncherInfoDialog::setup_ui()
         "QPushButton#launcherInfoLink:pressed {"
         "background: rgba(219,198,186,242);"
         "}"
-        "QLabel { background: transparent; }"));
+        "QLabel { background: transparent; }")
+        .arg(scaled(6))
+        .arg(scaled(8))
+        .arg(scaled(12)));
 
     auto* shadow = new QGraphicsDropShadowEffect(panel);
-    shadow->setBlurRadius(34);
-    shadow->setOffset(0, 8);
+    shadow->setBlurRadius(scaled(34));
+    shadow->setOffset(0, scaled(8));
     shadow->setColor(QColor(43, 28, 19, 94));
     panel->setGraphicsEffect(shadow);
 
     auto* root = new QVBoxLayout(panel);
-    const int horizontal_margin = page == Page::Credits ? 30 : 34;
-    root->setContentsMargins(horizontal_margin,
-                             page == Page::Credits ? 24 : 28,
-                             horizontal_margin,
-                             page == Page::Credits ? 22 : 26);
-    root->setSpacing(page == Page::Credits ? 7 : 8);
+    const int horizontal_margin = scaled(page == Page::Credits ? 30 : 34);
+    root->setContentsMargins(horizontal_margin, scaled(14), horizontal_margin, scaled(14));
+    root->setSpacing(scaled(6));
+    root->setAlignment(Qt::AlignTop);
 
     close_button = new QPushButton(panel);
     close_button->setFlat(true);
-    close_button->setFixedSize(QSize(28, 28));
+    close_button->setFixedSize(util::layout::scaled(util::layout::modal_close::k_hit, reference));
     close_button->setCursor(Qt::PointingHandCursor);
-    close_button->setStyleSheet(QStringLiteral("border:none; background:transparent;"));
+    close_button->setAttribute(Qt::WA_TranslucentBackground);
+    close_button->setStyleSheet(QStringLiteral(
+        "QPushButton { border: none; background: transparent; padding: 0px; }"
+        "QPushButton:hover { border: none; background: transparent; }"
+        "QPushButton:pressed { border: none; background: transparent; }"));
     close_button->setIcon(QIcon(util::assets::images[util::assets::Image::CloseSettings]));
-    close_button->setIconSize(QSize(22, 22));
-    close_button->move(panel->width() - horizontal_margin - close_button->width(), 16);
-    connect(close_button, &QPushButton::clicked, this, &QDialog::accept);
-    close_button->raise();
+    close_button->setIconSize(util::layout::scaled(util::layout::modal_close::k_icon, reference));
+    close_button->setGeometry(util::layout::modal_close::rect_in(panel->rect(), reference));
+    connect(close_button, &QPushButton::clicked, this, &QDialog::reject);
 
     logo_label = new QLabel(panel);
     logo_label->setAlignment(Qt::AlignCenter);
+    logo_label->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
     logo_label->setPixmap(util::assets::images[util::assets::Image::SoaLogo]
-        .scaled(page == Page::Credits ? QSize(78, 54) : QSize(120, 82),
+        .scaled(util::layout::scaled(
+                    page == Page::Credits ? QSize(64, 44) : QSize(92, 58), reference),
                 Qt::KeepAspectRatio, Qt::SmoothTransformation));
-    logo_label->setFixedHeight(page == Page::Credits ? 54 : 82);
+    logo_label->setFixedHeight(scaled(page == Page::Credits ? 44 : 58));
     root->addWidget(logo_label);
 
     title_label = new QLabel(panel);
     title_label->setAlignment(Qt::AlignCenter);
+    title_label->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+    title_label->setFixedHeight(scaled(page == Page::Credits ? 28 : 30));
     QFont title_font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
-    title_font.setPixelSize(page == Page::Credits ? 23 : 26);
+    title_font.setPixelSize(qMax(12, scaled(page == Page::Credits ? 22 : 25)));
     title_font.setWeight(QFont::Black);
     title_label->setFont(title_font);
     title_label->setStyleSheet(QStringLiteral("color: #4F1717;"));
@@ -115,8 +145,10 @@ void LauncherInfoDialog::setup_ui()
     subtitle_label = new QLabel(panel);
     subtitle_label->setAlignment(Qt::AlignCenter);
     subtitle_label->setWordWrap(true);
+    subtitle_label->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+    subtitle_label->setFixedHeight(scaled(page == Page::Credits ? 20 : 22));
     QFont subtitle_font = util::assets::fonts[util::assets::Font::Inter];
-    subtitle_font.setPixelSize(page == Page::Credits ? 13 : 14);
+    subtitle_font.setPixelSize(qMax(9, scaled(page == Page::Credits ? 13 : 14)));
     subtitle_font.setWeight(QFont::Medium);
     subtitle_label->setFont(subtitle_font);
     subtitle_label->setStyleSheet(QStringLiteral("color: #5A4636;"));
@@ -124,23 +156,29 @@ void LauncherInfoDialog::setup_ui()
 
     badge_label = new QLabel(panel);
     badge_label->setAlignment(Qt::AlignCenter);
-    badge_label->setFixedHeight(page == Page::Credits ? 26 : 28);
+    badge_label->setFixedHeight(scaled(page == Page::Credits ? 26 : 28));
+    badge_label->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Fixed);
     QFont badge_font = util::assets::fonts[util::assets::Font::EurostileBlack];
-    badge_font.setPixelSize(12);
+    badge_font.setPixelSize(qMax(8, scaled(12)));
     badge_font.setWeight(QFont::Black);
     badge_label->setFont(badge_font);
     badge_label->setStyleSheet(QStringLiteral(
-        "color: #4F1717; background: rgba(216,205,192,128);"
-        "border-radius: 8px; padding: 2px 12px;"));
+        "color: #4F1717; background: rgba(216,205,192,112);"
+        "border-radius: %1px; padding: %2px %3px;")
+        .arg(scaled(6))
+        .arg(scaled(2))
+        .arg(scaled(12)));
     root->addWidget(badge_label, 0, Qt::AlignHCenter);
 
     auto* info_card = new QFrame(panel);
     info_card->setObjectName(QStringLiteral("launcherInfoCard"));
+    info_card->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
     auto* info_layout = new QVBoxLayout(info_card);
-    info_layout->setContentsMargins(page == Page::Credits ? 18 : 22,
-                                    page == Page::Credits ? 13 : 12,
-                                    page == Page::Credits ? 18 : 22,
-                                    page == Page::Credits ? 13 : 12);
+    info_layout->setContentsMargins(
+        scaled(page == Page::Credits ? 18 : 20),
+        scaled(10),
+        scaled(page == Page::Credits ? 18 : 20),
+        scaled(page == Page::Credits ? 16 : 12));
     info_label = new QLabel(info_card);
     info_label->setTextFormat(Qt::RichText);
     info_label->setWordWrap(true);
@@ -148,27 +186,29 @@ void LauncherInfoDialog::setup_ui()
     info_label->setOpenExternalLinks(true);
     info_label->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     QFont info_font = util::assets::fonts[util::assets::Font::Inter];
-    info_font.setPixelSize(page == Page::Credits ? 12 : 13);
+    info_font.setPixelSize(qMax(8, scaled(page == Page::Credits ? 12 : 13)));
     info_font.setWeight(QFont::Medium);
     info_label->setFont(info_font);
     info_label->setStyleSheet(QStringLiteral("color: #4F1717;"));
-    info_label->setMinimumHeight(page == Page::Credits ? 150 : 88);
     info_layout->addWidget(info_label);
-    info_card->setFixedHeight(page == Page::Credits ? 190 : 122);
+    info_card->setFixedHeight(scaled(page == Page::Credits ? 200 : 116));
+    root->addSpacing(scaled(4));
     root->addWidget(info_card);
 
     links_widget = new QWidget(panel);
+    links_widget->setFixedHeight(scaled(38));
+    links_widget->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
     auto* link_row = new QHBoxLayout(links_widget);
     link_row->setContentsMargins(0, 0, 0, 0);
-    link_row->setSpacing(10);
-    const auto make_link_button = [this]()
+    link_row->setSpacing(scaled(10));
+    const auto make_link_button = [this, &scaled]()
     {
         auto* button = new QPushButton(links_widget);
         button->setObjectName(QStringLiteral("launcherInfoLink"));
         button->setCursor(Qt::PointingHandCursor);
-        button->setMinimumHeight(40);
+        button->setFixedHeight(scaled(38));
         QFont button_font = util::assets::fonts[util::assets::Font::EurostileBlack];
-        button_font.setPixelSize(12);
+        button_font.setPixelSize(qMax(8, scaled(12)));
         button_font.setWeight(QFont::Black);
         button->setFont(button_font);
         return button;
@@ -196,6 +236,7 @@ void LauncherInfoDialog::setup_ui()
         QDesktopServices::openUrl(QUrl(QStringLiteral("mailto:dev@storyofalicia.com")));
     });
 
+    close_button->raise();
 }
 
 void LauncherInfoDialog::retranslate()
@@ -247,7 +288,7 @@ void LauncherInfoDialog::retranslate()
 
 void LauncherInfoDialog::mousePressEvent(QMouseEvent* event)
 {
-    if (event->button() == Qt::LeftButton && event->position().y() <= 74)
+    if (event->button() == Qt::LeftButton && event->position().y() <= util::layout::scaled(74, launcher_reference_size(this)))
     {
         dragging = true;
         drag_offset = event->globalPosition().toPoint() - frameGeometry().topLeft();

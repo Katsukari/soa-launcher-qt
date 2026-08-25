@@ -45,6 +45,24 @@ private slots:
         QVERIFY(!environment.contains(QStringLiteral("invalid-key")));
     }
 
+    void applies_umu_and_dxvk_environment_entries()
+    {
+        QProcessEnvironment environment;
+        environment.insert(QStringLiteral("WINEPREFIX"), QStringLiteral("/safe/prefix"));
+
+        core::wine::RuntimeLocator::apply_runtime_environment_entries(
+            environment,
+            {QStringLiteral("UMU_CONTAINER_NSENTER=1"),
+             QStringLiteral("DXVK_HUD=fps"),
+             QStringLiteral("WINEPREFIX=/escape")});
+
+        QCOMPARE(environment.value(QStringLiteral("UMU_CONTAINER_NSENTER")),
+                 QStringLiteral("1"));
+        QCOMPARE(environment.value(QStringLiteral("DXVK_HUD")), QStringLiteral("fps"));
+        QCOMPARE(environment.value(QStringLiteral("WINEPREFIX")),
+                 QStringLiteral("/safe/prefix"));
+    }
+
     void redacts_process_arguments_and_output()
     {
         const QString secret = QStringLiteral("private-token");
@@ -59,6 +77,21 @@ private slots:
             core::wine::redact_sensitive_text(
                 QStringLiteral("launch -OP [private-token] private-token"), {secret}),
             QStringLiteral("launch -OP [REDACTED] [REDACTED]"));
+    }
+
+    void native_shell_does_not_require_rosetta()
+    {
+#if defined(Q_OS_MACOS)
+        const QString shell = QStandardPaths::findExecutable(QStringLiteral("sh"));
+        QVERIFY(!shell.isEmpty());
+        QVERIFY2(!core::wine::macos::executable_requires_rosetta(shell),
+                 qPrintable(QStringLiteral("Native shell was classified as Intel-only: %1 (%2)")
+                                .arg(shell,
+                                     core::wine::macos::executable_architectures(shell)
+                                         .join(QLatin1Char(' ')))));
+#else
+        QSKIP("Rosetta classification only applies to macOS.");
+#endif
     }
 
     void process_runner_completes_once()

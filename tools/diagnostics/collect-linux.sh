@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Story of Alicia — Linux diagnostics collector.
-# Counterpart to collect-macos.sh. Gathers everything
-# needed to diagnose a failed launch into one archive, and runs the analyser
-# over the newest Wine log so the bundle contains a verdict, not just raw data.
+
+
+
+
 
 set -uo pipefail
 
@@ -41,7 +41,7 @@ mkdir -p "$OUT_DIR"
     echo "32-bit runtime present: $([ -e /lib/i386-linux-gnu ] || [ -e /usr/lib32 ] && echo yes || echo no)"
 } >"$OUT_DIR/summary.txt" 2>&1
 
-# Launcher-owned logs
+
 for candidate in \
     "$DATA_HOME/Story of Alicia" \
     "$CONFIG_HOME/Story of Alicia" \
@@ -53,7 +53,7 @@ for candidate in \
         | while read -r file; do cp -a "$file" "$OUT_DIR/launcher/" 2>/dev/null; done
 done
 
-# Prefix registry (small, and it carries the graphics/audio settings)
+
 if [ -n "${WINEPREFIX:-}" ] && [ -d "$WINEPREFIX" ]; then
     mkdir -p "$OUT_DIR/prefix"
     for reg in system.reg user.reg userdef.reg; do
@@ -61,7 +61,7 @@ if [ -n "${WINEPREFIX:-}" ] && [ -d "$WINEPREFIX" ]; then
     done
 fi
 
-# Run the analyser over the newest Wine log we found.
+
 newest="$(find "$OUT_DIR" -name 'wine*.log' -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2-)"
 if [ -n "$newest" ] && [ -f "$ANALYSER" ] && command -v python3 >/dev/null 2>&1; then
     alicia="$(find "$OUT_DIR" -name 'alicia*.log' | head -1)"

@@ -106,7 +106,7 @@ void WineInstall::setup_buttons()
     change_path_button = new QPushButton("Change path", this);
     change_path_button->setFlat(true);
     change_path_button->setCursor(Qt::PointingHandCursor);
-    change_path_button->setStyleSheet(util::styles::k_link_blue_lg);
+    change_path_button->setStyleSheet(util::styles::link_blue_lg(w));
     change_path_button->setGeometry(util::layout::install_modal::change_path_button(w));
     change_path_button->setAccessibleName(QStringLiteral("Change prefix installation path"));
 
@@ -221,14 +221,14 @@ void WineInstall::paint_content(QPainter& painter)
     caption_font.setWeight(QFont::Normal);
     painter.setFont(caption_font);
     painter.setPen(util::colors::k_text_caption);
-    painter.drawText(path_rect.adjusted(10, 8, -10, 0), Qt::AlignTop | Qt::AlignLeft, util::i18n::translate("DEFAULT INSTALLATION PATH"));
+    painter.drawText(path_rect.adjusted(util::layout::scaled(10, w), util::layout::scaled(8, w), -util::layout::scaled(10, w), 0), Qt::AlignTop | Qt::AlignLeft, util::i18n::translate("DEFAULT INSTALLATION PATH"));
 
     QFont path_font = util::assets::fonts[util::assets::Font::EurostileBold];
     path_font.setPixelSize(util::layout::scaled(16, w));
     path_font.setWeight(QFont::ExtraBold);
     painter.setFont(path_font);
     painter.setPen(util::colors::k_text_maroon);
-    const QRect path_text_rect = path_rect.adjusted(14, 34, -14, 0);
+    const QRect path_text_rect = path_rect.adjusted(util::layout::scaled(14, w), util::layout::scaled(34, w), -util::layout::scaled(14, w), 0);
     const QString elided_path = painter.fontMetrics().elidedText(
         game_path, Qt::ElideMiddle, qMax(1, path_text_rect.width()));
     painter.drawText(path_text_rect, Qt::AlignTop | Qt::AlignLeft, elided_path);

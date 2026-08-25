@@ -48,7 +48,8 @@ private:
     [[nodiscard]] QString rules_url() const;
     [[nodiscard]] QString cache_path() const;
     [[nodiscard]] bool load_cached_document();
-    [[nodiscard]] static QString prepare_document(const QByteArray& source);
+    [[nodiscard]] bool save_cached_document();
+    [[nodiscard]] QString prepare_document(const QByteArray& source) const;
     [[nodiscard]] static QString rewrite_links(const QString& html);
 
     QTextBrowser* rules_text {};

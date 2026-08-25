@@ -287,6 +287,7 @@ void LauncherSettings::setup_run_connectivity_test_option()
         "Diagnose issues connecting to the game and related servers.");
 
     connectivity_button = util::simple_utils::make_flat_button(this);
+    connectivity_button->setProperty("soa_allow_while_mutation_locked", true);
     const QRect button_rect = ls::run_check(w, y);
     connectivity_button->setGeometry(button_rect);
     connectivity_button->setIconSize(button_rect.size());
@@ -301,9 +302,11 @@ void LauncherSettings::setup_run_connectivity_test_option()
     connectivity_button->setAccessibleName(QStringLiteral("Run connectivity check"));
 
     connectivity_panel = new QFrame(this);
+    connectivity_panel->setProperty("soa_allow_while_mutation_locked", true);
     connectivity_panel->setGeometry(lset::connectivity_results(w));
-    connectivity_panel->setStyleSheet(
-        "QFrame { background: rgba(255,255,255,0.42); border: 1px solid rgba(201,187,170,0.7); border-radius: 5px; }");
+    connectivity_panel->setStyleSheet(QStringLiteral(
+        "QFrame { background: rgba(255,255,255,0.42); border: 1px solid rgba(201,187,170,0.7); border-radius: %1px; }")
+        .arg(util::layout::scaled(3, w)));
     connectivity_panel->hide();
 
     connectivity_label = new QLabel(connectivity_panel);
@@ -312,16 +315,18 @@ void LauncherSettings::setup_run_connectivity_test_option()
     connectivity_label->setAlignment(Qt::AlignLeft | Qt::AlignTop);
     connectivity_label->setTextInteractionFlags(Qt::TextSelectableByMouse);
     connectivity_label->setAccessibleName(QStringLiteral("Connectivity check results"));
-    connectivity_label->setStyleSheet(
-        "QLabel { background: transparent; border: none; color: #5A4636; font-family: 'Inter'; font-size: 12px; }");
+    connectivity_label->setStyleSheet(QStringLiteral(
+        "QLabel { background: transparent; border: none; color: #5A4636; font-family: 'Inter'; font-size: %1px; }")
+        .arg(qMax(8, util::layout::scaled(12, w))));
 
     copy_report_button = new QPushButton(QStringLiteral("COPY REPORT"), connectivity_panel);
     copy_report_button->setGeometry(lset::copy_report(w));
     copy_report_button->setCursor(Qt::PointingHandCursor);
     copy_report_button->setAccessibleName(QStringLiteral("Copy connectivity report"));
-    copy_report_button->setStyleSheet(
-        "QPushButton { background: transparent; border: none; color: #9E8E7E; font-family: 'Inter'; font-size: 11px; font-weight: 700; }"
-        "QPushButton:hover { color: #6F5F50; }");
+    copy_report_button->setStyleSheet(QStringLiteral(
+        "QPushButton { background: transparent; border: none; color: #9E8E7E; font-family: 'Inter'; font-size: %1px; font-weight: 700; }"
+        "QPushButton:hover { color: #6F5F50; }")
+        .arg(qMax(8, util::layout::scaled(11, w))));
     connect(copy_report_button, &QPushButton::clicked, this, [this]()
     {
         if (!QApplication::clipboard())
@@ -375,21 +380,32 @@ void LauncherSettings::run_connectivity_check()
 
 void LauncherSettings::start_dns_check()
 {
+    static const QString production_host = QStringLiteral("production.storyofalicia.com");
+    static const QString production_ip = QStringLiteral("5.75.155.237");
     const qulonglong request_id = network_manager->resolve(
-        QStringLiteral("r2.storyofalicia.com"),
+        production_host,
         5000,
         [this](const core::network::DnsResponse& response)
         {
-            const bool ok = response.result == soa_http_result_completed
+            static const QString expected_ip = QStringLiteral("5.75.155.237");
+            const bool resolved = response.result == soa_http_result_completed
                 && !response.address.isEmpty();
-            const QString detail = ok
-                ? QStringLiteral("%1 (%2 ms)").arg(response.address).arg(response.elapsed_ms)
-                : response.error;
+            const bool ok = resolved && response.address == expected_ip;
+            QString detail;
+            if (ok)
+                detail = QStringLiteral("%1 (%2 ms)").arg(response.address).arg(response.elapsed_ms);
+            else if (resolved)
+                detail = QStringLiteral("resolved to %1; expected %2 (%3 ms)")
+                    .arg(response.address, expected_ip)
+                    .arg(response.elapsed_ms);
+            else
+                detail = response.error;
             record_connectivity_result(QStringLiteral("DNS"), ok, detail);
         });
     if (request_id == 0)
         record_connectivity_result(QStringLiteral("DNS"), false,
-                                   QStringLiteral("could not start DNS lookup"));
+                                   QStringLiteral("could not start DNS lookup for %1 (%2)")
+                                       .arg(production_host, production_ip));
 }
 
 void LauncherSettings::start_ping_check()
@@ -490,6 +506,7 @@ void LauncherSettings::record_connectivity_result(const QString& label, const bo
 
 void LauncherSettings::refresh_connectivity_report()
 {
+    const QSize w = window()->size();
     const QStringList left {
         QStringLiteral("DNS"),
         QStringLiteral("Network ping"),
@@ -501,7 +518,7 @@ void LauncherSettings::refresh_connectivity_report()
         QStringLiteral("Discord")
     };
 
-    const auto cell = [this](const QString& label)
+    const auto cell = [this, w](const QString& label)
     {
         const bool complete = connectivity_details.contains(label);
         const bool ok = connectivity_success.value(label);
@@ -512,8 +529,11 @@ void LauncherSettings::refresh_connectivity_report()
             ? QStringLiteral("#9E8E7E")
             : ok ? QStringLiteral("#15936E") : QStringLiteral("#C34A3C");
         return QStringLiteral(
-            "<td width=\"50%\" style=\"padding:1px 10px 2px 0;\">"
-            "<b>%1:</b> <span style=\"color:%2\">%3</span></td>")
+            "<td width=\"50%\" style=\"padding:%1px %2px %3px 0;\">"
+            "<b>%4:</b> <span style=\"color:%5\">%6</span></td>")
+            .arg(util::layout::scaled(1, w))
+            .arg(util::layout::scaled(10, w))
+            .arg(util::layout::scaled(2, w))
             .arg(escaped_html(util::i18n::translate(label)))
             .arg(color)
             .arg(escaped_html(util::i18n::translate(detail)));
@@ -578,6 +598,7 @@ void LauncherSettings::setup_launcher_size_option()
          QStringLiteral("Default (1400x846)"),
          QStringLiteral("Large (1600x967)"),
          QStringLiteral("Extra Large (1920x1160)")}, this);
+    launcher_size_dropdown->set_open_upwards(true);
 
     int index = sizes.indexOf(Config::instance().launcher_size());
     if (index < 0)

@@ -23,6 +23,7 @@ namespace util::simple_utils
                             QPoint offset = {});
     void set_button_asset(QPushButton* button, assets::Button asset);
     void set_button_loading(QPushButton* button, bool loading);
+    void set_button_enabled(QPushButton* button, bool enabled);
     void set_button_text(QPushButton* button, const QString& source);
     void refresh_button(QPushButton* button);
 }

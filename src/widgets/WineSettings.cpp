@@ -102,13 +102,13 @@ void WineSettings::setup_prefix_option()
     auto* field = new QLineEdit(this);
     field->setText(Config::instance().wine_prefix());
     field->setAccessibleName(QStringLiteral("Wine prefix path"));
-    field->setStyleSheet(util::styles::k_field);
+    field->setStyleSheet(util::styles::field(w));
     field->setGeometry(ls::field_rect(w, y));
     sync_field(field, []() { return Config::instance().wine_prefix(); });
 
     auto* browse = new QPushButton(QStringLiteral("..."), this);
     browse->setCursor(Qt::PointingHandCursor);
-    browse->setStyleSheet(util::styles::k_neutral_button);
+    browse->setStyleSheet(util::styles::neutral_button(w));
     browse->setGeometry(ls::browse_rect(w, y));
     browse->setAccessibleName(QStringLiteral("Choose Wine prefix folder"));
     connect(browse, &QPushButton::clicked, this, [this, field]()
@@ -146,7 +146,7 @@ void WineSettings::setup_wine_binary_option()
     auto* field = new QLineEdit(this);
     field->setPlaceholderText(util::i18n::translate("system wine"));
     field->setAccessibleName(QStringLiteral("Custom Wine path"));
-    field->setStyleSheet(util::styles::k_field);
+    field->setStyleSheet(util::styles::field(w));
     field->setGeometry(ls::field_rect(w, y));
     field->setText(Config::instance().wine_binary());
     sync_field(field, []() { return Config::instance().wine_binary(); });
@@ -185,7 +185,7 @@ void WineSettings::setup_wine_binary_option()
 
     auto* browse = new QPushButton(QStringLiteral("..."), this);
     browse->setCursor(Qt::PointingHandCursor);
-    browse->setStyleSheet(util::styles::k_neutral_button);
+    browse->setStyleSheet(util::styles::neutral_button(w));
     browse->setGeometry(ls::browse_rect(w, y));
 #if defined(Q_OS_MACOS)
     browse->setAccessibleName(QStringLiteral("Choose Wine app, executable, or folder"));
@@ -243,14 +243,14 @@ void WineSettings::setup_tricks_option()
     auto* field = new QLineEdit(this);
     field->setPlaceholderText(util::i18n::translate("from %1").arg(QStringLiteral("PATH")));
     field->setAccessibleName(QStringLiteral("Winetricks path"));
-    field->setStyleSheet(util::styles::k_field);
+    field->setStyleSheet(util::styles::field(w));
     field->setGeometry(ls::field_rect(w, y));
     field->setText(Config::instance().winetricks_binary());
     sync_field(field, []() { return Config::instance().winetricks_binary(); });
 
     auto* browse = new QPushButton(QStringLiteral("..."), this);
     browse->setCursor(Qt::PointingHandCursor);
-    browse->setStyleSheet(util::styles::k_neutral_button);
+    browse->setStyleSheet(util::styles::neutral_button(w));
     browse->setGeometry(ls::browse_rect(w, y));
     browse->setAccessibleName(QStringLiteral("Choose Winetricks executable"));
     connect(browse, &QPushButton::clicked, this, [this, field]()
@@ -283,7 +283,7 @@ void WineSettings::setup_wine_args_option()
     auto* field = new QLineEdit(this);
     field->setPlaceholderText(QStringLiteral("WINEESYNC=1"));
     field->setAccessibleName(QStringLiteral("Wine environment variables"));
-    field->setStyleSheet(util::styles::k_field);
+    field->setStyleSheet(util::styles::field(w));
     field->setGeometry(ls::ctrl_pos(w, y).x(), ls::ctrl_pos(w, y).y(),
                        ls::ctrl_w(w), qMax(32, util::layout::scaled(40, w)));
     field->setText(Config::instance().wine_args());

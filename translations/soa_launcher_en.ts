@@ -68,11 +68,6 @@ See launcher.log for the complete command output.</translation>
             <translation> after a crash</translation>
         </message>
         <message>
-            <location filename="../src/widgets/PrerequisitesIntro.cpp" line="106" />
-            <source> and </source>
-            <translation> and </translation>
-        </message>
-        <message>
             <source> The launcher stayed in Launching instead of falsely reporting Running; check the diagnostic log for the first runtime or DLL error.</source>
             <translation> The launcher stayed in Launching instead of falsely reporting Running; check the diagnostic log for the first runtime or DLL error.</translation>
         </message>
@@ -139,11 +134,6 @@ DXVK stays optional and can be enabled later in Settings. Nothing will be instal
         <message>
             <source>%1 · Wine %2</source>
             <translation>%1 · Wine %2</translation>
-        </message>
-        <message>
-            <location filename="../src/widgets/PrerequisitesIntro.cpp" line="109" />
-            <source>, and </source>
-            <translation>, and </translation>
         </message>
         <message>
             <source>-OP, -ID, and -GameID are managed by the launcher and cannot be overridden.</source>
@@ -1611,6 +1601,11 @@ Missing: %1. %2, then restart the launcher.</source>
 Missing: %1. %2, then restart the launcher.</translation>
         </message>
         <message>
+            <location filename="../src/widgets/PrerequisitesIntro.cpp" line="363" />
+            <source>The selected Proton build cannot use UMU Winetricks. Install GE-Proton or UMU-Proton, or install Winetricks on the host, then restart the launcher.</source>
+            <translation>The selected Proton build cannot use UMU Winetricks. Install GE-Proton or UMU-Proton, or install Winetricks on the host, then restart the launcher.</translation>
+        </message>
+        <message>
             <source>Proton Not Available</source>
             <translation>Proton Not Available</translation>
         </message>
@@ -2966,8 +2961,8 @@ Missing: %1.</translation>
         </message>
         <message>
             <location filename="../src/widgets/WineSelectMenu.cpp" line="190" />
-            <source>winetricks not found - required components will be installed manually</source>
-            <translation>winetricks not found - required components will be installed manually</translation>
+            <source>winetricks not found - Wine requires it; GE/UMU Proton uses UMU</source>
+            <translation>winetricks not found - Wine requires it; GE/UMU Proton uses UMU</translation>
         </message>
         <message>
             <location filename="../src/widgets/WineSelectMenu.cpp" line="188" />
@@ -3899,6 +3894,19 @@ Missing: %1.</translation>
         <source>Cancel launcher update download</source>
         <translation>Cancel launcher update download</translation>
     </message>
+    <message>
+        <source>%1 and %2</source>
+        <translation>%1 and %2</translation>
+    </message>
+    <message>
+        <source>%1, and %2</source>
+        <translation>%1, and %2</translation>
+    </message>
+    <message>
+        <source>Linux supports Wine and Proton. macOS supports Wine.</source>
+        <translation>Linux supports Wine and Proton. macOS supports Wine.</translation>
+    </message>
+
 </context>
     <context>
         <name>QPlatformTheme</name>

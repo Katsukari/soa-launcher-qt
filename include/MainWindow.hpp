@@ -62,6 +62,7 @@ public:
     ~MainWindow() override;
 
     void open_launcher_settings();
+    [[nodiscard]] bool has_system_tray() const { return tray_icon != nullptr; }
 
     [[nodiscard]] AuthHandler* auth_handler() const
     {
@@ -132,6 +133,7 @@ private:
     QPushButton* check_updates_button {};
     QPushButton* credits_button {};
     QPushButton* about_button {};
+    QLabel* version_art_label {};
     QLabel* version_label {};
     QPushButton* close_button {};
     QPushButton* minimize_button {};

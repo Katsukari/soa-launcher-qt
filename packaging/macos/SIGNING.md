@@ -1,223 +1,571 @@
-# macOS signing and release guide from Linux
+# macOS signing and local release guide
 
-`.github/workflows/build-macos.yml` builds one universal application and DMG
-containing both arm64 and x86_64 slices. Intel and Apple Silicon therefore use
-the same download, manifest, and three-version update history.
+The macOS release is built locally. GitHub Actions is not part of the signing
+or release process described here.
 
-Pull requests can build without credentials. A public release needs all Apple
-signing and notarization secrets below. The workflow signs the nested Mach-O
-files, app, and DMG; submits the app and DMG to Apple; staples the tickets; and
-verifies the result before uploading the artifact.
+The Apple credentials can be prepared from Linux, but the final signed and
+notarized release must be built on macOS because the release scripts use
+Apple's `codesign`, `notarytool`, `stapler`, Gatekeeper, and DMG tools.
 
-A Mac is not required to create the credentials or build the release. OpenSSL
-on Linux creates the certificate request and `.p12`, while GitHub's macOS runner
-provides `codesign`, `notarytool`, and `stapler`. A real Mac is still strongly
-recommended for testing the finished DMG and launcher behavior.
+There are two macOS build entry points:
 
-Never commit a `.p12`, `.p8`, private update key, password, or base64-encoded
-secret to the repository.
+- `packaging/macos/build-local.sh` builds and tests an **unsigned** `.app`.
+  It does not require signing, notarization, or update-signing credentials.
+- `packaging/macos/build-release-macos-local.sh` is the complete release
+  entry point. It builds, tests, signs, notarizes, staples, creates the DMG,
+  verifies it, and generates signed launcher-update metadata automatically.
 
-If the six Apple secrets are already configured, continue at
-[Test the signed universal build](#5-test-the-signed-universal-build).
+The remaining `.sh` files in `packaging/macos/` are shared helpers used by the
+release entry point. They are not alternative release workflows.
 
-## 1. Create the Developer ID Application certificate on Linux
+Never commit a `.p12`, `.p8`, private update key, password, or other private
+signing material to the repository.
 
-An active Apple Developer Program membership is required. Apple only permits
-the Account Holder to create Developer ID certificates.
+## Apple quick links
 
-1. Install OpenSSL, generate a private RSA key, and create the certificate
-   signing request:
+These are the Apple pages used by this guide:
 
-       sudo apt install openssl
-       umask 077
-       openssl genrsa -out developer-id.key 2048
-       openssl req -new \
-         -key developer-id.key \
-         -out developer-id.csr \
-         -subj "/CN=Story of Alicia Release Key/emailAddress=YOUR_EMAIL"
+- [Apple Developer Program](https://developer.apple.com/programs/)
+- [Certificates, Identifiers & Profiles → Certificates](https://developer.apple.com/account/resources/certificates/list)
+- [Apple: Create Developer ID certificates](https://developer.apple.com/help/account/certificates/create-developer-id-certificates/)
+- [App Store Connect → Users and Access → Integrations](https://appstoreconnect.apple.com/access/integrations/api)
+- [Apple: App Store Connect API / API keys](https://developer.apple.com/help/app-store-connect/get-started/app-store-connect-api)
+- [Apple: Notarizing macOS software before distribution](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution)
+- [Apple Developer ID overview](https://developer.apple.com/developer-id/)
 
-   `CN` is only a descriptive name for the key, so it does not need to be a
-   person's name. Use an email address you control. Country, city, state, and
-   organization are unnecessary; omit them instead of entering invented data.
-   To include a real two-letter country code, add `/C=XX` before `/CN`.
+## 1. Create the Developer ID Application certificate from Linux
 
-2. In [Certificates, Identifiers & Profiles](https://developer.apple.com/account/resources/certificates/list),
-   create a **Developer ID Application** certificate and upload the CSR. Do not
-   choose Developer ID Installer; this project publishes a DMG, not a PKG. See
-   [Create Developer ID certificates](https://developer.apple.com/help/account/certificates/create-developer-id-certificates/).
-3. Download the resulting `.cer`. The examples below assume it is named
-   `developerID_application.cer`.
-4. Convert Apple's DER certificate to PEM:
+An active [Apple Developer Program](https://developer.apple.com/programs/) membership is required.
 
-       openssl x509 \
-         -inform DER \
-         -in developerID_application.cer \
-         -out developerID_application.pem
+### Generate the private key and CSR
 
-5. Combine the certificate and the original private key into a `.p12`:
+Install OpenSSL, then create a private RSA key and certificate signing request:
 
-       openssl pkcs12 -export \
-         -inkey developer-id.key \
-         -in developerID_application.pem \
-         -out developer-id.p12 \
-         -name "Story of Alicia Developer ID"
+```bash
+sudo apt install openssl
 
-   Enter a strong, non-empty export password. This password becomes the
-   `APPLE_DEVELOPER_ID_P12_PASSWORD` secret.
+umask 077
 
-6. Confirm that the `.p12` can be opened before uploading it:
+openssl genrsa -out developer-id.key 2048
 
-       openssl pkcs12 -in developer-id.p12 -info -noout
+openssl req -new \
+  -key developer-id.key \
+  -out developer-id.csr \
+  -subj "/CN=Story of Alicia Release Key/emailAddress=YOUR_EMAIL"
+```
 
-7. Generate the certificate's 40-character SHA-1 fingerprint:
+`CN` is only a descriptive name for the key. Use an email address you control.
+Country, city, state, and organization fields can be omitted if they are not
+needed. If you want to include a real two-letter country code, add `/C=XX`
+before `/CN`.
 
-       openssl x509 \
-         -inform DER \
-         -in developerID_application.cer \
-         -noout \
-         -fingerprint \
-         -sha1 \
-         | cut -d= -f2 \
-         | tr -d ':\n'
+Keep `developer-id.key` private. It is the private key that will later be
+combined with the certificate Apple issues.
 
-   Use this fingerprint as `APPLE_DEVELOPER_IDENTITY`. Apple's `codesign`
-   accepts the fingerprint as an unambiguous signing identity, so the full name
-   does not need to be stored in that GitHub secret. The complete
-   `Developer ID Application: … (TEAMID)` value also works; if it is already
-   configured, changing it to the fingerprint is optional.
+### Request the certificate from Apple
 
-8. Encode the `.p12` as one line:
+Open [Certificates, Identifiers & Profiles → Certificates](https://developer.apple.com/account/resources/certificates/list), then create a
+**Developer ID Application** certificate and upload `developer-id.csr`.
 
-       base64 -w 0 developer-id.p12
+Apple's step-by-step reference is [Create Developer ID certificates](https://developer.apple.com/help/account/certificates/create-developer-id-certificates/).
 
-   Copy the complete output into `APPLE_DEVELOPER_ID_P12_BASE64`.
+Use **Developer ID Application**, not Developer ID Installer. The launcher is
+distributed as a DMG rather than a PKG.
 
-### Developer ID privacy
+Download the resulting certificate. The examples below assume it is named:
 
-The fingerprint keeps the full name out of the identity secret, but it does not
-hide the identity in the signed application. An individual Apple Developer
-membership produces a certificate containing the member's verified legal name
-and Team ID. The supported alternative is an organization membership belonging
-to a verified legal entity; aliases and trade names cannot replace the
-certificate identity.
+```text
+developerID_application.cer
+```
+
+Convert Apple's DER certificate to PEM:
+
+```bash
+openssl x509 \
+  -inform DER \
+  -in developerID_application.cer \
+  -out developerID_application.pem
+```
+
+Combine the certificate with the original private key into a password-protected
+`.p12`:
+
+```bash
+openssl pkcs12 -export \
+  -legacy \
+  -inkey developer-id.key \
+  -in developerID_application.pem \
+  -out developer-id.p12 \
+  -name "Story of Alicia Developer ID" \
+  -keypbe PBE-SHA1-3DES \
+  -certpbe PBE-SHA1-3DES \
+  -macalg sha1
+```
+
+Use a strong, non-empty export password.
+
+Confirm that the `.p12` can be opened before transferring it:
+
+```bash
+openssl pkcs12 \
+  -legacy \
+  -in developer-id.p12 \
+  -info \
+  -noout
+```
+
+You can also print the certificate's SHA-1 fingerprint:
+
+```bash
+openssl x509 \
+  -inform DER \
+  -in developerID_application.cer \
+  -noout \
+  -fingerprint \
+  -sha1 \
+  | cut -d= -f2 \
+  | tr -d ':\n'
+```
+
+The release script can use that 40-character fingerprint as
+`SOA_DEVELOPER_IDENTITY`.
+
+If exactly one Developer ID Application identity is installed on the Mac,
+`build-release-macos-local.sh` selects it automatically, so setting the
+fingerprint is optional.
+
+### Developer ID identity privacy
+
+The fingerprint can be used to select the signing identity without putting the
+full identity string into shell configuration, but it does not hide the
+identity embedded in the signed application.
+
+An individual Apple Developer membership produces a Developer ID certificate
+containing the member's verified certificate identity and Team ID.
 
 ## 2. Create the App Store Connect notarization key
 
-The `.p8` is a separate notarization credential. It is not created from the
-Developer ID `.cer`, `.pem`, `.key`, or `.p12`.
+The App Store Connect `.p8` key is separate from the Developer ID certificate.
+It is not created from the `.cer`, `.pem`, `.key`, or `.p12`.
 
-1. Open [App Store Connect → Users and Access → Integrations](https://appstoreconnect.apple.com/access/integrations/api).
-2. Select **Team Keys**. If **Request Access** appears, the Account Holder must
-   request access and wait for Apple's approval.
-3. Select **Generate API Key**, name it something like `Story of Alicia
-   Notarization`, and choose the **Developer** role.
-4. Record the Key ID and Issuer ID, then download the key. Apple allows each
-   `.p8` private key to be downloaded only once. It will have a name similar to
-   `AuthKey_AB12C3DEFG.p8`. See
-   [App Store Connect API](https://developer.apple.com/help/app-store-connect/get-started/app-store-connect-api/).
-5. Encode the downloaded key as one line on Linux:
+In [App Store Connect → Users and Access → Integrations](https://appstoreconnect.apple.com/access/integrations/api):
 
-       base64 -w 0 AuthKey_AB12C3DEFG.p8
+1. Open **Users and Access → Integrations**.
+2. Select **Team Keys**.
+3. Generate an API key for the release/notarization process.
+4. Record its **Key ID** and **Issuer ID**.
+5. Download the `AuthKey_*.p8` file and store it securely.
 
-   Copy the complete output into `APPLE_NOTARY_KEY_P8_BASE64`.
+Apple's API-key documentation is [App Store Connect API](https://developer.apple.com/help/app-store-connect/get-started/app-store-connect-api).
 
-The workflow passes this key directly to `xcrun notarytool`; it does not need to
-be imported into a keychain.
+Apple only provides the private `.p8` download when the key is created, so keep
+a secure backup.
 
-## 3. Add the GitHub Actions secrets
+The local release scripts use the `.p8` file directly with `xcrun notarytool`.
+It is not imported into the macOS keychain.
 
-In the GitHub repository, open **Settings → Secrets and variables → Actions →
-New repository secret**. GitHub documents the process in
-[Using secrets in GitHub Actions](https://docs.github.com/actions/security-guides/using-secrets-in-github-actions).
+For Apple's explanation of notarization, `notarytool`, and stapling, see
+[Notarizing macOS software before distribution](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution).
 
-Add these repository secrets exactly as named:
+## 3. Create the launcher update-signing key from Linux
 
-| Secret | Value |
+Apple code signing and launcher update signing are separate systems.
+
+The DMG is signed with the Apple Developer ID identity. Launcher self-update
+metadata is signed with an Ed25519 private key whose public half is committed
+in:
+
+```text
+packaging/soa-update-public-key.hex
+```
+
+Generate the update-signing key once on a trusted system:
+
+```bash
+sudo apt install openssl xxd
+
+umask 077
+
+openssl genpkey \
+  -algorithm Ed25519 \
+  -out soa-update-ed25519.pem
+```
+
+Print the 64-character public-key value:
+
+```bash
+openssl pkey \
+  -in soa-update-ed25519.pem \
+  -pubout \
+  -outform DER \
+  | tail -c 32 \
+  | xxd -p -c 64
+```
+
+Put that public value in:
+
+```text
+packaging/soa-update-public-key.hex
+```
+
+Keep the private file:
+
+```text
+soa-update-ed25519.pem
+```
+
+offline and backed up securely.
+
+Do not rotate this key casually. Existing launcher installations trust the
+public key that was compiled into them. Losing the private key prevents new
+metadata from being signed with the key those installations already trust.
+
+`build-release-macos-local.sh` requires the real update-signing key because it
+generates release metadata automatically. It will not intentionally complete a
+release using an ephemeral update key.
+
+## 4. Move the release credentials to the Mac
+
+Securely transfer these private files to the Mac that will produce the release:
+
+```text
+developer-id.p12
+AuthKey_XXXXXXXXXX.p8
+soa-update-ed25519.pem
+```
+
+### Import the Developer ID certificate
+
+For background on Developer ID distribution and Gatekeeper, see
+[Apple Developer ID](https://developer.apple.com/developer-id/).
+
+Import `developer-id.p12` into the login keychain using **Keychain Access**.
+The certificate and its private key must both be present.
+
+Verify that macOS sees the signing identity:
+
+```bash
+security find-identity -v -p codesigning
+```
+
+You should see a valid:
+
+```text
+Developer ID Application: ...
+```
+
+identity.
+
+The `.p8` notarization key and Ed25519 update-signing key do **not** need to be
+imported into Keychain Access. Keep them in a private directory readable only
+by the release user.
+
+For example:
+
+```bash
+mkdir -p "$HOME/private"
+chmod 700 "$HOME/private"
+```
+
+Then place the private files there and restrict their permissions:
+
+```bash
+chmod 600 \
+  "$HOME/private/AuthKey_XXXXXXXXXX.p8" \
+  "$HOME/private/soa-update-ed25519.pem"
+```
+
+## 5. Prepare the Mac build environment
+
+The build scripts expect the normal project build dependencies plus Apple's
+developer tools.
+
+At minimum, the release machine needs the tools checked by the scripts,
+including:
+
+```text
+cmake
+codesign
+cpack
+ditto
+hdiutil
+lipo
+security
+spctl
+xcrun
+swift
+file
+otool
+i686-w64-mingw32-gcc
+i686-w64-mingw32-g++
+```
+
+The update metadata generator also uses:
+
+```text
+OpenSSL 3
+jq
+curl
+```
+
+A complete Qt 6 macOS installation is required. The default release is
+universal:
+
+```text
+x86_64 + arm64
+```
+
+so the Qt installation selected by `SOA_QT_PREFIX` must contain both
+architectures.
+
+The build scripts verify the actual architectures before continuing.
+
+## 6. Build the signed and notarized release
+
+From the repository root, configure the paths and IDs for the current shell:
+
+```bash
+export SOA_QT_PREFIX="$HOME/Qt/6.9.3/macos"
+
+export SOA_NOTARY_KEY="$HOME/private/AuthKey_XXXXXXXXXX.p8"
+export SOA_NOTARY_KEY_ID="XXXXXXXXXX"
+export SOA_NOTARY_ISSUER_ID="00000000-0000-0000-0000-000000000000"
+
+export SOA_UPDATE_SIGNING_KEY="$HOME/private/soa-update-ed25519.pem"
+```
+
+If more than one Developer ID Application identity is installed, select the
+correct one explicitly:
+
+```bash
+export SOA_DEVELOPER_IDENTITY="YOUR_40_CHARACTER_SHA1_FINGERPRINT"
+```
+
+If exactly one Developer ID Application identity is installed, that variable
+can normally be omitted.
+
+If the default `openssl` is not OpenSSL 3, point the metadata generator at the
+correct executable:
+
+```bash
+export SOA_OPENSSL="/path/to/openssl"
+```
+
+For a Homebrew OpenSSL 3 installation, that can for example be:
+
+```bash
+export SOA_OPENSSL="$(brew --prefix openssl@3)/bin/openssl"
+```
+
+Run the complete release:
+
+```bash
+./packaging/macos/build-release-macos-local.sh
+```
+
+The release script already performs the complete chain:
+
+```text
+build-local.sh
+    ↓
+build + tests
+    ↓
+macdeployqt
+    ↓
+sign-app.sh
+    ↓
+notarize app archive
+    ↓
+staple + Gatekeeper check
+    ↓
+create DMG
+    ↓
+sign DMG
+    ↓
+notarize DMG
+    ↓
+staple + Gatekeeper check
+    ↓
+generate-macos-update-metadata.sh
+    ↓
+verify-release.sh
+```
+
+Do not manually repeat these signing/notarization steps unless you are
+debugging a helper script.
+
+The default DMG output is:
+
+```text
+build-macos-release-local/Story_Of_Alicia-<version>-macos.dmg
+```
+
+Use a fresh `SOA_BUILD_DIR` rather than renaming an already configured CMake
+build directory. CMake records absolute build paths.
+
+To use another build directory:
+
+```bash
+export SOA_BUILD_DIR="$PWD/build-macos-release-test"
+./packaging/macos/build-release-macos-local.sh
+```
+
+## 7. Update metadata is generated automatically
+
+A successful release automatically runs:
+
+```text
+packaging/macos/generate-macos-update-metadata.sh
+```
+
+The current generator produces the signed macOS metadata files in
+`packaging/macos/`:
+
+```text
+manifest.json
+manifest.json.seal
+versions.json
+versions.json.seal
+```
+
+The history generator keeps at most three releases.
+
+When the real update key is used, it verifies that the private key matches the
+public key in `packaging/soa-update-public-key.hex`. If existing remote history is
+available, it also verifies that history before extending it.
+
+You therefore do not need a separate metadata-generation command for a normal
+release.
+
+## 8. Verify an existing DMG again
+
+The release entry point already runs the full verification helper.
+
+To rerun the audit later without rebuilding:
+
+```bash
+./packaging/macos/verify-release.sh \
+  build-macos-release-local/Story_Of_Alicia-<version>-macos.dmg \
+  packaging/macos/manifest.json \
+  packaging/macos/manifest.json.seal \
+  packaging/macos/versions.json \
+  packaging/macos/versions.json.seal
+```
+
+`verify-release.sh` checks the release independently, including signatures,
+stapled tickets, Gatekeeper assessment, architectures, deployment target,
+nested Mach-O signatures, and non-portable library paths.
+
+You can also use Apple's checks directly when diagnosing a problem:
+
+```bash
+codesign --verify \
+  --strict \
+  --verbose=4 \
+  build-macos-release-local/Story_Of_Alicia-<version>-macos.dmg
+
+xcrun stapler validate \
+  build-macos-release-local/Story_Of_Alicia-<version>-macos.dmg
+
+spctl --assess \
+  --type open \
+  --context context:primary-signature \
+  --verbose=4 \
+  build-macos-release-local/Story_Of_Alicia-<version>-macos.dmg
+```
+
+## 9. Build only an unsigned local `.app`
+
+When you only want the application bundle for local development or testing,
+use:
+
+```bash
+./packaging/macos/build-local.sh
+```
+
+This path deliberately does **not**:
+
+- require a Developer ID identity,
+- sign the application,
+- submit anything to Apple,
+- require notarization credentials,
+- require the private update-signing key,
+- create a DMG release, or
+- generate signed release metadata.
+
+It still builds the application, runs the tests, deploys Qt, and verifies the
+important bundled architecture/runtime pieces.
+
+The output is an unsigned `.app` in the selected local build directory.
+
+## 10. What each macOS script is for
+
+| Script | Purpose |
 | --- | --- |
-| `APPLE_DEVELOPER_ID_P12_BASE64` | One-line base64 value of the `.p12` |
-| `APPLE_DEVELOPER_ID_P12_PASSWORD` | Password used when exporting the `.p12` |
-| `APPLE_DEVELOPER_IDENTITY` | 40-character SHA-1 fingerprint from the `.cer` |
-| `APPLE_NOTARY_KEY_P8_BASE64` | One-line base64 value of the `.p8` |
-| `APPLE_NOTARY_KEY_ID` | App Store Connect API Key ID |
-| `APPLE_NOTARY_ISSUER_ID` | App Store Connect Issuer ID |
+| `build-local.sh` | Build/test/deploy an unsigned local `.app` |
+| `build-release-macos-local.sh` | Complete signed/notarized release build |
+| `sign-app.sh` | Sign nested Mach-O code and the `.app` |
+| `notarize.sh` | Submit an app archive or DMG to Apple and wait for the result |
+| `verify-release.sh` | Audit the finished DMG and its SOA Seal metadata |
+| `generate-macos-update-metadata.sh` | Generate and sign macOS update metadata |
+| `packaging/publish-release.sh` | Publish both platform packages and metadata after both builds are ready |
 
-These must be repository or organization Actions secrets available to this
-repository. The workflow does not attach a GitHub Environment, so secrets stored
-only inside an Environment will not be visible.
+For a normal macOS release build, run:
 
-There is no secret named exactly `APPLE_DEVELOPER_ID`. The workflow uses the
-three `APPLE_DEVELOPER_ID_*` secrets shown above.
+```bash
+./packaging/macos/build-release-macos-local.sh
+```
 
-## 4. Keep the launcher update-signing key configured
+The release builder creates and verifies:
 
-Apple signing proves the DMG came from the Developer ID holder. Launcher
-self-update metadata uses a separate Ed25519 key. Official Linux and macOS
-artifacts both require the repository secret `SOA_UPDATE_SIGNING_KEY_B64` to
-match `packaging/update-public-key.hex` (and, when set, the repository variable
-`SOA_UPDATE_PUBLIC_KEY_HEX`). If that secret already exists and builds pass, do
-not rotate it.
+```text
+build-macos-release-local/Story_Of_Alicia-<version>-macos.dmg
+packaging/macos/manifest.json
+packaging/macos/manifest.json.seal
+packaging/macos/versions.json
+packaging/macos/versions.json.seal
+```
 
-For a first release, generate the key once on a trusted Linux system and keep a
-secure offline backup:
+## 11. Publish the release locally
 
-    sudo apt install openssl xxd
-    umask 077
-    openssl genpkey -algorithm Ed25519 -out soa-update-ed25519.pem
-    openssl pkey -in soa-update-ed25519.pem -pubout -outform DER \
-      | tail -c 32 | xxd -p -c 64
-    base64 -w 0 soa-update-ed25519.pem
+GitHub Actions is not used for releases. Create and push the release tag first,
+and create the `launcher-updates` branch before the first publish. The branch
+stores only update metadata under `linux/` and `macos/`.
 
-Put the printed 64-character public hex value in
-`packaging/update-public-key.hex` and the `SOA_UPDATE_PUBLIC_KEY_HEX` repository
-variable. Put the clipboard value in the `SOA_UPDATE_SIGNING_KEY_B64`
-repository secret. The public key must be committed before building the
-release. Losing the private key prevents publishing updates trusted by existing
-installations; rotating the public key requires shipping a launcher that trusts
-the new key first.
+Authenticate the GitHub CLI and Git push access:
 
-## 5. Test the signed universal build
+```bash
+gh auth login
+gh auth setup-git
+```
 
-Run **Build macOS (Universal)** from the Actions tab with `workflow_dispatch`,
-or push the intended commit to `main`. Confirm that these steps run rather than
-being skipped:
+Set the R2 credentials in the current shell:
 
-- Import Developer ID certificate
-- Prepare notarization key
-- Bundle and sign macOS application
-- Sign and notarize macOS DMG
+```bash
+export SOA_R2_ACCOUNT_ID="..."
+export SOA_R2_BUCKET="..."
+export AWS_ACCESS_KEY_ID="..."
+export AWS_SECRET_ACCESS_KEY="..."
+```
 
-The official artifact name is `soa-launcher-macos-universal-dmg`. A name ending
-in `-ephemeral-metadata` means `SOA_UPDATE_SIGNING_KEY_B64` was unavailable and
-that build must not be published as a launcher update.
+After the Linux and macOS release builders have both completed, put the
+AppImage and DMG on the same machine and run:
 
-No Mac is required for this CI test. The `macos-15` runner imports the `.p12`,
-selects it with `APPLE_DEVELOPER_IDENTITY`, signs the universal app and DMG,
-submits both to Apple, staples the tickets, and runs Apple's verification tools.
-If the certificate password, fingerprint, Key ID, Issuer ID, or encoded files
-are wrong, the corresponding import, signing, or notarization step will fail.
+```bash
+./packaging/publish-release.sh \
+  /path/to/Story_Of_Alicia-1.0.1-x86_64.AppImage \
+  /path/to/Story_Of_Alicia-1.0.1-macos.dmg
+```
 
-For final user-facing validation, download the DMG on a real Mac, open it, run
-the launcher, and check it again with:
+The publisher uploads only the AppImage and DMG as custom GitHub Release assets. GitHub still shows its automatic source-code archives separately. Update metadata is committed to the `launcher-updates` branch and uploaded to R2.
 
-    codesign --verify --strict --verbose=4 Story_Of_Alicia-macos.dmg
-    xcrun stapler validate Story_Of_Alicia-macos.dmg
-    spctl --assess --type open --context context:primary-signature \
-      --verbose=4 Story_Of_Alicia-macos.dmg
+Before either platform generator creates `versions.json`, it fetches the
+existing signed history from R2 and from the raw `launcher-updates` branch. If
+both copies exist, they must match. The current release is merged into that
+verified history and only the newest three releases are retained.
 
-## 6. Publish a release
+The launcher reads metadata from R2 first and falls back to the raw
+`launcher-updates` branch. Package downloads use R2 first and the matching
+GitHub Release asset as the mirror.
 
-`release.yml` does not rebuild packages. It downloads successful
-`build-linux.yml` and `build-macos.yml` artifacts for the exact tagged commit.
-Use this order:
-
-1. Make sure the version in `CMakeLists.txt` is the version being released.
-2. Push or merge the exact release commit to `main`.
-3. Wait for both Linux and macOS build workflows to succeed for that commit.
-4. Tag that same commit and push the tag:
-
-       git tag -a v1.0.0 -m "Story of Alicia Launcher 1.0.0"
-       git push origin v1.0.0
-
-The tag must use the `.yml` workflow files already present in the repository;
-GitHub Actions accepts both `.yml` and `.yaml`, but the release script looks up
-the exact filenames `build-linux.yml` and `build-macos.yml`.
+R2 stores packages directly in the platform directory with versioned filenames, such as `Story_Of_Alicia-1.0.1-x86_64.AppImage` and `Story_Of_Alicia-1.0.1-macos.dmg`, so retained history entries never overwrite one another.

@@ -59,9 +59,15 @@ namespace core::wine
             bool inspect_components_after {};
             bool invalidates_marker {};
             bool optional_failure {};
+
+
+
+
+            bool succeeds_if_prefix_ready {};
         };
 
         [[nodiscard]] bool ensure_idle();
+        [[nodiscard]] bool prefix_structure_ready() const;
         [[nodiscard]] QStringList missing_component_packages() const;
         [[nodiscard]] bool queue_missing_components();
         void run_setup(QVector<SetupCommand> commands, Kind kind);

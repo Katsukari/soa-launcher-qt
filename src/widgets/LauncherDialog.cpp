@@ -2,6 +2,7 @@
 
 #include "util/Assets.hpp"
 #include "util/LanguageManager.hpp"
+#include "util/Layout.hpp"
 
 #include <QApplication>
 #include <QColor>
@@ -12,10 +13,26 @@
 #include <QLabel>
 #include <QMouseEvent>
 #include <QPushButton>
+#include <QSize>
 #include <QSizePolicy>
 #include <QVBoxLayout>
 
 #include <utility>
+
+namespace
+{
+    QSize launcher_reference_size(const QWidget* widget)
+    {
+        if (widget && widget->parentWidget())
+            return widget->parentWidget()->window()->size();
+        return util::layout::win::k_default;
+    }
+
+    int ui_scaled(const QWidget* widget, const int value)
+    {
+        return util::layout::scaled(value, launcher_reference_size(widget));
+    }
+}
 
 LauncherDialog::LauncherDialog(const Tone tone_, const QString& title,
                                const QString& message, const QString& details,
@@ -31,7 +48,7 @@ LauncherDialog::LauncherDialog(const Tone tone_, const QString& title,
     setModal(true);
     setWindowModality(Qt::WindowModal);
     setSizeGripEnabled(false);
-    setMinimumWidth(680);
+    setMinimumWidth(ui_scaled(this, 680));
     build_ui();
     connect(&util::i18n::LanguageManager::instance(),
             &util::i18n::LanguageManager::language_changed,
@@ -42,67 +59,78 @@ LauncherDialog::LauncherDialog(const Tone tone_, const QString& title,
 void LauncherDialog::build_ui()
 {
     auto* outer = new QVBoxLayout(this);
-    outer->setContentsMargins(22, 22, 22, 22);
+    const int outer_margin = ui_scaled(this, 22);
+    outer->setContentsMargins(outer_margin, outer_margin, outer_margin, outer_margin);
 
     panel = new QFrame(this);
     panel->setObjectName(QStringLiteral("launcherDialogPanel"));
-    panel->setMinimumWidth(636);
+    panel->setMinimumWidth(ui_scaled(this, 636));
     panel->setAttribute(Qt::WA_StyledBackground);
     panel->setStyleSheet(QStringLiteral(
         "QFrame#launcherDialogPanel {"
         "background: rgba(249,244,240,252);"
         "border: 1px solid rgba(79,23,23,86);"
-        "border-radius: 15px;"
+        "border-radius: 0px;"
         "}"
         "QFrame#launcherDialogDetails {"
         "background: rgba(238,224,215,178);"
         "border: 1px solid rgba(79,23,23,45);"
-        "border-radius: 9px;"
+        "border-radius: 0px;"
         "}"
         "QLabel { background: transparent; }"
         "QPushButton#launcherDialogClose {"
-        "background: rgba(255,255,255,170);"
-        "border: 1px solid rgba(79,23,23,54);"
-        "border-radius: 9px;"
+        "background: transparent;"
+        "border: none;"
         "padding: 0px;"
         "}"
         "QPushButton#launcherDialogClose:hover {"
-        "background: rgba(235,220,211,242);"
-        "border-color: rgba(79,23,23,110);"
+        "background: transparent;"
+        "border: none;"
+        "}"
+        "QPushButton#launcherDialogClose:pressed {"
+        "background: transparent;"
+        "border: none;"
         "}"));
 
     auto* shadow = new QGraphicsDropShadowEffect(panel);
-    shadow->setBlurRadius(34);
-    shadow->setOffset(0, 8);
+    shadow->setBlurRadius(ui_scaled(this, 34));
+    shadow->setOffset(0, ui_scaled(this, 8));
     shadow->setColor(QColor(43, 28, 19, 100));
     panel->setGraphicsEffect(shadow);
     outer->addWidget(panel);
 
     auto* root = new QVBoxLayout(panel);
-    root->setContentsMargins(32, 24, 32, 30);
-    root->setSpacing(15);
+    root->setContentsMargins(ui_scaled(this, 28), ui_scaled(this, 20),
+                             ui_scaled(this, 28), ui_scaled(this, 24));
+    root->setSpacing(ui_scaled(this, 12));
 
     auto* top = new QHBoxLayout;
-    top->setContentsMargins(0, 0, 0, 0);
-    top->setSpacing(12);
+
+
+
+
+    top->setContentsMargins(0, 0, ui_scaled(this, 52), 0);
+    top->setSpacing(ui_scaled(this, 12));
 
     tone_badge = new QLabel(panel);
     tone_badge->setAlignment(Qt::AlignCenter);
-    tone_badge->setFixedSize(42, 42);
+    const QSize tone_badge_size = util::layout::scaled(QSize(42, 42), launcher_reference_size(this));
+    tone_badge->setFixedSize(tone_badge_size);
     QFont badge_font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
-    badge_font.setPixelSize(20);
+    badge_font.setPixelSize(qMax(10, ui_scaled(this, 20)));
     badge_font.setWeight(QFont::Black);
     tone_badge->setFont(badge_font);
     tone_badge->setStyleSheet(QStringLiteral(
-        "color: #FFFFFF; background: #4F1717; border-radius: 21px;"));
+        "color: #FFFFFF; background: #4F1717; border-radius: %1px;")
+        .arg(tone_badge_size.height() / 2));
     top->addWidget(tone_badge);
 
     auto* title_column = new QVBoxLayout;
-    title_column->setSpacing(1);
+    title_column->setSpacing(ui_scaled(this, 1));
     auto* category = new QLabel(panel);
     category->setObjectName(QStringLiteral("launcherDialogCategory"));
     QFont category_font = util::assets::fonts[util::assets::Font::EurostileBlack];
-    category_font.setPixelSize(11);
+    category_font.setPixelSize(qMax(8, ui_scaled(this, 11)));
     category_font.setWeight(QFont::Black);
     category->setFont(category_font);
     category->setStyleSheet(QStringLiteral("color: #9E8E7E; letter-spacing: 1px;"));
@@ -111,7 +139,7 @@ void LauncherDialog::build_ui()
     title_label = new QLabel(panel);
     title_label->setWordWrap(true);
     QFont title_font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
-    title_font.setPixelSize(23);
+    title_font.setPixelSize(qMax(12, ui_scaled(this, 23)));
     title_font.setWeight(QFont::Black);
     title_label->setFont(title_font);
     title_label->setStyleSheet(QStringLiteral("color: #4F1717;"));
@@ -120,12 +148,13 @@ void LauncherDialog::build_ui()
 
     close_button = new QPushButton(panel);
     close_button->setObjectName(QStringLiteral("launcherDialogClose"));
-    close_button->setFixedSize(40, 40);
+    close_button->setFixedSize(util::layout::scaled(util::layout::modal_close::k_hit, launcher_reference_size(this)));
     close_button->setCursor(Qt::PointingHandCursor);
+    close_button->setFlat(true);
+    close_button->setAttribute(Qt::WA_TranslucentBackground);
     close_button->setIcon(QIcon(util::assets::images[util::assets::Image::CloseSettings]));
-    close_button->setIconSize(QSize(16, 16));
+    close_button->setIconSize(util::layout::scaled(util::layout::modal_close::k_icon, launcher_reference_size(this)));
     connect(close_button, &QPushButton::clicked, this, &QDialog::reject);
-    top->addWidget(close_button, 0, Qt::AlignTop);
     root->addLayout(top);
 
     message_label = new QLabel(panel);
@@ -134,23 +163,24 @@ void LauncherDialog::build_ui()
     message_label->setAlignment(Qt::AlignLeft | Qt::AlignTop);
     message_label->setTextInteractionFlags(Qt::TextSelectableByMouse);
     QFont message_font = util::assets::fonts[util::assets::Font::Inter];
-    message_font.setPixelSize(14);
+    message_font.setPixelSize(qMax(9, ui_scaled(this, 14)));
     message_font.setWeight(QFont::Medium);
     message_label->setFont(message_font);
     message_label->setStyleSheet(QStringLiteral("color: #4F1717;"));
-    message_label->setMinimumWidth(574);
+    message_label->setMinimumWidth(ui_scaled(this, 574));
     root->addWidget(message_label);
 
     details_card = new QFrame(panel);
     details_card->setObjectName(QStringLiteral("launcherDialogDetails"));
     auto* details_layout = new QVBoxLayout(details_card);
-    details_layout->setContentsMargins(16, 12, 16, 12);
+    details_layout->setContentsMargins(ui_scaled(this, 16), ui_scaled(this, 12),
+                                        ui_scaled(this, 16), ui_scaled(this, 12));
     details_label = new QLabel(details_card);
     details_label->setTextFormat(Qt::PlainText);
     details_label->setWordWrap(true);
     details_label->setTextInteractionFlags(Qt::TextSelectableByMouse);
     QFont details_font = util::assets::fonts[util::assets::Font::Inter];
-    details_font.setPixelSize(12);
+    details_font.setPixelSize(qMax(8, ui_scaled(this, 12)));
     details_font.setWeight(QFont::Medium);
     details_label->setFont(details_font);
     details_label->setStyleSheet(QStringLiteral("color: #6C584A;"));
@@ -158,12 +188,12 @@ void LauncherDialog::build_ui()
     root->addWidget(details_card);
 
     action_container = new QWidget(panel);
-    action_container->setMinimumHeight(48);
+    action_container->setMinimumHeight(ui_scaled(this, 48));
     action_container->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     action_container->setStyleSheet(QStringLiteral("background: transparent;"));
     auto* actions = new QHBoxLayout(action_container);
-    actions->setContentsMargins(0, 4, 0, 0);
-    actions->setSpacing(12);
+    actions->setContentsMargins(0, ui_scaled(this, 4), 0, 0);
+    actions->setSpacing(ui_scaled(this, 12));
     actions->addStretch();
     root->addWidget(action_container);
 
@@ -213,7 +243,9 @@ void LauncherDialog::retranslate()
         case Tone::Question: accent = QStringLiteral("#4F1717"); break;
     }
     tone_badge->setStyleSheet(QStringLiteral(
-        "color: #FFFFFF; background: %1; border-radius: 21px;").arg(accent));
+        "color: #FFFFFF; background: %1; border-radius: %2px;")
+        .arg(accent)
+        .arg(tone_badge->height() / 2));
 
     const auto category_labels = panel->findChildren<QLabel*>();
     for (QLabel* label : category_labels)
@@ -238,13 +270,19 @@ void LauncherDialog::retranslate()
     panel->layout()->activate();
     layout()->activate();
     const int action_width = action_container->layout()->sizeHint().width();
-    const int required_width = qBound(680, action_width + 112, 860);
-    message_label->setMinimumWidth(required_width - 106);
-    panel->setMinimumWidth(required_width - 44);
+    const int required_width = qBound(ui_scaled(this, 680),
+                                      action_width + ui_scaled(this, 112),
+                                      ui_scaled(this, 860));
+    message_label->setMinimumWidth(required_width - ui_scaled(this, 106));
+    panel->setMinimumWidth(required_width - ui_scaled(this, 44));
     panel->layout()->activate();
     layout()->activate();
-    const int required_height = qMax(220, layout()->sizeHint().height());
+    const int required_height = qMax(ui_scaled(this, 220), layout()->sizeHint().height());
     setFixedSize(required_width, required_height);
+    layout()->activate();
+    panel->layout()->activate();
+    close_button->setGeometry(util::layout::modal_close::rect_in(panel->rect(), launcher_reference_size(this)));
+    close_button->raise();
 }
 
 QPushButton* LauncherDialog::add_action(const Action& action)
@@ -252,11 +290,11 @@ QPushButton* LauncherDialog::add_action(const Action& action)
     auto* layout = qobject_cast<QHBoxLayout*>(action_container->layout());
     auto* button = new QPushButton(action_container);
     button->setCursor(Qt::PointingHandCursor);
-    button->setFixedHeight(42);
-    button->setMinimumWidth(118);
+    button->setFixedHeight(ui_scaled(this, 42));
+    button->setMinimumWidth(ui_scaled(this, 118));
     button->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
     QFont font = util::assets::fonts[util::assets::Font::EurostileBlack];
-    font.setPixelSize(12);
+    font.setPixelSize(qMax(8, ui_scaled(this, 12)));
     font.setWeight(QFont::Black);
     button->setFont(font);
     button->setProperty("dialogTextSource", action.text);
@@ -265,23 +303,32 @@ QPushButton* LauncherDialog::add_action(const Action& action)
         case ActionStyle::Primary:
             button->setStyleSheet(QStringLiteral(
                 "QPushButton { background: #20ACDA; color: #FFFFFF;"
-                "border: 1px solid #1198C5; border-radius: 8px; padding: 9px 18px; }"
+                "border: 1px solid #1198C5; border-radius: %1px; padding: %2px %3px; }"
                 "QPushButton:hover { background: #39BCE7; border-color: #168BB0; }"
-                "QPushButton:pressed { background: #168EB8; }"));
+                "QPushButton:pressed { background: #168EB8; }")
+                .arg(ui_scaled(this, 6))
+                .arg(ui_scaled(this, 9))
+                .arg(ui_scaled(this, 18)));
             break;
         case ActionStyle::Neutral:
             button->setStyleSheet(QStringLiteral(
                 "QPushButton { background: rgba(255,255,255,210); color: #4F1717;"
-                "border: 1px solid rgba(79,23,23,72); border-radius: 8px; padding: 9px 18px; }"
+                "border: 1px solid rgba(79,23,23,72); border-radius: %1px; padding: %2px %3px; }"
                 "QPushButton:hover { background: #EEE0D7; border-color: rgba(79,23,23,125); }"
-                "QPushButton:pressed { background: #DDC9BD; }"));
+                "QPushButton:pressed { background: #DDC9BD; }")
+                .arg(ui_scaled(this, 6))
+                .arg(ui_scaled(this, 9))
+                .arg(ui_scaled(this, 18)));
             break;
         case ActionStyle::Destructive:
             button->setStyleSheet(QStringLiteral(
                 "QPushButton { background: #E84B24; color: #FFFFFF;"
-                "border: 1px solid #C83515; border-radius: 8px; padding: 9px 18px; }"
+                "border: 1px solid #C83515; border-radius: %1px; padding: %2px %3px; }"
                 "QPushButton:hover { background: #F15F38; border-color: #B92D10; }"
-                "QPushButton:pressed { background: #C93616; }"));
+                "QPushButton:pressed { background: #C93616; }")
+                .arg(ui_scaled(this, 6))
+                .arg(ui_scaled(this, 9))
+                .arg(ui_scaled(this, 18)));
             break;
     }
     connect(button, &QPushButton::clicked, this, [this, result = action.result]()
@@ -371,7 +418,7 @@ int LauncherDialog::choose(QWidget* parent, const Tone tone, const QString& titl
 
 void LauncherDialog::mousePressEvent(QMouseEvent* event)
 {
-    if (event->button() == Qt::LeftButton && event->position().y() <= 78)
+    if (event->button() == Qt::LeftButton && event->position().y() <= ui_scaled(this, 78))
     {
         dragging = true;
         drag_offset = event->globalPosition().toPoint() - frameGeometry().topLeft();

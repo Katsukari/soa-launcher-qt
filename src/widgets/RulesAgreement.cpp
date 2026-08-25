@@ -53,8 +53,8 @@ namespace
             return;
         QFont font = label->font();
         int size = base_size;
-        const int available = qMax(1, label->width() - 12);
-        while (size > 10)
+        const int available = qMax(1, label->width() - util::layout::scaled(12, label->window()->size()));
+        while (size > qMax(8, util::layout::scaled(10, label->window()->size())))
         {
             font.setPixelSize(size);
             if (QFontMetrics(font).horizontalAdvance(label->text()) <= available)
@@ -93,12 +93,20 @@ void RulesAgreement::setup_controls()
     rules_text->setOpenLinks(false);
     rules_text->setOpenExternalLinks(false);
     rules_text->setStyleSheet(QStringLiteral(
-        "QTextBrowser { background:transparent; color:#392518; padding:32px 16px 16px 48px; "
-        "font-family:'Inter'; font-size:13px; border:0px; }"
-        "QScrollBar:vertical { width:6px; background:#E4DED9; margin:35px 0px 0px 0px; }"
-        "QScrollBar::handle:vertical { background:#B0A297; border-radius:3px; min-height:28px; }"
+        "QTextBrowser { background:transparent; color:#392518; padding:%1px %2px %2px %3px; "
+        "font-family:'Inter'; font-size:%4px; border:0px; }"
+        "QScrollBar:vertical { width:%5px; background:#E4DED9; margin:%6px 0px 0px 0px; }"
+        "QScrollBar::handle:vertical { background:#B0A297; border-radius:%7px; min-height:%8px; }"
         "QScrollBar::handle:vertical:hover { background:#9A8A7E; }"
-        "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0px; }"));
+        "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0px; }")
+        .arg(util::layout::scaled(32, w))
+        .arg(util::layout::scaled(16, w))
+        .arg(util::layout::scaled(48, w))
+        .arg(qMax(9, util::layout::scaled(13, w)))
+        .arg(qMax(4, util::layout::scaled(6, w)))
+        .arg(util::layout::scaled(35, w))
+        .arg(util::layout::scaled(3, w))
+        .arg(util::layout::scaled(28, w)));
 
     agree_button = util::simple_utils::make_flat_button(this);
     const QSize agree_size = util::layout::scaled(
@@ -219,9 +227,11 @@ void RulesAgreement::load_rules()
     load_error.clear();
     if (!document_ready)
     {
+        const int loading_height = util::layout::scaled(330, window()->size());
         rules_text->setHtml(QStringLiteral(
-            "<div style='height:330px; display:flex; align-items:center; justify-content:center; "
-            "color:#988776; text-align:center;'>%1</div>")
+            "<div style='height:%1px; display:flex; align-items:center; justify-content:center; "
+            "color:#988776; text-align:center;'>%2</div>")
+            .arg(loading_height)
             .arg(util::i18n::translate("Loading rules...").toHtmlEscaped()));
     }
     update_agree_button();
@@ -319,9 +329,12 @@ void RulesAgreement::show_load_failure(const QString& reason)
     document_ready = false;
     load_error = reason;
     const QString link = rules_url();
+    const QSize w = window()->size();
     rules_text->setHtml(QStringLiteral(
-        "<div style='padding:90px 28px; text-align:center; color:#8B2E2E;'>"
-        "<p><b>%1</b></p><p>%2</p><p><a href='%3'>%4</a></p></div>")
+        "<div style='padding:%1px %2px; text-align:center; color:#8B2E2E;'>"
+        "<p><b>%3</b></p><p>%4</p><p><a href='%5'>%6</a></p></div>")
+        .arg(util::layout::scaled(90, w))
+        .arg(util::layout::scaled(28, w))
         .arg(util::i18n::translate("Failed to load rules").toHtmlEscaped(),
              reason.toHtmlEscaped(),
              link.toHtmlEscaped(),
@@ -376,9 +389,11 @@ void RulesAgreement::retranslate_content()
     agree_button->setAccessibleName(util::i18n::translate("Agree with the rules"));
     if (loading && !document_ready)
     {
+        const int loading_height = util::layout::scaled(330, window()->size());
         rules_text->setHtml(QStringLiteral(
-            "<div style='height:330px; display:flex; align-items:center; justify-content:center; "
-            "color:#988776; text-align:center;'>%1</div>")
+            "<div style='height:%1px; display:flex; align-items:center; justify-content:center; "
+            "color:#988776; text-align:center;'>%2</div>")
+            .arg(loading_height)
             .arg(util::i18n::translate("Loading rules...").toHtmlEscaped()));
     }
     else if (!load_error.isEmpty() && !document_ready)
@@ -404,7 +419,7 @@ void RulesAgreement::set_button_text(const QString& source)
     fit_button_label(agree_button_label, util::layout::scaled(12, window()->size()));
 }
 
-QString RulesAgreement::prepare_document(const QByteArray& source)
+QString RulesAgreement::prepare_document(const QByteArray& source) const
 {
     QString html = QString::fromUtf8(source);
     html.remove(QRegularExpression(QStringLiteral("<script\\b[^>]*>[\\s\\S]*?</script>"),
@@ -428,17 +443,30 @@ QString RulesAgreement::prepare_document(const QByteArray& source)
                                    QRegularExpression::CaseInsensitiveOption));
     body = rewrite_links(body);
 
+    const QSize w = window()->size();
     const QString launcher_styles = QStringLiteral(
-        "body, p, li, td, span, a { font-family:'Inter'; font-size:13px; line-height:1.5; color:#392518; }"
+        "body, p, li, td, span, a { font-family:'Inter'; font-size:%1px; line-height:1.5; color:#392518; }"
         "h1, h2, h3, h4 { color:#4F1717; font-family:'Eurostile'; font-weight:800; }"
-        "h1 { font-size:22px; text-align:center; margin:0 0 8px 0; }"
-        "h2 { font-size:15px; text-align:center; margin:0 0 28px 0; }"
-        "h3 { font-size:14px; margin-top:22px; }"
+        "h1 { font-size:%2px; text-align:center; margin:0 0 %3px 0; }"
+        "h2 { font-size:%4px; text-align:center; margin:0 0 %5px 0; }"
+        "h3 { font-size:%6px; margin-top:%7px; }"
         "a { color:#20AEDD; text-decoration:none; }"
-        "hr { margin:44px 0 6px 0; color:#4F1717; }"
-        "ul, ol { margin-left:18px; }"
+        "hr { margin:%8px 0 %9px 0; color:#4F1717; }"
+        "ul, ol { margin-left:%10px; }"
         "table { border-collapse:collapse; width:100%; }"
-        "td { vertical-align:top; padding:2px 6px; }");
+        "td { vertical-align:top; padding:%11px %12px; }")
+        .arg(qMax(9, util::layout::scaled(13, w)))
+        .arg(qMax(14, util::layout::scaled(22, w)))
+        .arg(util::layout::scaled(8, w))
+        .arg(qMax(10, util::layout::scaled(15, w)))
+        .arg(util::layout::scaled(28, w))
+        .arg(qMax(9, util::layout::scaled(14, w)))
+        .arg(util::layout::scaled(22, w))
+        .arg(util::layout::scaled(44, w))
+        .arg(util::layout::scaled(6, w))
+        .arg(util::layout::scaled(18, w))
+        .arg(util::layout::scaled(2, w))
+        .arg(util::layout::scaled(6, w));
     return QStringLiteral("<html><head><style>%1\n%2</style></head><body>%3</body></html>")
         .arg(styles, launcher_styles, body);
 }

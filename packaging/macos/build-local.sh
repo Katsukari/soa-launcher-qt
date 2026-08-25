@@ -7,7 +7,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 BUILD_DIR="${SOA_BUILD_DIR:-$PROJECT_ROOT/build-macos-local}"
 ARCHS="${SOA_MACOS_ARCHS:-${SOA_MACOS_ARCH:-x86_64;arm64}}"
 BUILD_TYPE="${SOA_BUILD_TYPE:-Release}"
-LOCAL_SIGN="${SOA_LOCAL_SIGN:-0}"
+IFS=';' read -r -a REQUESTED_ARCHS <<< "$ARCHS"
 
 for tool in cmake swift xcrun lipo otool file i686-w64-mingw32-gcc i686-w64-mingw32-g++; do
   if ! command -v "$tool" >/dev/null 2>&1; then
@@ -33,14 +33,46 @@ if [ -z "$QT_PREFIX" ] && command -v brew >/dev/null 2>&1; then
   QT_PREFIX="$(brew --prefix qt 2>/dev/null || brew --prefix qt@6 2>/dev/null || true)"
 fi
 
-MACDEPLOYQT="${MACDEPLOYQT:-$(command -v macdeployqt || true)}"
+MACDEPLOYQT="${MACDEPLOYQT:-}"
 if [ -z "$MACDEPLOYQT" ] && [ -n "$QT_PREFIX" ] && [ -x "$QT_PREFIX/bin/macdeployqt" ]; then
   MACDEPLOYQT="$QT_PREFIX/bin/macdeployqt"
+fi
+if [ -z "$MACDEPLOYQT" ]; then
+  MACDEPLOYQT="$(command -v macdeployqt || true)"
 fi
 if [ -z "$MACDEPLOYQT" ] || [ ! -x "$MACDEPLOYQT" ]; then
   echo "macdeployqt was not found. Install Qt 6 or set SOA_QT_PREFIX/MACDEPLOYQT." >&2
   exit 1
 fi
+
+QT_CORE_BINARY=""
+for candidate in \
+  "$QT_PREFIX/lib/QtCore.framework/Versions/A/QtCore" \
+  "$QT_PREFIX/lib/QtCore.framework/QtCore" \
+  "$QT_PREFIX/lib/libQt6Core.dylib"; do
+  if [ -f "$candidate" ]; then
+    QT_CORE_BINARY="$candidate"
+    break
+  fi
+done
+if [ -z "$QT_CORE_BINARY" ]; then
+  echo "QtCore was not found below Qt prefix: $QT_PREFIX" >&2
+  echo "Set SOA_QT_PREFIX to a complete Qt 6 macOS installation." >&2
+  exit 1
+fi
+
+QT_ARCHS="$(lipo -archs "$QT_CORE_BINARY")"
+for requested_arch in "${REQUESTED_ARCHS[@]}"; do
+  case " $QT_ARCHS " in
+    *" $requested_arch "*) ;;
+    *)
+      echo "Qt at $QT_PREFIX does not contain requested architecture $requested_arch." >&2
+      echo "QtCore architectures: $QT_ARCHS" >&2
+      echo "Install a universal Qt build or request only an architecture present in QtCore." >&2
+      exit 1
+      ;;
+  esac
+done
 
 CMAKE_QT_ARGS=()
 if [ -n "$QT_PREFIX" ]; then
@@ -71,17 +103,8 @@ APP="${apps[0]}"
 
 "$MACDEPLOYQT" "$APP" -always-overwrite -verbose=1
 
-if [ "$LOCAL_SIGN" = "1" ]; then
-  if ! command -v codesign >/dev/null 2>&1; then
-    echo "SOA_LOCAL_SIGN=1 was requested, but codesign is unavailable." >&2
-    exit 1
-  fi
-  "$SCRIPT_DIR/sign-app.sh" "$APP" - "$SCRIPT_DIR/entitlements.plist"
-fi
-
 BINARY="$APP/Contents/MacOS/soa_launcher"
 ACTUAL_ARCHS="$(lipo -archs "$BINARY")"
-IFS=';' read -r -a REQUESTED_ARCHS <<< "$ARCHS"
 for requested_arch in "${REQUESTED_ARCHS[@]}"; do
   case " $ACTUAL_ARCHS " in
     *" $requested_arch "*) ;;
@@ -142,15 +165,6 @@ if otool -L "$BINARY" | grep -F "$PROJECT_ROOT" >/dev/null; then
   exit 1
 fi
 
-if [ "$LOCAL_SIGN" = "1" ]; then
-  codesign --verify --deep --strict --verbose=4 "$APP"
-fi
-
-printf '\nBuilt local test app:\n  %s\n\n' "$APP"
-if [ "$LOCAL_SIGN" = "1" ]; then
-  printf 'Local ad-hoc signing: enabled\n'
-else
-  printf 'Local ad-hoc signing: skipped\n'
-fi
+printf '\nBuilt unsigned local app:\n  %s\n\n' "$APP"
+printf 'Signing: skipped by design\n'
 printf 'Open it with:\n  open "%s"\n' "$APP"
-printf '\nTo opt into local ad-hoc signing on a later build:\n  SOA_LOCAL_SIGN=1 ./packaging/macos/build-local.sh\n'

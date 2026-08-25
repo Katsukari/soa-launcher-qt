@@ -242,6 +242,9 @@ void MainWindow::setup_discord_rpc()
 
 void MainWindow::setup_system_tray()
 {
+    if (!QSystemTrayIcon::isSystemTrayAvailable())
+        return;
+
     tray_menu = new QMenu(this);
     open_launcher_action = tray_menu->addAction(QStringLiteral("Open Launcher"));
     run_alicia_action = tray_menu->addAction(QStringLiteral("Run Alicia Directly"));
@@ -254,7 +257,7 @@ void MainWindow::setup_system_tray()
     connect(tray_menu, &QMenu::aboutToShow, this, &MainWindow::refresh_tray_actions);
 
     tray_icon = new QSystemTrayIcon(QIcon(QStringLiteral(":/assets/soa-logo.png")), this);
-    tray_icon->setToolTip(util::i18n::translate("Story Of Alicia Launcher"));
+    tray_icon->setToolTip(QStringLiteral("Story Of Alicia Launcher"));
     tray_icon->setContextMenu(tray_menu);
     connect(tray_icon, &QSystemTrayIcon::activated, this,
             [this](const QSystemTrayIcon::ActivationReason reason)
@@ -355,11 +358,12 @@ void MainWindow::setup_launcher_menu()
     launcher_menu_button->setFont(menu_icon_font);
     launcher_menu_button->setStyleSheet(QStringLiteral(
         "QToolButton { background: rgba(247,240,235,232); color: #4F1717; "
-        "border: 1px solid rgba(79,23,23,72); border-radius: 10px; padding: 0px; }"
+        "border: 1px solid rgba(79,23,23,72); border-radius: %1px; padding: 0px; }"
         "QToolButton:hover { background: rgba(255,250,247,246); "
         "border-color: rgba(79,23,23,125); }"
         "QToolButton:pressed, QToolButton:checked { background: rgba(232,216,206,246); "
-        "border-color: rgba(79,23,23,150); }"));
+        "border-color: rgba(79,23,23,150); }")
+        .arg(util::layout::scaled(6, window_size)));
 
     launcher_menu_panel = new QFrame(this);
     launcher_menu_panel->setObjectName(QStringLiteral("launcherMenuPanel"));
@@ -367,14 +371,16 @@ void MainWindow::setup_launcher_menu()
         util::layout::scaled(QRect(38, 86, 272, 291), window_size));
     launcher_menu_panel->setStyleSheet(QStringLiteral(
         "QFrame#launcherMenuPanel { background: rgba(247,240,235,248); "
-        "border: 1px solid rgba(79,23,23,85); border-radius: 12px; }"
+        "border: 1px solid rgba(79,23,23,85); border-radius: 0px; }"
         "QPushButton { background: rgba(255,255,255,132); color: #4F1717; "
-        "border: 1px solid rgba(79,23,23,38); border-radius: 8px; "
-        "padding-left: 17px; text-align: left; }"
+        "border: 1px solid rgba(79,23,23,38); border-radius: %1px; "
+        "padding-left: %2px; text-align: left; }"
         "QPushButton:hover { background: rgba(235,220,211,224); "
         "border-color: rgba(79,23,23,92); }"
         "QPushButton:pressed { background: rgba(219,198,186,236); "
-        "border-color: rgba(79,23,23,125); }"));
+        "border-color: rgba(79,23,23,125); }")
+        .arg(util::layout::scaled(6, window_size))
+        .arg(util::layout::scaled(17, window_size)));
     auto* menu_shadow = new QGraphicsDropShadowEffect(launcher_menu_panel);
     menu_shadow->setBlurRadius(util::layout::scaled(28, window_size));
     menu_shadow->setOffset(0, util::layout::scaled(6, window_size));
@@ -408,11 +414,19 @@ void MainWindow::setup_launcher_menu()
     language_menu = new QMenu(this);
     language_menu->setStyleSheet(QStringLiteral(
         "QMenu { background: #F7F0EB; color: #4F1717; border: 1px solid #A98678; "
-        "border-radius: 8px; padding: 6px; }"
-        "QMenu::item { min-width: 170px; padding: 9px 28px 9px 12px; "
-        "border-radius: 6px; }"
+        "border-radius: 0px; padding: %1px; font-size: %2px; }"
+        "QMenu::item { min-width: %3px; padding: %4px %5px %4px %6px; "
+        "border-radius: %7px; }"
         "QMenu::item:selected { background: #EBDCD3; }"
-        "QMenu::indicator { width: 14px; height: 14px; }"));
+        "QMenu::indicator { width: %8px; height: %8px; }")
+        .arg(util::layout::scaled(6, window_size))
+        .arg(qMax(9, util::layout::scaled(13, window_size)))
+        .arg(util::layout::scaled(170, window_size))
+        .arg(util::layout::scaled(9, window_size))
+        .arg(util::layout::scaled(28, window_size))
+        .arg(util::layout::scaled(12, window_size))
+        .arg(util::layout::scaled(6, window_size))
+        .arg(util::layout::scaled(14, window_size)));
     language_action_group = new QActionGroup(this);
     language_action_group->setExclusive(true);
     for (const auto& language : util::i18n::LanguageManager::instance().languages())
@@ -511,6 +525,9 @@ void MainWindow::raise_persistent_controls()
         launcher_menu_panel->hide();
     if (!chrome_hidden)
     {
+
+
+
         if (close_button) close_button->raise();
         if (minimize_button) minimize_button->raise();
     }
@@ -563,8 +580,6 @@ void MainWindow::retranslate_dynamic_text()
         run_alicia_action->setText(util::i18n::translate("Run Alicia Directly"));
     if (tray_quit_action)
         tray_quit_action->setText(util::i18n::translate("Quit Launcher"));
-    if (tray_icon)
-        tray_icon->setToolTip(util::i18n::translate("Story Of Alicia Launcher"));
     if (launcher_menu_button)
     {
         launcher_menu_button->setText(QStringLiteral("☰"));
@@ -583,8 +598,17 @@ void MainWindow::retranslate_dynamic_text()
 void MainWindow::setup_version_label()
 {
     const QSize window_size = size();
-    version_label = new QLabel(this);
 
+    version_art_label = new QLabel(this);
+    version_art_label->setAttribute(Qt::WA_TransparentForMouseEvents);
+    version_art_label->setAlignment(Qt::AlignRight | Qt::AlignBottom);
+    const QRect art_rect = util::layout::chrome::version_art(window_size);
+    version_art_label->setGeometry(art_rect);
+    version_art_label->setPixmap(util::assets::images[util::assets::Image::VersionIconKatsu]
+        .scaled(art_rect.size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+
+    version_label = new QLabel(this);
+    version_label->setAttribute(Qt::WA_TransparentForMouseEvents);
     QFont font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
     font.setPixelSize(util::layout::scaled(util::layout::text::k_version, window_size));
     font.setWeight(QFont::Black);
@@ -593,6 +617,7 @@ void MainWindow::setup_version_label()
     version_label->setStyleSheet("color: #747B82; background: transparent;");
     version_label->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     version_label->setGeometry(util::layout::chrome::version(window_size));
+    version_label->raise();
     retranslate_dynamic_text();
 }
 
@@ -645,7 +670,7 @@ void MainWindow::setup_rules()
 
     connect(rules_agreement, &RulesAgreement::accepted, this, [this]()
     {
-        Config::instance().set_rules_accepted(true);
+        install_state->confirm_rules_reviewed();
         close_overlay(rules_agreement);
     });
 }
@@ -778,6 +803,7 @@ void MainWindow::setup_alicia_chooser()
 
         if (!confirmed) return;
 
+        install_state->clear_rules_reviewed();
         Config::instance().reset_launcher_config();
         game_version = Config::instance().game_version();
         alicia_chooser->set_game_version(game_version);
@@ -794,10 +820,7 @@ void MainWindow::setup_game_selector()
 
     playtest_button = util::simple_utils::make_flat_button(this);
     playtest_button->setCursor(Qt::PointingHandCursor);
-    playtest_button->setAccessibleName(
-        util::i18n::translate("Story Of Alicia Playtest"));
-    playtest_button->setProperty(
-        "soa_i18n_accessible_name_source", QStringLiteral("Story Of Alicia Playtest"));
+    playtest_button->setAccessibleName("Story of Alicia Playtest");
     playtest_button->setGeometry(util::layout::chrome::playtest_button(window_size));
     connect(playtest_button, &QPushButton::clicked, this, [this]()
     {
@@ -806,10 +829,7 @@ void MainWindow::setup_game_selector()
 
     alicia_2_button = util::simple_utils::make_flat_button(this);
     alicia_2_button->setCursor(Qt::PointingHandCursor);
-    alicia_2_button->setAccessibleName(
-        util::i18n::translate("Story Of Alicia 2.0 Playtest"));
-    alicia_2_button->setProperty(
-        "soa_i18n_accessible_name_source", QStringLiteral("Story Of Alicia 2.0 Playtest"));
+    alicia_2_button->setAccessibleName("Story of Alicia 2.0");
     alicia_2_button->setGeometry(util::layout::chrome::alicia_2_button(window_size));
     connect(alicia_2_button, &QPushButton::clicked, this, [this]()
     {
@@ -906,13 +926,13 @@ void MainWindow::setup_launcher_updates()
     {
         if (check_updates_button)
             check_updates_button->setEnabled(true);
+        launcher_update->set_versions(
+            core::update::LauncherUpdateManager::current_version(),
+            launcher_update_manager->available_versions(), false);
         launcher_update->set_release(
             launcher_update_manager->available_version(),
             launcher_update_manager->update_required(),
             launcher_update_manager->release_message());
-        launcher_update->set_versions(
-            core::update::LauncherUpdateManager::current_version(),
-            launcher_update_manager->available_versions(), false);
         open_overlay(launcher_update);
     });
     connect(launcher_update_manager,
@@ -921,12 +941,12 @@ void MainWindow::setup_launcher_updates()
     {
         if (check_updates_button)
             check_updates_button->setEnabled(true);
-        launcher_update->set_release(
-            launcher_update_manager->available_version(), false,
-            launcher_update_manager->release_message());
         launcher_update->set_versions(
             core::update::LauncherUpdateManager::current_version(),
             launcher_update_manager->available_versions(), true);
+        launcher_update->set_release(
+            launcher_update_manager->available_version(), false,
+            launcher_update_manager->release_message());
         open_overlay(launcher_update);
     });
     connect(launcher_update, &LauncherUpdate::postponed, this, [this]()
@@ -940,13 +960,7 @@ void MainWindow::setup_launcher_updates()
             launcher_update_manager,
             &core::update::LauncherUpdateManager::download_and_install);
     connect(launcher_update, &LauncherUpdate::version_selected,
-            this, [this](const QString& version)
-    {
-        launcher_update_manager->select_version(version);
-        launcher_update->set_release(
-            launcher_update_manager->available_version(), false,
-            launcher_update_manager->release_message());
-    });
+            launcher_update_manager, &core::update::LauncherUpdateManager::select_version);
     connect(launcher_update_manager,
             &core::update::LauncherUpdateManager::download_started,
             this, [this]()
@@ -1089,10 +1103,15 @@ void MainWindow::on_stage_changed(const Stage stage)
         && !(shell && shell->is_busy());
     if (settings)
     {
+        const bool game_active = stage == Stage::Launching
+            || stage == Stage::Running
+            || (shell && shell->is_game_running());
         settings->set_mutation_enabled(
             settingsEditable,
-            QStringLiteral(
-                "Settings are read-only while Alicia or another launcher operation is active."));
+            game_active
+                ? QStringLiteral("Disabled while Alicia is running")
+                : QStringLiteral(
+                    "Settings are read-only while Alicia or another launcher operation is active."));
     }
 
     if (integrity_watcher)
@@ -1278,12 +1297,10 @@ void MainWindow::closeEvent(QCloseEvent* event)
     if (force_quit_requested)
     {
         event->accept();
-        QTimer::singleShot(0, qApp, []() { QCoreApplication::exit(0); });
         return;
     }
 
-    if (tray_icon && tray_icon->isVisible()
-        && QSystemTrayIcon::isSystemTrayAvailable())
+    if (tray_icon && tray_icon->isVisible())
     {
         set_launcher_menu_visible(false);
         hide();
@@ -1306,7 +1323,6 @@ void MainWindow::closeEvent(QCloseEvent* event)
     if (!operationActive)
     {
         event->accept();
-        QTimer::singleShot(0, qApp, []() { QCoreApplication::exit(0); });
         return;
     }
 
@@ -1345,7 +1361,6 @@ void MainWindow::closeEvent(QCloseEvent* event)
     else if (result == LauncherDialog::Secondary)
     {
         event->accept();
-        QTimer::singleShot(0, qApp, []() { QCoreApplication::exit(0); });
     }
     else
     {

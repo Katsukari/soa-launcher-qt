@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-echo "SOA AppImage packager: minimal Qt plugins revision 2026-08-04"
+echo "SOA Linux local AppImage builder"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -45,8 +45,8 @@ cd "$SCRIPT_DIR"
 
 echo "Launcher source directory: $PROJECT_ROOT"
 
-BUILD_DIR="$SCRIPT_DIR/build-appimage"
-APPDIR="$SCRIPT_DIR/AppDir"
+BUILD_DIR="${SOA_BUILD_DIR:-$SCRIPT_DIR/build-linux-local}"
+APPDIR="${SOA_APPDIR:-$SCRIPT_DIR/AppDir-local}"
 LINUXDEPLOY_TAG="${LINUXDEPLOY_TAG:-1-alpha-20250213-2}"
 LINUXDEPLOY_SHA256="${LINUXDEPLOY_SHA256:-4648f278ab3ef31f819e67c30d50f462640e5365a77637d7e6f2ad9fd0b4522a}"
 
@@ -60,13 +60,7 @@ require_command() {
 
 run_portability_check() {
   local root="$1"
-
-  if [ "${SOA_ALLOW_NONPORTABLE_LOCAL_BUILD:-0}" = "1" ]; then
-    echo "Skipping Linux portability checks for local test build: $root" >&2
-    return 0
-  fi
-
-  "$SCRIPT_DIR/check-linux-portability.sh" "$root"
+  echo "Skipping release portability policy for local build: $root" >&2
 }
 
 get_tool() {
@@ -101,72 +95,15 @@ require_command cmake
 require_command ninja
 require_command wget
 require_command file
-require_command readelf
 require_command find
 require_command sha256sum
 require_command swiftc
-require_command timeout
 require_command desktop-file-validate
-require_command jq
-require_command openssl
+require_command patchelf
 require_command i686-w64-mingw32-gcc
 require_command i686-w64-mingw32-g++
 
-TEMPORARY_UPDATE_KEY=""
-UPDATE_HISTORY_TEMP=""
-if [ -z "${SOA_UPDATE_SIGNING_KEY:-}" ]; then
-  TEMPORARY_UPDATE_KEY="$(mktemp)"
-  if [ -n "${SOA_UPDATE_SIGNING_KEY_B64:-}" ]; then
-    printf '%s' "$SOA_UPDATE_SIGNING_KEY_B64" | base64 --decode >"$TEMPORARY_UPDATE_KEY"
-  elif [ "${GITHUB_REF_TYPE:-}" = "tag" ]; then
-    echo "Tagged release builds require the SOA_UPDATE_SIGNING_KEY_B64 secret." >&2
-    rm -f "$TEMPORARY_UPDATE_KEY"
-    exit 1
-  else
-    echo "Using an ephemeral update key for this non-release build." >&2
-    openssl genpkey -algorithm Ed25519 -out "$TEMPORARY_UPDATE_KEY"
-  fi
-  chmod 600 "$TEMPORARY_UPDATE_KEY"
-  SOA_UPDATE_SIGNING_KEY="$TEMPORARY_UPDATE_KEY"
-fi
-export SOA_UPDATE_SIGNING_KEY
 
-cleanup_update_key() {
-  if [ -n "$TEMPORARY_UPDATE_KEY" ]; then
-    rm -f "$TEMPORARY_UPDATE_KEY"
-  fi
-  if [ -n "$UPDATE_HISTORY_TEMP" ]; then
-    rm -rf "$UPDATE_HISTORY_TEMP"
-  fi
-}
-trap cleanup_update_key EXIT
-
-if [ -z "${SOA_UPDATE_SIGNING_KEY:-}" ] || [ ! -f "$SOA_UPDATE_SIGNING_KEY" ]; then
-  echo "SOA_UPDATE_SIGNING_KEY must point to the offline Ed25519 private key." >&2
-  exit 1
-fi
-
-DERIVED_UPDATE_PUBLIC_KEY_HEX="$(
-  openssl pkey -in "$SOA_UPDATE_SIGNING_KEY" -pubout -outform DER \
-    | tail -c 32 \
-    | od -An -v -tx1 \
-    | tr -d ' \n'
-)"
-if [ -n "${SOA_UPDATE_PUBLIC_KEY_HEX:-}" ] \
-    && [ "${SOA_UPDATE_PUBLIC_KEY_HEX,,}" != "$DERIVED_UPDATE_PUBLIC_KEY_HEX" ]; then
-  echo "SOA_UPDATE_PUBLIC_KEY_HEX does not match SOA_UPDATE_SIGNING_KEY." >&2
-  exit 1
-fi
-SOA_UPDATE_PUBLIC_KEY_HEX="$DERIVED_UPDATE_PUBLIC_KEY_HEX"
-
-LAUNCHER_VERSION="${SOA_LAUNCHER_VERSION:-$(
-  sed -nE 's/^[[:space:]]*VERSION[[:space:]]+([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' \
-    "$PROJECT_ROOT/CMakeLists.txt" | head -n 1
-)}"
-if [[ ! "$LAUNCHER_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]; then
-  echo "Could not determine a valid launcher version." >&2
-  exit 1
-fi
 
 if [ -z "${QMAKE:-}" ]; then
   QMAKE="$(command -v qmake6 || true)"
@@ -179,10 +116,6 @@ fi
 
 export QMAKE
 
-unset CFLAGS
-unset CXXFLAGS
-unset CPPFLAGS
-unset LDFLAGS
 
 rm -rf "$BUILD_DIR"
 rm -rf "$APPDIR"
@@ -192,27 +125,15 @@ cmake \
   -S "$PROJECT_ROOT" \
   -B "$BUILD_DIR" \
   -G Ninja \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DBUILD_TESTING=OFF \
+  -DCMAKE_BUILD_TYPE="${SOA_BUILD_TYPE:-Release}" \
+  -DBUILD_TESTING="${SOA_BUILD_TESTING:-OFF}" \
   -DSOA_REQUIRE_ALICIA_LOG_HOOK=ON \
-  -DSOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX="$SOA_UPDATE_PUBLIC_KEY_HEX" \
-  -DCMAKE_CXX_FLAGS="-march=x86-64 -mtune=generic"
+  -DSOA_PORTABLE_BUILD=OFF
 
 cmake --build "$BUILD_DIR"
 
 DESTDIR="$APPDIR" cmake --install "$BUILD_DIR" --prefix /usr
 
-mkdir -p "$APPDIR/usr/share/soa-launcher/update"
-jq -n \
-  --arg version "$LAUNCHER_VERSION" \
-  --arg manifest_url "https://r2.storyofalicia.com/launcher/linux/version.json" \
-  --arg fallback_manifest_url \
-    "https://github.com/Story-Of-Alicia/soa-launcher-qt/releases/latest/download/version.json" \
-  --arg signing_public_key "$SOA_UPDATE_PUBLIC_KEY_HEX" \
-  '{schema: 1, version: $version, platform: "linux-x86_64",
-    manifest_url: $manifest_url, fallback_manifest_url: $fallback_manifest_url,
-    signing_public_key: $signing_public_key}' \
-  >"$APPDIR/usr/share/soa-launcher/update/version.json"
 
 cp soa-launcher.png "$APPDIR/soa-launcher.png"
 cp soa-launcher.desktop "$APPDIR/soa-launcher.desktop"
@@ -227,13 +148,40 @@ get_tool \
 SWIFT_BIN="$(dirname "$(command -v swiftc)")"
 SWIFT_LIB="$(dirname "$SWIFT_BIN")/lib/swift/linux"
 
-export LD_LIBRARY_PATH="${SWIFT_LIB}:${LD_LIBRARY_PATH:-}"
-export NO_STRIP=1
-
+QT_VERSION="$("$QMAKE" -query QT_VERSION)"
 QT_PLUGIN_DIR="$("$QMAKE" -query QT_INSTALL_PLUGINS)"
 QT_TRANSLATIONS_DIR="$("$QMAKE" -query QT_INSTALL_TRANSLATIONS)"
 QT_LIB_DIR="$("$QMAKE" -query QT_INSTALL_LIBS)"
 QT_PLATFORM_DIR="$QT_PLUGIN_DIR/platforms"
+
+if [[ "$QT_VERSION" != 6.* ]]; then
+  echo "Qt 6 is required, but $QMAKE reports Qt $QT_VERSION." >&2
+  exit 1
+fi
+
+if [ ! -d "$QT_LIB_DIR" ]; then
+  echo "Qt library directory reported by qmake does not exist: $QT_LIB_DIR" >&2
+  exit 1
+fi
+
+if [ ! -e "$QT_LIB_DIR/libQt6Core.so.6" ]; then
+  echo "Qt 6 runtime libraries were not found in: $QT_LIB_DIR" >&2
+  exit 1
+fi
+
+if [ ! -d "$SWIFT_LIB" ]; then
+  echo "Swift Linux runtime directory was not found: $SWIFT_LIB" >&2
+  exit 1
+fi
+
+export LD_LIBRARY_PATH="${QT_LIB_DIR}:${SWIFT_LIB}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+export NO_STRIP=1
+
+if command -v locale >/dev/null 2>&1 \
+    && LC_ALL=C.UTF-8 locale charmap >/dev/null 2>&1; then
+  export LANG=C.UTF-8
+  export LC_ALL=C.UTF-8
+fi
 
 copy_qt_library_family() {
   local stem="$1"
@@ -254,6 +202,26 @@ copy_qt_library_family() {
 
   mkdir -p "$APPDIR/usr/lib"
   cp -a "${matches[@]}" "$APPDIR/usr/lib/"
+}
+
+copy_qt_platform_dependency() {
+  local consumer="$1"
+  local soname="$2"
+  local source
+
+  source="$(
+    ldd "$consumer" 2>/dev/null \
+      | awk -v expected="$soname" \
+          '$1 == expected && $2 == "=>" && $3 ~ /^\// { print $3; exit }'
+  )"
+  if [ -z "$source" ] || [ ! -f "$source" ]; then
+    echo "Required Qt platform dependency not found: $soname (needed by $consumer)" >&2
+    exit 1
+  fi
+
+  mkdir -p "$APPDIR/usr/lib"
+  install -m 755 "$source" "$APPDIR/usr/lib/$soname"
+  echo "Included Qt platform dependency: $soname"
 }
 
 copy_qt_plugin() {
@@ -286,6 +254,7 @@ copy_qt_plugin() {
 
   mkdir -p "$destination"
   install -m 755 "$source" "$destination/$filename"
+  patchelf --set-rpath '$ORIGIN/../../lib' "$destination/$filename"
   echo "Included Qt plugin: $category/$filename"
 }
 
@@ -303,6 +272,8 @@ copy_qt_plugin_directory() {
 }
 
 copy_qt_plugin platforms libqxcb.so 1
+copy_qt_platform_dependency "$QT_PLATFORM_DIR/libqxcb.so" libxcb-cursor.so.0
+copy_qt_platform_dependency "$QT_PLATFORM_DIR/libqxcb.so" libxkbcommon-x11.so.0
 
 if [ -f "$QT_PLATFORM_DIR/libqwayland.so" ]; then
   copy_qt_plugin platforms libqwayland.so 1
@@ -322,11 +293,16 @@ copy_qt_plugin imageformats libqsvg.so
 copy_qt_plugin imageformats libqwebp.so
 copy_qt_plugin iconengines libqsvgicon.so
 
+copy_qt_library_family libQt6Core
+copy_qt_library_family libQt6Gui
+copy_qt_library_family libQt6Widgets
+copy_qt_library_family libQt6Network
+copy_qt_library_family libQt6Concurrent
 copy_qt_library_family libQt6Svg
 copy_qt_library_family libQt6OpenGL
 copy_qt_library_family libQt6XcbQpa
 
-copy_qt_library_family libQt6WaylandClient 0
+copy_qt_library_family libQt6WaylandClient
 copy_qt_library_family libQt6WaylandEglClientHwIntegration 0
 copy_qt_library_family libQt6WlShellIntegration 0
 
@@ -346,6 +322,54 @@ Plugins = plugins
 Translations = translations
 EOF
 
+cat >"$APPDIR/AppRun" <<'EOF'
+#!/usr/bin/env sh
+set -eu
+
+SOA_BUNDLED_QT_RUNTIME=1
+export SOA_BUNDLED_QT_RUNTIME
+
+if [ "${LD_LIBRARY_PATH+x}" = x ]; then
+  SOA_HOST_LD_LIBRARY_PATH_SET=1
+  SOA_HOST_LD_LIBRARY_PATH="$LD_LIBRARY_PATH"
+  export SOA_HOST_LD_LIBRARY_PATH_SET SOA_HOST_LD_LIBRARY_PATH
+else
+  SOA_HOST_LD_LIBRARY_PATH_SET=0
+  export SOA_HOST_LD_LIBRARY_PATH_SET
+  unset SOA_HOST_LD_LIBRARY_PATH
+fi
+
+if [ "${QT_PLUGIN_PATH+x}" = x ]; then
+  SOA_HOST_QT_PLUGIN_PATH_SET=1
+  SOA_HOST_QT_PLUGIN_PATH="$QT_PLUGIN_PATH"
+  export SOA_HOST_QT_PLUGIN_PATH_SET SOA_HOST_QT_PLUGIN_PATH
+else
+  SOA_HOST_QT_PLUGIN_PATH_SET=0
+  export SOA_HOST_QT_PLUGIN_PATH_SET
+  unset SOA_HOST_QT_PLUGIN_PATH
+fi
+
+if [ "${QT_QPA_PLATFORM_PLUGIN_PATH+x}" = x ]; then
+  SOA_HOST_QT_QPA_PLATFORM_PLUGIN_PATH_SET=1
+  SOA_HOST_QT_QPA_PLATFORM_PLUGIN_PATH="$QT_QPA_PLATFORM_PLUGIN_PATH"
+  export SOA_HOST_QT_QPA_PLATFORM_PLUGIN_PATH_SET SOA_HOST_QT_QPA_PLATFORM_PLUGIN_PATH
+else
+  SOA_HOST_QT_QPA_PLATFORM_PLUGIN_PATH_SET=0
+  export SOA_HOST_QT_QPA_PLATFORM_PLUGIN_PATH_SET
+  unset SOA_HOST_QT_QPA_PLATFORM_PLUGIN_PATH
+fi
+
+SOA_APPIMAGE_ENV_ACTIVE=1
+export SOA_APPIMAGE_ENV_ACTIVE
+
+APPDIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+export LD_LIBRARY_PATH="$APPDIR/usr/lib:$APPDIR/usr/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export QT_PLUGIN_PATH="$APPDIR/usr/plugins"
+export QT_QPA_PLATFORM_PLUGIN_PATH="$APPDIR/usr/plugins/platforms"
+exec "$APPDIR/usr/bin/soa_launcher" "$@"
+EOF
+chmod 755 "$APPDIR/AppRun"
+
 if [ -d "$QT_TRANSLATIONS_DIR" ]; then
   find "$QT_TRANSLATIONS_DIR" -maxdepth 1 -type f \
     \( -name 'qt_*.qm' -o -name 'qtbase_*.qm' \) \
@@ -359,6 +383,12 @@ while IFS= read -r -d '' packaged_plugin; do
   fi
 done < <(find "$APPDIR/usr/plugins" -type f -name '*.so' -print0)
 
+OUTPUT="$SCRIPT_DIR/Story_Of_Alicia-x86_64.AppImage"
+if [ -e "$OUTPUT" ]; then
+  echo "Removing previous AppImage output: $OUTPUT"
+  rm -f "$OUTPUT"
+fi
+
 ./linuxdeploy-x86_64.AppImage \
   --appdir "$APPDIR" \
   --output appimage \
@@ -367,18 +397,9 @@ done < <(find "$APPDIR/usr/plugins" -type f -name '*.so' -print0)
 
 run_portability_check "$APPDIR"
 
-OUTPUT="$SCRIPT_DIR/Story_Of_Alicia-x86_64.AppImage"
 if [ ! -f "$OUTPUT" ]; then
   echo "The expected AppImage was not produced: $OUTPUT" >&2
   exit 1
-fi
-
-if [ "${SOA_ALLOW_NONPORTABLE_LOCAL_BUILD:-0}" != "1" ]; then
-  outer_isa="$(readelf -nW "$OUTPUT" 2>/dev/null | grep -E 'x86 ISA needed|x86 feature needed' || true)"
-  if grep -qE 'x86-64-v[234]' <<< "$outer_isa"; then
-    printf 'The AppImage runtime has a nonportable ISA requirement:\n%s\n' "$outer_isa" >&2
-    exit 1
-  fi
 fi
 
 (
@@ -386,82 +407,26 @@ fi
   APPIMAGE_EXTRACT_AND_RUN=1 "$OUTPUT" --appimage-extract >/dev/null
 )
 
+if ! grep -q 'SOA_BUNDLED_QT_RUNTIME' "$SCRIPT_DIR/squashfs-root/AppRun" \
+    || ! grep -q 'SOA_APPIMAGE_ENV_ACTIVE' "$SCRIPT_DIR/squashfs-root/AppRun"; then
+  echo "The bundled-library AppRun wrapper or host-environment handoff is missing from the AppImage." >&2
+  exit 1
+fi
+
+for required_platform_library in \
+    libQt6WaylandClient.so.6 \
+    libQt6XcbQpa.so.6 \
+    libxcb-cursor.so.0 \
+    libxkbcommon-x11.so.0; do
+  if [ ! -s "$SCRIPT_DIR/squashfs-root/usr/lib/$required_platform_library" ]; then
+    echo "Required Qt platform library is missing from the AppImage: $required_platform_library" >&2
+    exit 1
+  fi
+done
+
 run_portability_check "$SCRIPT_DIR/squashfs-root"
-
-SMOKE_ROOT="$(mktemp -d)"
-SMOKE_LOG="$(mktemp)"
-
-cleanup_smoke() {
-  rm -rf "$SMOKE_ROOT"
-  rm -f "$SMOKE_LOG"
-}
-
-trap 'cleanup_smoke; cleanup_update_key' EXIT
-
-mkdir -p \
-  "$SMOKE_ROOT/home" \
-  "$SMOKE_ROOT/config" \
-  "$SMOKE_ROOT/data" \
-  "$SMOKE_ROOT/cache" \
-  "$SMOKE_ROOT/runtime"
-
-SMOKE_STATUS=0
-set +e
-
-if command -v xvfb-run >/dev/null 2>&1; then
-  timeout 8 env \
-    LD_LIBRARY_PATH= \
-    HOME="$SMOKE_ROOT/home" \
-    XDG_CONFIG_HOME="$SMOKE_ROOT/config" \
-    XDG_DATA_HOME="$SMOKE_ROOT/data" \
-    XDG_CACHE_HOME="$SMOKE_ROOT/cache" \
-    XDG_RUNTIME_DIR="$SMOKE_ROOT/runtime" \
-    QT_QPA_PLATFORM=xcb \
-    xvfb-run -a -s "-screen 0 1280x800x24" \
-    "$SCRIPT_DIR/squashfs-root/AppRun" >"$SMOKE_LOG" 2>&1
-  SMOKE_STATUS=$?
-elif [ -n "${DISPLAY:-}" ]; then
-  timeout 8 env \
-    LD_LIBRARY_PATH= \
-    HOME="$SMOKE_ROOT/home" \
-    XDG_CONFIG_HOME="$SMOKE_ROOT/config" \
-    XDG_DATA_HOME="$SMOKE_ROOT/data" \
-    XDG_CACHE_HOME="$SMOKE_ROOT/cache" \
-    XDG_RUNTIME_DIR="$SMOKE_ROOT/runtime" \
-    QT_QPA_PLATFORM=xcb \
-    "$SCRIPT_DIR/squashfs-root/AppRun" >"$SMOKE_LOG" 2>&1
-  SMOKE_STATUS=$?
-elif [ "${CI:-false}" = "true" ]; then
-  echo "xvfb-run is required for the headless AppImage smoke test in CI." >&2
-  SMOKE_STATUS=1
-else
-  echo "Skipping GUI smoke test because xvfb-run is unavailable and DISPLAY is unset." >&2
-fi
-
-set -e
-
-if [ "$SMOKE_STATUS" -ne 0 ] && [ "$SMOKE_STATUS" -ne 124 ]; then
-  cat "$SMOKE_LOG" >&2
-  exit "$SMOKE_STATUS"
-fi
-
-cleanup_smoke
 
 rm -rf "$SCRIPT_DIR/squashfs-root"
 
-if [ -z "${SOA_UPDATE_HISTORY_INPUT:-}" ]; then
-  UPDATE_HISTORY_TEMP="$(mktemp -d)"
-  if wget -q \
-      "https://r2.storyofalicia.com/launcher/linux/versions.json" \
-      -O "$UPDATE_HISTORY_TEMP/versions.json" \
-      && wget -q \
-      "https://r2.storyofalicia.com/launcher/linux/versions.json.sig" \
-      -O "$UPDATE_HISTORY_TEMP/versions.json.sig"; then
-    SOA_UPDATE_HISTORY_INPUT="$UPDATE_HISTORY_TEMP/versions.json"
-    export SOA_UPDATE_HISTORY_INPUT
-  fi
-fi
-
-"$SCRIPT_DIR/generate-linux-update-metadata.sh" "$LAUNCHER_VERSION" "$OUTPUT"
-
-echo "Done. The AppImage and signed update metadata are in: $SCRIPT_DIR"
+echo "Done. The unsigned local AppImage is: $OUTPUT"
+echo "No release portability policy or update metadata signing was performed."
