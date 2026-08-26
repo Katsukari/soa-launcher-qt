@@ -1,16 +1,24 @@
 # Story of Alicia Launcher
 
-[![Build macOS and Linux](https://github.com/Story-Of-Alicia/soa-launcher-qt/actions/workflows/cmake-multi-platform.yml/badge.svg)](https://github.com/Story-Of-Alicia/soa-launcher-qt/actions/workflows/cmake-multi-platform.yml)
+[![License](https://img.shields.io/github/license/Story-Of-Alicia/soa-launcher-qt?color=blue)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/Story-Of-Alicia/soa-launcher-qt?label=release&color=success)](https://github.com/Story-Of-Alicia/soa-launcher-qt/releases)
+[![Downloads](https://img.shields.io/github/downloads/Story-Of-Alicia/soa-launcher-qt/total?color=orange)](https://github.com/Story-Of-Alicia/soa-launcher-qt/releases)
+[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS-lightgrey)](#supported-platforms)
+[![Qt 6](https://img.shields.io/badge/Qt-6-41CD52?logo=qt&logoColor=white)](https://www.qt.io/)
+[![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C?logo=cplusplus&logoColor=white)](CMakeLists.txt)
+[![Swift](https://img.shields.io/badge/Swift-5-F05138?logo=swift&logoColor=white)](src/core/network)
 
 The official **Story of Alicia** launcher for Linux and macOS.
+
+> **AI development disclosure:** AI was used as a development tool alongside human direction, testing, review, and decision-making
 
 The launcher can:
 
 - Install and update the game
 - Verify and repair damaged files
 - Manage both supported game versions
-- Set up Wine or Proton on Linux
-- Use the bundled Story of Alicia runtime on macOS
+- Set up Wine or Proton through UMU on Linux
+- Use Game Porting Toolkit on macOS
 - Sign in through Discord
 - Start the game and collect useful diagnostics when something goes wrong
 
@@ -20,16 +28,107 @@ The launcher is designed to work for regular players without requiring knowledge
 
 ## Supported platforms
 
-| Platform                      | Status                                                    |
-|-------------------------------|-----------------------------------------------------------|
-| Linux x86_64                  | AppImage  in releases                                     |
-| Linux ARM64                   | On the todo list                                          |
-| macOS Intel and Apple Silicon | Experimental .app that you have to build yourself for now |
-| Windows                       | Use the original Windows launcher                         |
+| Platform            | Status                                             |
+|---------------------|----------------------------------------------------|
+| Linux x86_64        | AppImage in releases                               |
+| Linux ARM64         | On the todo list                                   |
+| macOS Apple Silicon | DMG in releases - experimental, requires Rosetta 2 |
+| macOS Intel         | DMG in releases - untested                         |
+| Windows             | Use the original Windows launcher                  |
+
+> [!WARNING]
+> **macOS support is experimental.**
+>
+> The macOS build has had far less testing than the Linux build. Expect rough
+> edges, and please report anything you hit.
+>
+> The DMG is a universal binary, so the launcher itself runs natively on both
+> Apple Silicon and Intel Macs. **However, it has only been tested on Apple
+> Silicon. Intel Macs have not been tested at all** - the build should run, but
+> nobody has confirmed it yet.
+>
+> Running the game on macOS also depends on Game Porting Toolkit, which is a
+> compatibility layer with its own limitations. Some things that work on Linux
+> may not work on macOS.
+
+## Downloading the launcher
+
+Download the newest launcher release from either:
+
+- The [official Story of Alicia website](https://storyofalicia.com/)
+- The project's [GitHub Releases](https://github.com/Story-Of-Alicia/soa-launcher-qt/releases)
+
+## Runtime requirements
+
+The launcher manages the game and its prefix, but it still needs a compatible Windows runtime installed on your system.
+
+### What you need, at a glance
+
+|                | Linux + Wine | Linux + Proton (UMU) | macOS                        |
+|----------------|--------------|----------------------|------------------------------|
+| Wine           | yes          | no                   | through Game Porting Toolkit |
+| Proton build   | no           | yes                  | not supported                |
+| `umu-launcher` | no           | yes                  | no                           |
+| `winetricks`   | yes          | yes                  | yes                          |
+| Rosetta 2      | no           | no                   | yes, on Apple Silicon        |
+
+**`winetricks` is required in every case.** The launcher checks for it before it
+will set up a prefix and will not continue without it. What it is actually used
+for differs:
+
+- **Linux + Wine** - the launcher calls your system `winetricks` directly to
+  install the Windows components Alicia needs, and optionally DXVK.
+- **Linux + Proton through UMU** - components are installed through
+  `umu-run winetricks`, using the Proton build's own copy. Your system
+  `winetricks` is not what does the work, but the launcher still requires it.
+- **macOS** - Game Porting Toolkit supplies the components itself, so nothing is
+  installed through `winetricks`. The launcher still requires it.
+
+> [!NOTE]
+> **Known issue: `winetricks` is required more often than it needs to be.**
+>
+> The prerequisite check asks for `winetricks` on every platform and with every
+> runtime, including the two cases above where the launcher never actually calls
+> it. That is a bug, not intended behavior.
+>
+> It will be fixed in the next release. The current release cannot be changed.
+
+### Linux
+
+Install `winetricks`, then choose one of these runtime options:
+
+- **Wine** - use your distribution's Wine package.
+- **Proton through UMU** - install `umu-launcher` and provide a compatible Proton build. GE-Proton and UMU-Proton builds work best.
+- **Custom runtime** - select an existing Wine-compatible runtime in the launcher.
+
+You do not need to install both Wine and Proton. Package names vary between Linux distributions, so use the packages provided by your distribution whenever possible.
+
+### macOS
+
+**1. Install Rosetta 2 (Apple Silicon only).** Game Porting Toolkit runs the game
+as x86_64 code, so it will not work without it. The launcher itself is universal
+and does not need Rosetta, but the game will not start without it.
+
+```sh
+softwareupdate --install-rosetta --agree-to-license
+```
+
+**2. Install Homebrew and `winetricks`.** macOS does not ship `winetricks`, and
+[Homebrew](https://brew.sh/) is the simplest way to get it:
+
+```sh
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+brew install winetricks
+```
+
+**3. Install Game Porting Toolkit.** Use the
+[distribution maintained by Gcenx](https://github.com/Gcenx/game-porting-toolkit/releases).
+This runtime is what actually runs Alicia on macOS, and it is not bundled with
+the launcher, so it has to be installed separately.
+
+Follow the requirements and installation notes for the specific Game Porting Toolkit release you download.
 
 ## Installing the launcher
-
-Download the newest package from the project's **Releases** page.
 
 ### Linux
 
@@ -46,19 +145,19 @@ Download the newest package from the project's **Releases** page.
    ./Story_Of_Alicia-x86_64.AppImage
    ```
 
-Linux users can choose between Wine, Proton through UMU, or a custom runtime.
+Linux users can choose between Wine, Proton through UMU, or a custom runtime from the launcher.
 
 ### macOS
 
-Currently the macOS launcher has to be built from source.
-Read [`BUILDING.md`](docs/BUILDING.md).
-
-You can read about why in [`PLATFORM_MACOS.md`](docs/PLATFORM_MACOS.md).
+1. Complete the [runtime requirements](#macos) first - Rosetta 2, `winetricks`, and Game Porting Toolkit.
+2. Download the DMG.
+3. Open it and move the launcher to Applications.
+4. Open the launcher.
 
 ## Documentation
+
 - [`BUILDING.md`](docs/BUILDING.md) - building the launcher from source
 - [`CONTRIBUTING.md`](docs/CONTRIBUTING.md) - contributing code, translations, or documentation
-- [`SECURITY.md`](docs/SECURITY_INTEGRATION.md) - launcher security
 - [`CONFIG_REFERENCE.md`](docs/CONFIG_REFERENCE.md) - persisted launcher configuration
 - [`PLATFORM_LINUX.md`](docs/PLATFORM_LINUX.md) - Linux behavior and packaging
 - [`PLATFORM_MACOS.md`](docs/PLATFORM_MACOS.md) - macOS behavior and packaging
@@ -68,3 +167,10 @@ You can read about why in [`PLATFORM_MACOS.md`](docs/PLATFORM_MACOS.md).
 The launcher source code is distributed under the license in [`LICENSE`](LICENSE).
 
 Artwork, logos, fonts, game files, and modified textless versions of existing artwork remain owned by their respective copyright holders and are not automatically covered by the launcher's source-code license.
+
+Licenses for the bundled fonts are in [`assets/fonts/`](assets/fonts). I'm still looking into these licences.
+
+## Acknowledgements
+
+- Thank you to the SOA development team for the assets and the great help.
+- Thank you Katsu for the beautiful custom art peace in the launcher and testing work.

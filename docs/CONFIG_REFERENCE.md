@@ -1,21 +1,22 @@
 # Launcher Configuration Reference
 
-The Story of Alicia launcher stores its persistent launcher settings in `config.json`.
-The file is created automatically on first launch, rewritten when settings change, and normalized whenever it is loaded.
+The Story of Alicia launcher stores persistent settings in `config.json`. The file is created automatically and rewritten whenever launcher settings change.
 
-This reference describes the configuration keys implemented by the current launcher source.
+This reference describes the configuration used by the current Linux and macOS launcher.
 
 ## File locations
 
 ### Linux
 
-The launcher uses Qt's application data directory:
+The launcher uses Qt's application data directory.
+
+When `XDG_DATA_HOME` is set:
 
 ```text
 $XDG_DATA_HOME/Story Of Alicia/Story Of Alicia Launcher/config.json
 ```
 
-When `XDG_DATA_HOME` is not set, the usual location is:
+The usual default is:
 
 ```text
 ~/.local/share/Story Of Alicia/Story Of Alicia Launcher/config.json
@@ -27,390 +28,281 @@ When `XDG_DATA_HOME` is not set, the usual location is:
 ~/Library/Application Support/Story of Alicia/state/config.json
 ```
 
-## Editing the file manually
+The launcher also keeps a recovery copy beside the main file:
 
-The launcher watches `config.json` for external changes and reloads it automatically. Values may be normalized and written back immediately.
+```text
+config.json.bak
+```
+
+## Editing the file
+
+The launcher watches `config.json` while it is running. Valid external changes are reloaded automatically and normalized values may be written back to disk.
 
 For predictable manual editing:
 
 1. Close the launcher.
-2. Back up `config.json`.
-3. Edit only documented keys.
-4. Keep valid JSON syntax.
-5. Start the launcher and inspect the launcher log for rejected or replaced values.
+2. Back up `config.json` if you want to keep the current state.
+3. Change only keys documented here.
+4. Keep the file valid JSON.
+5. Start the launcher again.
 
-Changing a stored path does not move an existing Wine prefix, Proton compatibility directory, game installation, or runtime.
+Changing a stored path does not move an existing Wine prefix, Proton compatibility directory, or game installation.
 
-## Complete example
+If `config.json` disappears while the launcher is running, the launcher recreates it from the configuration already held in memory. If the file is missing or unreadable at startup, the launcher tries `config.json.bak` before falling back to defaults.
 
-This example represents a Linux Wine configuration. Paths are examples and must be replaced with paths valid for the current system.
+## Runtime settings
 
-```json
-{
-    "after_game_start": "keep",
-    "game_args": "",
-    "game_install_path_1_0": "/home/alicia/soa-launcher/drive_c/users/alicia/AppData/Roaming/Story Of Alicia/game",
-    "game_install_path_2_0": "/home/alicia/soa-launcher/drive_c/users/alicia/AppData/Roaming/Story Of Alicia 2.0/game",
-    "game_version": "1.0",
-    "keep_signed_in": false,
-    "language": "en",
-    "launch_on_startup": false,
-    "launcher_size": "1400x846",
-    "macos_compatibility_profile": "default",
-    "macos_deep_diagnostics": false,
-    "prerequisites_confirmed": true,
-    "proton_compat_data_root": "/home/alicia/soa-launcher",
-    "rosetta_x87_path": "",
-    "rules_accepted": true,
-    "runtime_selected": true,
-    "setup_assistant_version": 1,
-    "setup_runtime_preference": "wine",
-    "umu_binary": "/usr/bin/umu-run",
-    "use_dxvk": false,
-    "wine_arch": "win64",
-    "wine_args": "",
-    "wine_binary": "/usr/bin/wine",
-    "wine_prefix": "/home/alicia/soa-launcher",
-    "winetricks_binary": "/usr/bin/winetricks"
-}
-```
-
-The order of keys is not significant.
-
-## Runtime and prefix settings
+| Key | Type | Default | Purpose |
+|---|---|---|---|
+| `wine_binary` | string | detected when possible | Selected Wine or Proton runtime |
+| `winetricks_binary` | string | detected on Linux | Winetricks executable used with Wine |
+| `umu_binary` | string | detected on Linux | UMU Runner used for Proton |
+| `wine_prefix` | string | platform default | Wine prefix root |
+| `proton_compat_data_root` | string | `~/soa-launcher` on Linux | Proton compatibility data root |
+| `wine_arch` | string | `win64` | Wine prefix architecture |
+| `runtime_selected` | boolean | `false` | Records whether runtime selection is complete |
+| `use_dxvk` | boolean | `false` | Enables launcher managed DXVK for supported Linux Wine setups |
+| `wine_args` | string | empty | Additional arguments passed to the selected runtime |
+| `setup_runtime_preference` | string | `recommended` on Linux | Runtime family selected during setup |
 
 ### `wine_binary`
 
-- **Type:** string
-- **Default on Linux:** automatically detected `wine` or `wine64`, otherwise empty
-- **Default on macOS:** the launcher-managed bundled runtime selector
+On Linux this may point to Wine, GE Proton, UMU Proton, or another runtime recognized by the launcher.
 
-The selected Wine or Proton runtime. On Linux this may be a Wine executable, Proton runtime entry, or another runtime understood by the launcher. On macOS Proton selections are rejected and the bundled or custom Wine runtime is used.
-
-Changing the runtime may cause stored game paths to be rebased to the active prefix.
+On macOS the launcher uses Wine based runtimes. Proton selections are not used there.
 
 ### `winetricks_binary`
 
-- **Type:** string
-- **Default on Linux:** automatically detected `winetricks`, otherwise empty
-- **Default on macOS:** empty
+Linux tries to find `winetricks` automatically. This setting is used for normal Wine prerequisite installation.
 
-Path to the Winetricks executable used for Wine prerequisite installation. The value is cleared on macOS.
+GE Proton and UMU Proton can use their own Winetricks support through UMU, so this path is not required for those runtimes.
 
 ### `umu_binary`
 
-- **Type:** string
-- **Default on Linux:** automatically detected `umu-run`, then `~/.local/bin/umu-run`, otherwise empty
-- **Default on macOS:** empty
+Linux tries `umu-run` from `PATH` first, followed by `~/.local/bin/umu-run`.
 
-Optional path to the UMU Runner executable used for Proton launching on Linux. Leading and trailing whitespace is removed.
+The value is unused on macOS.
 
 ### `wine_prefix`
 
-- **Type:** string
-- **Default on Linux:** `~/soa-launcher`
-- **Default on macOS:** `~/Library/Application Support/Story of Alicia/prefixes/shared`
+Linux default:
 
-Root of the Wine prefix used when the selected runtime is Wine.
+```text
+~/soa-launcher
+```
 
-The path is converted to an absolute, cleaned path. Changing it rebases the stored installation paths for both supported game versions where possible.
+macOS default:
+
+```text
+~/Library/Application Support/Story of Alicia/prefixes/shared
+```
+
+When Wine is selected, this is the active prefix root.
 
 ### `proton_compat_data_root`
 
-- **Type:** string
-- **Default on Linux:** `~/soa-launcher`
-- **Used by:** Proton on Linux
+This is the Proton compatibility data directory, not the `pfx` directory itself.
 
-Root of the Proton compatibility-data directory. The active Wine prefix is:
+The active Proton prefix is:
 
 ```text
 <proton_compat_data_root>/pfx
 ```
 
-When a selected path ends in `pfx`, the launcher stores its parent directory as the compatibility-data root.
+If a path ending in `pfx` is selected, the launcher stores its parent as the compatibility data root.
 
 ### `wine_arch`
 
-- **Type:** string
-- **Default:** `win64`
-- **Accepted on Linux:** `win32`, `win64`
-- **macOS:** always forced to `win64`
+Linux accepts:
 
-Wine prefix architecture requested by the launcher.
+```text
+win32
+win64
+```
 
-Any Linux value other than `win32` is normalized to `win64`.
-
-### `runtime_selected`
-
-- **Type:** boolean
-- **Default on Linux:** `false`
-
-Records whether runtime selection has been completed. On macOS it becomes `true` when a valid bundled or custom runtime selector is available.
-
-This flag does not prove that the runtime still exists or is executable. Runtime validation is performed separately.
+macOS always uses `win64`.
 
 ### `use_dxvk`
 
-- **Type:** boolean
-- **Default:** `false`
-- **macOS:** always forced to `false`
+This option applies to supported Linux Wine configurations. It is forced off on macOS.
 
-Enables DXVK for supported Linux runtime configurations. DXVK is intentionally disabled in the macOS configuration.
+Proton uses the graphics stack supplied by the selected Proton runtime rather than a separate launcher installed DXVK copy.
 
 ### `wine_args`
 
-- **Type:** string
-- **Default:** empty
-- **Maximum length:** 8192 characters
-
-Additional arguments passed to the Wine runtime. Null characters are removed and longer values are truncated.
-
-Incorrect arguments may prevent prefix setup or game launching.
+The launcher removes null characters and limits the value to 8192 characters.
 
 ### `setup_runtime_preference`
 
-- **Type:** string
-- **Linux values:** `recommended`, `wine`, `proton`
-- **macOS value:** `wine`
+Linux accepts:
 
-Stores the runtime family chosen in the setup assistant. Invalid Linux values become `recommended`. macOS normalizes this setting to `wine`.
+```text
+recommended
+wine
+proton
+```
+
+macOS uses Wine.
 
 ## Game settings
 
+| Key | Type | Default | Purpose |
+|---|---|---|---|
+| `game_version` | string | `1.0` | Selected game version |
+| `game_install_path_1_0` | string | derived automatically | Story of Alicia 1.0 install directory |
+| `game_install_path_2_0` | string | derived automatically | Story of Alicia 2.0 install directory |
+| `game_args` | string | empty | Additional game launch arguments |
+
 ### `game_version`
 
-- **Type:** string
-- **Default:** `1.0`
-- **Accepted values:** `1.0`, `2.0`
-
-The currently selected Story of Alicia version. Any value other than `2.0` is treated as `1.0`.
-
-The launch `GameID` is derived from the selected game profile and is not stored in `config.json`.
-
-### `game_install_path_1_0`
-
-- **Type:** string
-
-Installation directory for Story of Alicia 1.0.
-
-The default Wine location is derived as:
+Accepted values are:
 
 ```text
-<wine_prefix>/drive_c/users/<user>/AppData/Roaming/Story Of Alicia/game
+1.0
+2.0
 ```
 
-The default Proton location is derived as:
+The launch game ID is selected from the active game profile and is not stored in `config.json`.
 
-```text
-<proton_compat_data_root>/pfx/drive_c/users/steamuser/AppData/Roaming/Story Of Alicia/game
-```
+### Game install paths
 
-### `game_install_path_2_0`
+For Wine, the default paths are derived inside the active Wine prefix using the current Wine user.
 
-- **Type:** string
+For Proton, the launcher uses the `steamuser` directory inside the Proton prefix.
 
-Installation directory for Story of Alicia 2.0.
+The launcher keeps both game paths inside the active prefix. Paths that point outside it are replaced with the derived default for that game version.
 
-The default Wine location is derived as:
-
-```text
-<wine_prefix>/drive_c/users/<user>/AppData/Roaming/Story Of Alicia 2.0/game
-```
-
-The default Proton location is derived as:
-
-```text
-<proton_compat_data_root>/pfx/drive_c/users/steamuser/AppData/Roaming/Story Of Alicia 2.0/game
-```
-
-### Game path containment
-
-Both game installation paths must remain inside the active prefix.
-
-The launcher rejects or replaces paths that:
-
-- are outside the active Wine or Proton prefix;
-- escape through an existing symbolic link;
-- resolve through an existing ancestor outside the prefix.
-
-An invalid stored path is replaced with the derived default for that game version.
+When the prefix or runtime family changes, paths that belonged to the previous prefix are rebased where possible.
 
 ### `game_args`
 
-- **Type:** string
-- **Default:** empty
-- **Maximum length:** 8192 characters
+The launcher removes null characters and limits the value to 8192 characters.
 
-Additional arguments appended to the game launch command. Null characters are removed and longer values are truncated.
+Authentication arguments are generated by the launcher and are not stored in this field.
 
-Authentication arguments and the selected game ID are generated by the launcher and are not stored here.
+## Launcher settings
 
-## Launcher behaviour
-
-### `launch_on_startup`
-
-- **Type:** boolean
-- **Default:** `false`
-
-Records whether the launcher should start automatically with the desktop session. Platform integration may require a separate system registration in addition to this value.
-
-### `after_game_start`
-
-- **Type:** string
-- **Default:** `keep`
-- **Accepted values:** `keep`, `minimize`
-
-Controls what happens to the launcher window after the game starts. Any value other than `minimize` becomes `keep`.
+| Key | Type | Default | Accepted values |
+|---|---|---|---|
+| `launch_on_startup` | boolean | `false` | `true`, `false` |
+| `after_game_start` | string | `keep` | `keep`, `minimize` |
+| `launcher_size` | string | `1400x846` | supported launcher sizes |
+| `language` | string | `en` | `en`, `nb`, `nl` |
 
 ### `launcher_size`
 
-- **Type:** string
-- **Default:** `1400x846`
-- **Accepted values:**
-  - `1120x677`
-  - `1400x846`
-  - `1600x967`
-  - `1920x1160`
+Supported values are:
 
-The legacy value `900x544` is migrated to `1120x677`. Other unsupported values become `1400x846`.
+```text
+1120x677
+1400x846
+1600x967
+1920x1160
+```
+
+The old `900x544` value is migrated to `1120x677`. Unsupported values are replaced with `1400x846`.
 
 ### `language`
 
-- **Type:** string
-- **Default:** `en`
-- **Accepted values:**
-  - `en` — English
-  - `nb` — Norwegian Bokmål
-  - `nl` — Dutch
+The launcher supports English, Norwegian Bokmål, and Dutch.
 
-Locale-like values are normalized. Examples include `en-US` to `en`, `nb-NO` to `nb`, and `nl-NL` to `nl`. Legacy Norwegian values beginning with `no` also become `nb`.
+Locale style values are normalized. Examples include `en-US` to `en`, `nb-NO` to `nb`, and `nl-NL` to `nl`. Older Norwegian values beginning with `no` are also normalized to `nb`.
 
-## Setup and agreement state
+## Setup and sign in state
+
+| Key | Type | Default | Purpose |
+|---|---|---|---|
+| `prerequisites_confirmed` | boolean | `false` | Records completion of the current prerequisite step |
+| `setup_assistant_version` | integer | `0` | Version of the setup flow already completed |
+| `rules_accepted` | boolean | `false` | Records completion of the one time rules acknowledgement |
+| `keep_signed_in` | boolean | `false` | Controls whether credentials persist between sessions |
 
 ### `prerequisites_confirmed`
 
-- **Type:** boolean
-- **Default:** `false`
+The value only counts as complete when `setup_assistant_version` is at least `1`.
 
-Records whether the user completed the current prerequisites step. It is considered valid only when `setup_assistant_version` is at least `1`.
-
-### `setup_assistant_version`
-
-- **Type:** integer
-- **Default:** `0`
-- **Current completed version:** `1`
-
-Internal schema/version marker for setup completion. Negative values become `0`.
-
-Setting prerequisites as confirmed through the launcher also writes this value as `1`. A future launcher may increase it to require a newer setup step.
+Completing the prerequisite step through the launcher sets the current setup assistant version automatically.
 
 ### `rules_accepted`
 
-- **Type:** boolean
-- **Default:** `false`
+The value becomes `true` after the user completes the rules flow and confirms both acknowledgements before entering the playtest.
 
-Records whether the launcher rules were accepted.
-
-This is launcher state, not a cryptographic receipt or substitute for server-side account enforcement.
+Once stored, the launcher does not ask for those acknowledgements again unless the launcher configuration is reset.
 
 ### `keep_signed_in`
 
-- **Type:** boolean
-- **Default:** `false`
+Account credentials are not stored directly in `config.json`.
 
-Controls whether login credentials persist between launcher sessions.
+When this option is enabled, the launcher first uses the platform credential store. If that is unavailable, it can use a protected `.env` fallback beside `config.json`.
 
-Credentials are not stored directly in `config.json`. When persistence is enabled, the launcher first uses the platform credential store. If that is unavailable, it may use a restricted `.env` fallback beside `config.json`.
+Disabling the option removes persisted credentials while leaving the current session available until it ends or is cleared.
 
-Disabling this setting removes saved credentials while leaving the current session available until it is otherwise cleared or the launcher exits.
+## Diagnostics and macOS compatibility
 
-## macOS compatibility settings
+| Key | Type | Default | Purpose |
+|---|---|---|---|
+| `diagnostics_enabled` | boolean | `false` | Enables the launch diagnostic mode |
+| `macos_compatibility_profile` | string | `default` | Selects a macOS Wine compatibility profile |
+| `rosetta_x87_path` | string | empty | Stores the optional Rosetta x87 compatibility path |
 
-These keys remain present in the shared configuration schema but only affect macOS.
+### `diagnostics_enabled`
+
+Diagnostic Mode is available through Advanced Settings. It controls the additional per launch diagnostic collection used when troubleshooting game startup or runtime problems.
+
+The old `macos_deep_diagnostics` key is migrated to `diagnostics_enabled` and then removed.
 
 ### `macos_compatibility_profile`
 
-- **Type:** string
-- **Default:** `default`
-- **Accepted values:**
-  - `default`
-  - `safe-display`
-  - `low-graphics`
-  - `gl-behind`
+Persisted profile values currently normalized by the configuration loader are:
 
-Selects a predefined macOS Wine compatibility profile. Unsupported values become `default`.
+```text
+default
+safe-display
+low-graphics
+gl-behind
+```
 
-### `macos_deep_diagnostics`
-
-- **Type:** boolean
-- **Default:** `false`
-
-Enables additional macOS runtime and launch diagnostics. The value has no effect on Linux.
+The macOS Advanced Settings UI also exposes the diagnostic `audio-isolation` profile. The current configuration loader does not preserve that value across a full reload, so it should not be relied on as a permanent manual config value yet.
 
 ### `rosetta_x87_path`
 
-- **Type:** string
-- **Default:** empty
-
-Optional macOS path associated with the Rosetta x87 compatibility setup. It has no effect on Linux.
+This value is only relevant to macOS compatibility setup. It has no effect on Linux.
 
 ## Credentials and sensitive data
 
-The following values are intentionally not stored in `config.json`:
+The following values are deliberately kept out of `config.json`:
 
-- account ID or login username;
-- authentication token;
-- display name;
-- generated launch authentication arguments.
+1. Account user ID or login name
+2. Authentication token
+3. Display name
+4. Generated game authentication arguments
 
-When `keep_signed_in` is enabled, credentials are stored using the platform credential store where available.
+When persistent sign in is enabled, the launcher uses the platform credential store when available.
 
-The fallback credential file is located beside `config.json`:
+The fallback credential file is stored beside `config.json` as `.env` and is restricted to owner read and write access.
 
-### Linux
+Do not commit or share the `.env` file.
 
-```text
-$XDG_DATA_HOME/Story Of Alicia/Story Of Alicia Launcher/.env
-```
-
-### macOS
-
-```text
-~/Library/Application Support/Story of Alicia/state/.env
-```
-
-The fallback file is written with owner-only read and write permissions. It must not be committed, attached to bug reports, or shared with launcher logs.
-!@
 ## Automatic normalization
 
-When the launcher loads the configuration, it may automatically:
+When configuration is loaded, the launcher can perform the following cleanup:
 
-- add missing keys with defaults;
-- normalize language, window size, launch behaviour, architecture, and compatibility-profile values;
-- force macOS-only restrictions such as `win64`, Wine-only runtime preference, and disabled DXVK;
-- derive empty game installation paths;
-- replace game paths outside the active prefix;
-- migrate legacy keys;
-- rebase game paths after a prefix or runtime change;
-- save the normalized configuration back to disk.
-
-The launcher uses an atomic save operation so an interrupted write is less likely to leave a partially written configuration.
+1. Add missing keys using current defaults.
+2. Normalize launcher size, language, launch behavior, Wine architecture, and runtime preference.
+3. Force macOS restrictions such as `win64` and disabled launcher managed DXVK.
+4. Derive missing game installation paths.
+5. Replace game paths that are outside the active prefix.
+6. Rebase game paths when the active prefix changes.
+7. Migrate older configuration keys.
+8. Rewrite the normalized configuration using an atomic save.
+9. Refresh `config.json.bak` after a successful save.
 
 ## Resetting launcher settings
 
-The launcher's **Reset Launcher Settings** action:
+The launcher's Reset Launcher Settings action removes the stored launcher state and recreates it from current defaults.
 
-- removes and recreates `config.json` with current defaults;
-- removes the `.env` fallback;
-- clears credentials from the platform credential store;
-- clears the current authenticated session.
+It clears `config.json`, `config.json.bak`, saved credentials, and the current authenticated session.
 
-It does not delete:
+It does not delete the Wine prefix, Proton compatibility data, installed game files, downloaded runtimes, or launcher logs.
 
-- the Wine prefix;
-- Proton compatibility data;
-- installed game files;
-- downloaded runtimes;
-- launcher logs.
-
-After a reset, existing files may still be detected again when setup runs.
+Existing game files can be detected again when setup runs.

@@ -271,7 +271,9 @@ extension Courier
                 }
                 targetPaths.append(targetRelative)
 
-                let percent = Int(Double(index + 1) / Double(manifest.count) * 100)
+                let completed = Double(index + 1)
+                let total = Double(manifest.count)
+                let percent = Int(completed / total * 100.0)
                 reportProgress(operationID, courier_phase_checking,
                                "Checking (\(index + 1)/\(manifest.count))", percent,
                                0, 0, 0, index + 1, manifest.count)
