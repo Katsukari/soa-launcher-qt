@@ -72,18 +72,6 @@ The launcher manages the game and its prefix, but it still needs a compatible Wi
 | `winetricks`   | yes          | yes                  | yes                          |
 | Rosetta 2      | no           | no                   | yes, on Apple Silicon        |
 
-**`winetricks` is required in every case.** The launcher checks for it before it
-will set up a prefix and will not continue without it. What it is actually used
-for differs:
-
-- **Linux + Wine** - the launcher calls your system `winetricks` directly to
-  install the Windows components Alicia needs, and optionally DXVK.
-- **Linux + Proton through UMU** - components are installed through
-  `umu-run winetricks`, using the Proton build's own copy. Your system
-  `winetricks` is not what does the work, but the launcher still requires it.
-- **macOS** - Game Porting Toolkit supplies the components itself, so nothing is
-  installed through `winetricks`. The launcher still requires it.
-
 > [!NOTE]
 > **Known issue: `winetricks` is required more often than it needs to be.**
 >
