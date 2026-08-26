@@ -42,6 +42,12 @@ If a C++ class gains a member, signal, slot, or helper, update its header and im
 
 A change that compiles only because a local header is newer than the submitted source is incomplete.
 
+### Use Python and shell for different jobs
+
+The repository intentionally uses both. Shell scripts coordinate platform commands for builds, packaging, signing, and diagnostics. Python handles structured parsing and analysis, such as translation checks and launcher logs.
+
+Using both keeps each task in the simpler tool. Do not rewrite one into the other only for consistency.
+
 ### Use the shared layout system
 
 Launcher geometry should go through `util::layout` and the existing layout helpers instead of adding unrelated fixed coordinates in individual widgets.
@@ -51,6 +57,8 @@ The launcher has several window size presets and the UI is expected to remain us
 ### Comments are welcome
 
 Comments are useful when they explain behavior that is not obvious from the code.
+
+Much of the existing source still needs to be documented by me. This is why many files currently have few or no comments.
 
 Good places for comments include Wine and Proton compatibility workarounds, macOS runtime behavior, signing assumptions, unusual process handling, and decisions that would otherwise look unnecessary to a future contributor.
 
