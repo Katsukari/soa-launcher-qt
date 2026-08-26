@@ -164,4 +164,4 @@ Licenses for the bundled fonts are in [`assets/fonts/`](assets/fonts). I'm still
 ## Acknowledgements
 
 - Thank you to the SOA development team for the assets and the great help.
-- Thank you Katsu for the beautiful custom art peace in the launcher and testing work.
+- Thank you Katsu for the beautiful custom art piece in the launcher and testing work.
