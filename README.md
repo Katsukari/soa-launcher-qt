@@ -10,6 +10,8 @@
 
 The official **Story of Alicia** launcher for Linux and macOS.
 
+![Launcher screenshot](/docs/soa-launcher-screenshot.png)
+
 > **AI development disclosure:** AI was used as a development tool alongside human direction, testing, review, and decision-making
 
 The launcher can:
