@@ -59,6 +59,8 @@ if(NOT CMAKE_GENERATOR MATCHES "^Ninja" AND NOT CMAKE_GENERATOR STREQUAL "Xcode"
     message(FATAL_ERROR "The Swift Courier library requires the Ninja or Xcode generator")
 endif()
 
+set(CMAKE_Swift_LANGUAGE_VERSION 5)
+
 enable_language(Swift)
 
 set(CMAKE_CXX_STANDARD 20)
