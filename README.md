@@ -64,13 +64,14 @@ The launcher manages the game and its prefix, but it still needs a compatible Wi
 
 ### What you need, at a glance
 
-|                | Linux + Wine | Linux + Proton (UMU) | macOS                        |
-|----------------|--------------|----------------------|------------------------------|
-| Wine           | yes          | no                   | through Game Porting Toolkit |
-| Proton build   | no           | yes                  | not supported                |
-| `umu-launcher` | no           | yes                  | no                           |
-| `winetricks`   | yes          | yes                  | yes                          |
-| Rosetta 2      | no           | no                   | yes, on Apple Silicon        |
+| Requirement | Linux + Wine | Linux + Proton (UMU) | macOS                                                  |
+|---|---|---|--------------------------------------------------------|
+| Runtime | Wine | Proton | Apple Silicon: GPTK. Intel: untested, try normal wine? |
+| `umu-launcher` | No | Yes | No                                                     |
+| `winetricks` | Yes, for setup | Usually no | No                                                     |
+| Rosetta 2 | No | No | Apple Silicon only                                     |
+
+Compatible GE/UMU Proton runs Winetricks through UMU. Other Proton builds may require standalone Winetricks.
 
 > [!NOTE]
 > **Known issue: `winetricks` is required more often than it needs to be.**
