@@ -1,6 +1,6 @@
 # Story of Alicia Launcher
 
-[![License](https://img.shields.io/github/license/Story-Of-Alicia/soa-launcher-qt?color=blue)](LICENSE)
+[![License: GPL v3](https://img.shields.io/badge/License-GPL_v3-blue.svg)](LICENSE)
 [![Latest release](https://img.shields.io/github/v/release/Story-Of-Alicia/soa-launcher-qt?label=release&color=success)](https://github.com/Story-Of-Alicia/soa-launcher-qt/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/Story-Of-Alicia/soa-launcher-qt/total?color=orange)](https://github.com/Story-Of-Alicia/soa-launcher-qt/releases)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS-lightgrey)](#supported-platforms)
