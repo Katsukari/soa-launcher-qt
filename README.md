@@ -46,7 +46,7 @@ The launcher is designed to work for regular players without requiring knowledge
 >
 > The DMG is a universal binary, so the launcher itself runs natively on both
 > Apple Silicon and Intel Macs. **However, it has only been tested on Apple
-> Silicon. Intel Macs have not been tested at all** - the build should run, but
+> Silicon. Intel Macs have not been tested at all** the build should run, but
 > nobody has confirmed it yet.
 >
 > Running the game on macOS also depends on Game Porting Toolkit, which is a
