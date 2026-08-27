@@ -96,7 +96,7 @@ You do not need to install both Wine and Proton. Package names vary between Linu
 
 ### macOS
 
-**1. Install Rosetta 2 (Apple Silicon only).** Game Porting Toolkit runs the game
+**1. Install Rosetta 2 (Apple Silicon only) via the terminal.** Game Porting Toolkit runs the game
 as x86_64 code, so it will not work without it. The launcher itself is universal
 and does not need Rosetta, but the game will not start without it.
 
@@ -104,7 +104,7 @@ and does not need Rosetta, but the game will not start without it.
 softwareupdate --install-rosetta --agree-to-license
 ```
 
-**2. Install Homebrew and `winetricks`.** macOS does not ship `winetricks`, and
+**2. Install Homebrew and `winetricks` via the terminal.** macOS does not ship `winetricks`, and
 [Homebrew](https://brew.sh/) is the simplest way to get it:
 
 ```sh
@@ -144,6 +144,9 @@ Linux users can choose between Wine, Proton through UMU, or a custom runtime fro
 2. Download the DMG.
 3. Open it and move the launcher to Applications.
 4. Open the launcher.
+
+## Known issues
+If you encounter an error/problem, check [known issues](Known_Issues.md) first if your issue is already known and if it has a solution.
 
 ## Documentation
 
