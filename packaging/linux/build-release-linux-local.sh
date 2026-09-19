@@ -6,47 +6,38 @@ echo "SOA Linux release AppImage builder"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-resolve_project_root() {
-  local requested="${1:-${SOA_SOURCE_DIR:-}}"
-  local candidate
-
-  if [ -n "$requested" ]; then
-    candidate="$(cd "$requested" 2>/dev/null && pwd)" || {
-      echo "Launcher source directory does not exist: $requested" >&2
-      exit 1
-    }
-  elif [ -f "$PWD/CMakeLists.txt" ]; then
-    candidate="$PWD"
-  else
-    candidate="$SCRIPT_DIR"
-    while [ "$candidate" != "/" ] && [ ! -f "$candidate/CMakeLists.txt" ]; do
-      candidate="$(dirname "$candidate")"
-    done
-  fi
-
-  if [ ! -f "$candidate/CMakeLists.txt" ]; then
-    echo "Could not find the launcher CMakeLists.txt." >&2
-    echo "Run this script from the repository root, pass the source directory as its first argument," >&2
-    echo "or set SOA_SOURCE_DIR=/path/to/soa-launcher-qt." >&2
-    exit 1
-  fi
-
-  printf '%s\n' "$candidate"
-}
+source "$SCRIPT_DIR/../build-common.sh"
 
 if [ "$#" -gt 1 ]; then
   echo "Usage: $0 [launcher-source-directory]" >&2
   exit 2
 fi
 
-PROJECT_ROOT="$(resolve_project_root "${1:-}")"
-
-cd "$SCRIPT_DIR"
+PROJECT_ROOT="$(soa_resolve_project_root "${1:-${SOA_SOURCE_DIR:-}}" "$SCRIPT_DIR")"
+SCRIPT_DIR="$PROJECT_ROOT/packaging/linux"
 
 echo "Launcher source directory: $PROJECT_ROOT"
 
-BUILD_DIR="$SCRIPT_DIR/build-appimage"
-APPDIR="$SCRIPT_DIR/AppDir"
+BUILD_DIR="$(soa_absolute_directory "${SOA_BUILD_DIR:-$SCRIPT_DIR/build-appimage}")"
+APPDIR="$(soa_absolute_directory "${SOA_APPDIR:-$SCRIPT_DIR/AppDir}")"
+BUILD_TYPE="${SOA_BUILD_TYPE:-Release}"
+soa_validate_output_directory "$BUILD_DIR" "$PROJECT_ROOT"
+soa_validate_output_directory "$APPDIR" "$PROJECT_ROOT"
+case "$BUILD_DIR/" in
+  "$APPDIR/"*) echo "SOA_APPDIR must not contain SOA_BUILD_DIR." >&2; exit 1 ;;
+esac
+case "$APPDIR/" in
+  "$BUILD_DIR/"*) echo "SOA_BUILD_DIR must not contain SOA_APPDIR." >&2; exit 1 ;;
+esac
+soa_validate_build_cache "$BUILD_DIR" "$PROJECT_ROOT" Ninja
+
+if [ -n "${SOA_UPDATE_SIGNING_KEY:-}" ] && [ -f "$SOA_UPDATE_SIGNING_KEY" ]; then
+  SOA_UPDATE_SIGNING_KEY="$(cd "$(dirname "$SOA_UPDATE_SIGNING_KEY")" && pwd -P)/$(basename "$SOA_UPDATE_SIGNING_KEY")"
+  export SOA_UPDATE_SIGNING_KEY
+fi
+
+cd "$SCRIPT_DIR"
+
 LINUXDEPLOY_TAG="${LINUXDEPLOY_TAG:-1-alpha-20250213-2}"
 LINUXDEPLOY_SHA256="${LINUXDEPLOY_SHA256:-4648f278ab3ef31f819e67c30d50f462640e5365a77637d7e6f2ad9fd0b4522a}"
 
@@ -132,15 +123,6 @@ if [ "$DERIVED_UPDATE_PUBLIC_KEY_HEX" != "$EXPECTED_UPDATE_PUBLIC_KEY_HEX" ]; th
   exit 1
 fi
 
-LAUNCHER_VERSION="${SOA_LAUNCHER_VERSION:-$(
-  sed -nE 's/^[[:space:]]*VERSION[[:space:]]+([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' \
-    "$PROJECT_ROOT/CMakeLists.txt" | head -n 1
-)}"
-if [[ ! "$LAUNCHER_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]; then
-  echo "Could not determine a valid launcher version." >&2
-  exit 1
-fi
-
 if [ -z "${QMAKE:-}" ]; then
   QMAKE="$(command -v qmake6 || true)"
 fi
@@ -165,16 +147,35 @@ cmake \
   -S "$PROJECT_ROOT" \
   -B "$BUILD_DIR" \
   -G Ninja \
-  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
+  -DCMAKE_INSTALL_PREFIX=/usr \
+  -DCMAKE_INSTALL_BINDIR=bin \
+  -DCMAKE_INSTALL_LIBDIR=lib \
+  -DCMAKE_INSTALL_DATADIR=share \
+  -DCMAKE_INSTALL_LIBEXECDIR=libexec \
   -DBUILD_TESTING=ON \
   -DSOA_REQUIRE_ALICIA_LOG_HOOK=ON \
   -DSOA_PORTABLE_BUILD=ON
 
-cmake --build "$BUILD_DIR"
-QT_QPA_PLATFORM=offscreen LANG=C.UTF-8 LC_ALL=C.UTF-8 \
-  ctest --test-dir "$BUILD_DIR" --output-on-failure
+LAUNCHER_VERSION="$(soa_build_value "$BUILD_DIR" "$BUILD_TYPE" version)"
+if [ -n "${SOA_LAUNCHER_VERSION:-}" ] && [ "$SOA_LAUNCHER_VERSION" != "$LAUNCHER_VERSION" ]; then
+  echo "SOA_LAUNCHER_VERSION must match the configured project version: $LAUNCHER_VERSION" >&2
+  exit 1
+fi
 
-DESTDIR="$APPDIR" cmake --install "$BUILD_DIR" --prefix /usr
+cmake --build "$BUILD_DIR" --config "$BUILD_TYPE" --parallel
+QT_QPA_PLATFORM=offscreen LANG=C.UTF-8 LC_ALL=C.UTF-8 \
+  ctest --test-dir "$BUILD_DIR" -C "$BUILD_TYPE" --output-on-failure --no-tests=error
+
+DESTDIR="$APPDIR" cmake --install "$BUILD_DIR" --config "$BUILD_TYPE" --prefix /usr
+
+NETWORK_NAME="$(soa_build_value "$BUILD_DIR" "$BUILD_TYPE" network_name)"
+for required_artifact in "$APPDIR/usr/bin/soa_launcher" "$APPDIR/usr/lib/$NETWORK_NAME"; do
+  if [ ! -s "$required_artifact" ]; then
+    echo "Required installed launcher artifact is missing: $required_artifact" >&2
+    exit 1
+  fi
+done
 
 mkdir -p "$APPDIR/usr/share/soa-launcher/update"
 jq -n \
@@ -188,8 +189,8 @@ jq -n \
     signing_public_key: $signing_public_key}' \
   >"$APPDIR/usr/share/soa-launcher/update/manifest.json"
 
-cp soa-launcher.png "$APPDIR/soa-launcher.png"
-cp soa-launcher.desktop "$APPDIR/soa-launcher.desktop"
+cp "$SCRIPT_DIR/soa-launcher.png" "$APPDIR/soa-launcher.png"
+cp "$SCRIPT_DIR/soa-launcher.desktop" "$APPDIR/soa-launcher.desktop"
 
 desktop-file-validate "$APPDIR/usr/share/applications/soa-launcher.desktop"
 
@@ -198,8 +199,7 @@ get_tool \
   "https://github.com/linuxdeploy/linuxdeploy/releases/download/$LINUXDEPLOY_TAG/linuxdeploy-x86_64.AppImage" \
   "$LINUXDEPLOY_SHA256"
 
-SWIFT_BIN="$(dirname "$(command -v swiftc)")"
-SWIFT_LIB="$(dirname "$SWIFT_BIN")/lib/swift/linux"
+SWIFT_LIB="$(soa_swift_runtime_library_path "$(command -v swiftc)" "$APPDIR/usr/lib/$NETWORK_NAME")"
 
 QT_VERSION="$("$QMAKE" -query QT_VERSION)"
 QT_PLUGIN_DIR="$("$QMAKE" -query QT_INSTALL_PLUGINS)"
@@ -222,8 +222,8 @@ if [ ! -e "$QT_LIB_DIR/libQt6Core.so.6" ]; then
   exit 1
 fi
 
-if [ ! -d "$SWIFT_LIB" ]; then
-  echo "Swift Linux runtime directory was not found: $SWIFT_LIB" >&2
+if ! soa_swift_runtime_has_core "$SWIFT_LIB"; then
+  echo "Swift Linux runtime libraries were not found: $SWIFT_LIB" >&2
   exit 1
 fi
 
