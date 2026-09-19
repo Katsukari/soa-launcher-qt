@@ -69,7 +69,7 @@ target_link_libraries(soa_ui
         soa_config
         soa_i18n
         soa_auth
-        soa_network
+        soa_network_bridge
         soa_runtime
         soa_update
         Qt6::Core

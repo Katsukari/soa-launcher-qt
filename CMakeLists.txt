@@ -7,7 +7,7 @@ endif()
 project(soa_launcher
         LANGUAGES C CXX
         DESCRIPTION "Story of Alicia Launcher"
-        VERSION 1.0.0
+        VERSION 1.0.1
 )
 
 set(SOA_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}")

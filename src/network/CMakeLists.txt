@@ -21,10 +21,6 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     soa_apply_build_options(soa_seal_crypto)
 endif()
 
-qt6_wrap_cpp(SOA_NETWORK_MOC_SOURCES
-        ${SOA_INCLUDE_DIR}/network/CourierBridge.hpp
-)
-
 add_library(soa_network SHARED
         Courier.swift
         CourierUpdate.swift
@@ -41,16 +37,8 @@ add_library(soa_network SHARED
         DiscordRpcService.swift
         SwiftNetworkABI.swift
         MD5.swift
-        Courier.cpp
-        SwiftHttpClient.cpp
-        DiscordRpc.cpp
-        ${SOA_NETWORK_MOC_SOURCES}
 
         ${SOA_INCLUDE_DIR}/network/Courier.h
-        ${SOA_INCLUDE_DIR}/network/CourierBridge.hpp
-        ${SOA_INCLUDE_DIR}/network/DiscordRpc.hpp
-        ${SOA_INCLUDE_DIR}/network/DownloadStatus.hpp
-        ${SOA_INCLUDE_DIR}/network/SwiftHttpClient.hpp
         ${SOA_INCLUDE_DIR}/network/SwiftNetwork.h
 )
 
@@ -61,12 +49,6 @@ target_compile_options(soa_network PRIVATE
 target_include_directories(soa_network
         PUBLIC
         ${SOA_INCLUDE_DIR}
-)
-
-target_link_libraries(soa_network PRIVATE
-        soa_common
-        spdlog::spdlog
-        Qt6::Core
 )
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
@@ -82,4 +64,40 @@ set_target_properties(soa_network PROPERTIES
         Swift_MODULE_NAME SoaCourier
 )
 
-soa_apply_build_options(soa_network)
+qt6_wrap_cpp(SOA_NETWORK_MOC_SOURCES
+        ${SOA_INCLUDE_DIR}/network/CourierBridge.hpp
+)
+
+add_library(soa_network_bridge STATIC
+        Courier.cpp
+        SwiftHttpClient.cpp
+        DiscordRpc.cpp
+        ${SOA_NETWORK_MOC_SOURCES}
+
+        ${SOA_INCLUDE_DIR}/network/CourierBridge.hpp
+        ${SOA_INCLUDE_DIR}/network/DiscordRpc.hpp
+        ${SOA_INCLUDE_DIR}/network/DownloadStatus.hpp
+        ${SOA_INCLUDE_DIR}/network/SwiftHttpClient.hpp
+)
+
+target_include_directories(soa_network_bridge
+        PUBLIC
+        ${SOA_INCLUDE_DIR}
+)
+
+target_link_libraries(soa_network_bridge
+        PUBLIC
+        soa_network
+        soa_common
+        Qt6::Core
+        PRIVATE
+        spdlog::spdlog
+)
+
+set_target_properties(soa_network_bridge PROPERTIES
+        AUTOMOC OFF
+        AUTORCC OFF
+        AUTOUIC OFF
+)
+
+soa_apply_build_options(soa_network_bridge)

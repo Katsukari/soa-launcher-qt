@@ -56,7 +56,7 @@ target_link_libraries(soa_runtime
         soa_config
         soa_runtime_support
         soa_i18n
-        soa_network
+        soa_network_bridge
         Qt6::Core
         Qt6::Gui
         Qt6::Widgets

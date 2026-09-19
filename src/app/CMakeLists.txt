@@ -26,7 +26,7 @@ target_link_libraries(soa_launcher
         soa_i18n
         soa_auth
         soa_credentials
-        soa_network
+        soa_network_bridge
         soa_runtime
         soa_ui
         soa_update
