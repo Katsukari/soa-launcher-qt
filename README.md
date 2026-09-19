@@ -160,13 +160,19 @@ If you encounter an error/problem, check [known issues](Known_Issues.md) first i
 - [`PLATFORM_LINUX.md`](docs/PLATFORM_LINUX.md) - Linux behavior and packaging
 - [`PLATFORM_MACOS.md`](docs/PLATFORM_MACOS.md) - macOS behavior and packaging
 
-## License and assets
+## License
 
-The launcher source code is distributed under the license in [`LICENSE`](LICENSE).
+The Story of Alicia Launcher is licensed under the
+[GNU General Public License version 3](LICENSE).
 
-Artwork, logos, fonts, game files, and modified textless versions of existing artwork remain owned by their respective copyright holders and are not automatically covered by the launcher's source-code license.
+Additional attribution terms permitted under GPLv3 Section 7 apply.
+See [ADDITIONAL_TERMS.md](ADDITIONAL_TERMS.md).
 
-Licenses for the bundled fonts are in [`assets/fonts/`](assets/fonts). I'm still looking into these licences.
+Story of Alicia branding and project assets are subject to the terms
+described in [BRANDING.md](BRANDING.md).
+
+Contributions are subject to the terms described in
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Acknowledgements
 
