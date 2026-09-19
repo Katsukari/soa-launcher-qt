@@ -3,13 +3,21 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-BUILD_DIR="${SOA_BUILD_DIR:-$PROJECT_ROOT/build-macos-local}"
+source "$SCRIPT_DIR/../build-common.sh"
+PROJECT_ROOT="$(soa_resolve_project_root "${SOA_SOURCE_DIR:-}" "$SCRIPT_DIR")"
+SCRIPT_DIR="$PROJECT_ROOT/packaging/macos"
+if [ "$(uname -s)" != Darwin ]; then
+  echo "The macOS app must be built on macOS." >&2
+  exit 1
+fi
+BUILD_DIR="$(soa_absolute_directory "${SOA_BUILD_DIR:-$PROJECT_ROOT/build-macos-local}")"
+soa_validate_output_directory "$BUILD_DIR" "$PROJECT_ROOT"
+soa_validate_build_cache "$BUILD_DIR" "$PROJECT_ROOT" Xcode
 ARCHS="${SOA_MACOS_ARCHS:-${SOA_MACOS_ARCH:-x86_64;arm64}}"
 BUILD_TYPE="${SOA_BUILD_TYPE:-Release}"
 IFS=';' read -r -a REQUESTED_ARCHS <<< "$ARCHS"
 
-for tool in cmake swift xcrun lipo otool file i686-w64-mingw32-gcc i686-w64-mingw32-g++; do
+for tool in cmake ctest swift xcrun lipo otool file i686-w64-mingw32-gcc i686-w64-mingw32-g++; do
   if ! command -v "$tool" >/dev/null 2>&1; then
     echo "Required tool not found: $tool" >&2
     exit 1
@@ -93,17 +101,15 @@ cmake \
 cmake --build "$BUILD_DIR" --config "$BUILD_TYPE" --parallel
 ctest --test-dir "$BUILD_DIR" -C "$BUILD_TYPE" --output-on-failure
 
-apps=("$BUILD_DIR/$BUILD_TYPE"/*.app)
-if [ "${#apps[@]}" -ne 1 ] || [ ! -d "${apps[0]}" ]; then
-  printf 'Expected exactly one app bundle in %s/%s, found: %s\n' \
-    "$BUILD_DIR" "$BUILD_TYPE" "${apps[*]}" >&2
+APP="$(soa_build_value "$BUILD_DIR" "$BUILD_TYPE" app_bundle)"
+if [ ! -d "$APP" ]; then
+  printf 'The configured app bundle was not built: %s\n' "$APP" >&2
   exit 1
 fi
-APP="${apps[0]}"
 
 "$MACDEPLOYQT" "$APP" -always-overwrite -verbose=1
 
-BINARY="$APP/Contents/MacOS/soa_launcher"
+BINARY="$(soa_build_value "$BUILD_DIR" "$BUILD_TYPE" executable)"
 ACTUAL_ARCHS="$(lipo -archs "$BINARY")"
 for requested_arch in "${REQUESTED_ARCHS[@]}"; do
   case " $ACTUAL_ARCHS " in
@@ -115,7 +121,8 @@ for requested_arch in "${REQUESTED_ARCHS[@]}"; do
   esac
 done
 
-COURIER="$APP/Contents/Frameworks/libsoa_network.dylib"
+NETWORK_NAME="$(soa_build_value "$BUILD_DIR" "$BUILD_TYPE" network_name)"
+COURIER="$APP/Contents/Frameworks/$NETWORK_NAME"
 if [ ! -f "$COURIER" ]; then
   echo "The Swift Courier library is missing from the application bundle." >&2
   exit 1
@@ -130,6 +137,15 @@ for requested_arch in "${REQUESTED_ARCHS[@]}"; do
       ;;
   esac
 done
+COURIER_INSTALL_NAME="$(otool -D "$COURIER" | tail -n 1)"
+if [ "$COURIER_INSTALL_NAME" != "@rpath/$NETWORK_NAME" ]; then
+  echo "Unexpected Swift network install name: $COURIER_INSTALL_NAME" >&2
+  exit 1
+fi
+if ! otool -L "$BINARY" | grep -F "@rpath/$NETWORK_NAME" >/dev/null; then
+  echo "The launcher does not reference the bundled Swift network library through @rpath." >&2
+  exit 1
+fi
 HOOK_ROOT="$APP/Contents/Resources/alicia-log-hook"
 AUDIO_HOST="$HOOK_ROOT/soa-audio-host"
 if [ ! -s "$AUDIO_HOST" ]; then
@@ -160,7 +176,8 @@ for hook_artifact in SoaAliciaLogInjector.exe SoaAliciaLogHook.dll; do
     exit 1
   fi
 done
-if otool -L "$BINARY" | grep -F "$PROJECT_ROOT" >/dev/null; then
+if otool -L "$BINARY" | grep -F "$PROJECT_ROOT" >/dev/null \
+    || otool -L "$COURIER" | grep -F "$PROJECT_ROOT" >/dev/null; then
   echo "The launcher still contains a build-machine library path." >&2
   exit 1
 fi
