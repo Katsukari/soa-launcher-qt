@@ -6,7 +6,7 @@
 
 #include <functional>
 
-namespace core::wine
+namespace soa::runtime
 {
 
 

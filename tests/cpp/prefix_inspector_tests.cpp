@@ -37,13 +37,13 @@ private slots:
         QCOMPARE(executable.write("runtime-a"), qint64(9));
         executable.close();
 
-        QVERIFY(core::wine::PrefixInspector::write_marker(prefix, runtime));
-        QVERIFY(core::wine::PrefixInspector::marker_valid(prefix, runtime));
+        QVERIFY(soa::runtime::PrefixInspector::write_marker(prefix, runtime));
+        QVERIFY(soa::runtime::PrefixInspector::marker_valid(prefix, runtime));
 
         QVERIFY(executable.open(QIODevice::Append));
         QCOMPARE(executable.write("-changed"), qint64(8));
         executable.close();
-        QVERIFY(!core::wine::PrefixInspector::marker_valid(prefix, runtime));
+        QVERIFY(!soa::runtime::PrefixInspector::marker_valid(prefix, runtime));
     }
 
     void dxvk_requires_files_and_native_overrides()
@@ -74,8 +74,8 @@ private slots:
             "\"*d3d9\"=\"native\"\n"
             "\"*dxgi\"=\"native,builtin\"\n") > 0);
         userRegistry.close();
-        QVERIFY(core::wine::PrefixInspector::dxvk_installed(prefix));
-        auto inspection = core::wine::PrefixInspector::inspect(
+        QVERIFY(soa::runtime::PrefixInspector::dxvk_installed(prefix));
+        auto inspection = soa::runtime::PrefixInspector::inspect(
             prefix, QString(), false);
         QVERIFY(inspection.dxvk_files_present);
         QVERIFY(inspection.dxvk_overrides_present);
@@ -85,8 +85,8 @@ private slots:
             "\"*d3d9\"=\"builtin\"\n"
             "\"*dxgi\"=\"native\"\n") > 0);
         userRegistry.close();
-        QVERIFY(!core::wine::PrefixInspector::dxvk_installed(prefix));
-        inspection = core::wine::PrefixInspector::inspect(
+        QVERIFY(!soa::runtime::PrefixInspector::dxvk_installed(prefix));
+        inspection = soa::runtime::PrefixInspector::inspect(
             prefix, QString(), false);
         QVERIFY(inspection.dxvk_files_present);
         QVERIFY(!inspection.dxvk_overrides_present);
@@ -119,8 +119,8 @@ private slots:
             "\"d3d9\"=\"native\"\n"
             "\"dxgi\"=\"native\"\n") > 0);
         userRegistry.close();
-        QVERIFY(core::wine::PrefixInspector::dxvk_installed(prefix));
-        const auto inspection = core::wine::PrefixInspector::inspect(
+        QVERIFY(soa::runtime::PrefixInspector::dxvk_installed(prefix));
+        const auto inspection = soa::runtime::PrefixInspector::inspect(
             prefix, QString(), false);
         QVERIFY(inspection.dxvk_files_present);
         QVERIFY(inspection.dxvk_overrides_present);
@@ -128,18 +128,18 @@ private slots:
 
     void dxvk_uses_a_reproducible_winetricks_verb()
     {
-        QCOMPARE(core::wine::PrefixInspector::dxvk_winetricks_verb(),
+        QCOMPARE(soa::runtime::PrefixInspector::dxvk_winetricks_verb(),
                  QStringLiteral("dxvk2071"));
 #if !defined(Q_OS_MACOS)
         QTemporaryDir directory;
         QVERIFY(directory.isValid());
         const QStringList packages =
-            core::wine::PrefixInspector::missing_packages(
+            soa::runtime::PrefixInspector::missing_packages(
                 directory.filePath(QStringLiteral("prefix")),
                 false,
                 true);
         QVERIFY(packages.contains(
-            core::wine::PrefixInspector::dxvk_winetricks_verb()));
+            soa::runtime::PrefixInspector::dxvk_winetricks_verb()));
         QVERIFY(!packages.contains(QStringLiteral("dxvk")));
 #endif
     }
@@ -162,8 +162,8 @@ private slots:
         QVERIFY(userRegistry.write("#arch=win64\n") > 0);
         userRegistry.close();
 
-        QCOMPARE(core::wine::PrefixInspector::architecture(prefix),
-                 core::wine::PrefixArchitecture::Win64);
+        QCOMPARE(soa::runtime::PrefixInspector::architecture(prefix),
+                 soa::runtime::PrefixArchitecture::Win64);
     }
 
 #if defined(Q_OS_MACOS)
@@ -181,7 +181,7 @@ private slots:
         QVERIFY(systemRegistry.write("#arch=win64\n") > 0);
         systemRegistry.close();
 
-        QCOMPARE(core::wine::PrefixInspector::game_dll_directory(prefix), system32);
+        QCOMPARE(soa::runtime::PrefixInspector::game_dll_directory(prefix), system32);
     }
 
     void accepts_new_wow64_prefix_structure_without_arch_marker()
@@ -202,18 +202,18 @@ private slots:
             registry.close();
         }
 
-        const auto inspection = core::wine::PrefixInspector::inspect(
+        const auto inspection = soa::runtime::PrefixInspector::inspect(
             prefix, QStringLiteral("/tmp/wine"), false);
         QVERIFY(inspection.exists);
         QVERIFY(inspection.structure_valid);
-        QCOMPARE(inspection.architecture, core::wine::PrefixArchitecture::Win64);
+        QCOMPARE(inspection.architecture, soa::runtime::PrefixArchitecture::Win64);
 
 
 
         QVERIFY(inspection.required_components_present(false));
-        QVERIFY(core::wine::PrefixInspector::missing_packages(
+        QVERIFY(soa::runtime::PrefixInspector::missing_packages(
                     prefix, false, false).isEmpty());
-        QCOMPARE(core::wine::PrefixInspector::game_dll_directory(prefix),
+        QCOMPARE(soa::runtime::PrefixInspector::game_dll_directory(prefix),
                  QDir(prefix).filePath(QStringLiteral("drive_c/windows/system32")));
     }
 
@@ -251,10 +251,10 @@ private slots:
             file.close();
         }
 
-        const auto inspection = core::wine::PrefixInspector::inspect(
+        const auto inspection = soa::runtime::PrefixInspector::inspect(
             prefix, QStringLiteral("/tmp/wine"), false);
         QVERIFY(inspection.structure_valid);
-        QCOMPARE(inspection.architecture, core::wine::PrefixArchitecture::Win64);
+        QCOMPARE(inspection.architecture, soa::runtime::PrefixArchitecture::Win64);
         QVERIFY(inspection.required_components_present(false));
         QVERIFY(!inspection.physx_runtime);
     }

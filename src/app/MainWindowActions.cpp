@@ -14,10 +14,10 @@
 #include <QPushButton>
 #include <QTimer>
 
-using core::game::GameVersion;
-using core::state::Stage;
-using core::state::View;
-using util::config::Config;
+using soa::common::game::GameVersion;
+using soa::ui::Stage;
+using soa::ui::View;
+using soa::config::Config;
 
 #ifndef SOA_LAUNCHER_VERSION
 #define SOA_LAUNCHER_VERSION "0.3.0"
@@ -102,11 +102,11 @@ void MainWindow::retranslate_dynamic_text()
     if (tray_controller)
         tray_controller->retranslate();
     if (close_button)
-        close_button->setAccessibleName(util::i18n::translate("Close launcher"));
+        close_button->setAccessibleName(soa::i18n::translate("Close launcher"));
     if (minimize_button)
-        minimize_button->setAccessibleName(util::i18n::translate("Minimize launcher"));
+        minimize_button->setAccessibleName(soa::i18n::translate("Minimize launcher"));
     if (version_label)
-        version_label->setText(util::i18n::translate("VERSION") + QLatin1Char(' ')
+        version_label->setText(soa::i18n::translate("VERSION") + QLatin1Char(' ')
             + QString::fromLatin1(SOA_LAUNCHER_VERSION));
 }
 

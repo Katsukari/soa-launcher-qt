@@ -5,7 +5,7 @@
 #include <QRect>
 #include <QtGlobal>
 
-namespace util::progress_bar
+namespace soa::ui::progress_bar
 {
     namespace
     {

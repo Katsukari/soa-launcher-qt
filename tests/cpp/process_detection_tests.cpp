@@ -30,7 +30,7 @@ private slots:
         const QString output = QStringLiteral(
             "\"services.exe\",\"52\",\"Services\",\"0\",\"8,000 K\"\n"
             "\"Alicia.exe\",\"184\",\"Console\",\"1\",\"220,000 K\"\n");
-        const auto process = core::wine::find_windows_process(
+        const auto process = soa::runtime::find_windows_process(
             output, QStringLiteral("Alicia.exe"));
         QVERIFY(process.has_value());
         QCOMPARE(process->pid, qint64(184));
@@ -52,8 +52,8 @@ private slots:
         }
 
         const QString decoded =
-            core::wine::decode_windows_process_output(utf16);
-        const auto process = core::wine::find_windows_process(
+            soa::runtime::decode_windows_process_output(utf16);
+        const auto process = soa::runtime::find_windows_process(
             decoded, QStringLiteral("Alicia.exe"));
         QVERIFY(process.has_value());
         QCOMPARE(process->pid, qint64(4242));
@@ -72,8 +72,8 @@ private slots:
         }
 
         const QString decoded =
-            core::wine::decode_windows_process_output(mixed);
-        const auto process = core::wine::find_windows_process(
+            soa::runtime::decode_windows_process_output(mixed);
+        const auto process = soa::runtime::find_windows_process(
             decoded, QStringLiteral("Alicia.exe"));
         QVERIFY(process.has_value());
         QCOMPARE(process->pid, qint64(4243));
@@ -87,7 +87,7 @@ private slots:
             "C:\\Story Of Alicia\\Alicia.exe -GameID 1\n"
             " 1017 /opt/wine/bin/winedbg --auto 1042 Alicia.exe\n"
             " 1042 /opt/wine/bin/wine64-preloader C:\\Story Of Alicia\\Alicia.exe -GameID 1\n");
-        const auto process = core::wine::find_host_process(
+        const auto process = soa::runtime::find_host_process(
             output, QStringLiteral("Alicia.exe"));
         QVERIFY(process.has_value());
         QCOMPARE(process->pid, qint64(1042));
@@ -102,7 +102,7 @@ private slots:
             "C:\\users\\test\\game\\Alicia.exe -GameID 4\n"
             " 175228 /prefix/SoaAliciaLogInjector.exe "
             "C:\\users\\test\\game\\Alicia.exe -GameID 4\n");
-        const auto process = core::wine::find_host_process(
+        const auto process = soa::runtime::find_host_process(
             output, QStringLiteral("Alicia.exe"));
         QVERIFY(!process.has_value());
     }

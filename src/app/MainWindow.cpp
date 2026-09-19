@@ -18,10 +18,10 @@
 #include <QDialog>
 #include <QTimer>
 
-using core::game::GameVersion;
-using core::state::Stage;
-using core::state::View;
-using util::config::Config;
+using soa::common::game::GameVersion;
+using soa::ui::Stage;
+using soa::ui::View;
+using soa::config::Config;
 
 #ifndef SOA_LAUNCHER_VERSION
 #define SOA_LAUNCHER_VERSION "0.3.0"
@@ -32,12 +32,12 @@ MainWindow::MainWindow(QWidget* parent)
       game_version(Config::instance().game_version())
 {
     setWindowFlags(Qt::FramelessWindowHint);
-    setFixedSize(app::detail::configured_window_size());
+    setFixedSize(soa::app::detail::configured_window_size());
     setAttribute(Qt::WA_TranslucentBackground);
 
-    shell = new core::wine::Shell(this);
+    shell = new soa::runtime::Shell(this);
     auth = new AuthHandler(this);
-    install_state = new core::state::InstallState(this);
+    install_state = new soa::ui::InstallState(this);
     connect(auth, &AuthHandler::browser_open_failed, this, [this]()
     {
         LauncherDialog::warning(
@@ -65,13 +65,13 @@ MainWindow::MainWindow(QWidget* parent)
     setup_wine_select();
     setup_launcher_updates();
 
-    connect(install_state, &core::state::InstallState::stage_changed,
+    connect(install_state, &soa::ui::InstallState::stage_changed,
             this, &MainWindow::on_stage_changed);
-    connect(install_state, &core::state::InstallState::stage_changed,
+    connect(install_state, &soa::ui::InstallState::stage_changed,
             this, [this]() { refresh_tray_actions(); });
     connect(&Config::instance(), &Config::changed,
             this, [this]() { refresh_tray_actions(); });
-    connect(install_state, &core::state::InstallState::error_changed, this,
+    connect(install_state, &soa::ui::InstallState::error_changed, this,
             [this](const QString& message)
     {
         if (message.isEmpty())
@@ -79,39 +79,39 @@ MainWindow::MainWindow(QWidget* parent)
         if ((game_install && game_install->isVisible())
             || (repair_progress && repair_progress->isVisible()))
             return;
-        LauncherDialog* box = app::detail::show_modeless_message(
+        LauncherDialog* box = soa::app::detail::show_modeless_message(
             this, LauncherDialog::Tone::Error, QStringLiteral("Launcher Error"), message,
             QStringLiteral(
                 "The launcher log has diagnostic details. Close this message, then retry the action."));
         connect(box, &QDialog::finished, install_state,
                 [this]() { install_state->dismiss_error(); });
     });
-    connect(shell, &core::wine::Shell::user_notice, this, [this](const QString& message)
+    connect(shell, &soa::runtime::Shell::user_notice, this, [this](const QString& message)
     {
-        app::detail::show_modeless_message(this, LauncherDialog::Tone::Information,
+        soa::app::detail::show_modeless_message(this, LauncherDialog::Tone::Information,
                                QStringLiteral("Story of Alicia Launcher"), message);
     });
     connect(&Config::instance(), &Config::persistence_failed, this,
             [this](const QString& path, const QString& reason)
     {
-        app::detail::show_modeless_message(
+        soa::app::detail::show_modeless_message(
             this, LauncherDialog::Tone::Error, QStringLiteral("Settings Not Saved"),
-            util::i18n::translate(
+            soa::i18n::translate(
                 "The launcher could not save config.json.\n\nPath: %1\nReason: %2\n\n"
                 "Your on-screen change is active only for this session.")
                 .arg(path, reason));
     });
     if (!Config::instance().persistence_error().isEmpty())
     {
-        app::detail::show_modeless_message(
+        soa::app::detail::show_modeless_message(
             this, LauncherDialog::Tone::Error, QStringLiteral("Settings Not Saved"),
-            util::i18n::translate(
+            soa::i18n::translate(
                 "The launcher could not initialize config.json.\n\nPath: %1\n"
                 "Reason: %2")
                 .arg(Config::instance().file_path(),
                      Config::instance().persistence_error()));
     }
-    connect(shell, &core::wine::Shell::game_started, this, [this](core::game::GameVersion)
+    connect(shell, &soa::runtime::Shell::game_started, this, [this](soa::common::game::GameVersion)
     {
         const QString proxy_username = Config::instance().display_name().trimmed().isEmpty()
             ? Config::instance().username()
@@ -125,8 +125,8 @@ MainWindow::MainWindow(QWidget* parent)
             showMinimized();
         }
     });
-    connect(shell, &core::wine::Shell::game_exited, this,
-            [this](core::game::GameVersion, int, bool)
+    connect(shell, &soa::runtime::Shell::game_exited, this,
+            [this](soa::common::game::GameVersion, int, bool)
     {
         if (discord_rpc)
             discord_rpc->set_launcher_presence();
@@ -140,10 +140,10 @@ MainWindow::MainWindow(QWidget* parent)
     refresh_tray_actions();
     raise_persistent_controls();
     QTimer::singleShot(0, launcher_update_manager,
-                       &core::update::LauncherUpdateManager::check_for_updates);
+                       &soa::update::LauncherUpdateManager::check_for_updates);
 
-    connect(&util::i18n::LanguageManager::instance(),
-            &util::i18n::LanguageManager::language_changed, this,
+    connect(&soa::i18n::LanguageManager::instance(),
+            &soa::i18n::LanguageManager::language_changed, this,
             [this]()
     {
         retranslate_dynamic_text();
@@ -161,7 +161,7 @@ MainWindow::~MainWindow()
 
 void MainWindow::setup_discord_rpc()
 {
-    discord_rpc = new core::discord::DiscordRpc(this);
+    discord_rpc = new soa::network::DiscordRpc(this);
     discord_rpc->set_launcher_presence();
 }
 

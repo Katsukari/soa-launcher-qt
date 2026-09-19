@@ -15,7 +15,7 @@
 #include "platform/UrlSchemeHandler.hpp"
 #include <spdlog/spdlog.h>
 
-using util::config::Config;
+using soa::config::Config;
 
 namespace
 {
@@ -33,7 +33,7 @@ namespace
 }
 
 AuthHandler::AuthHandler(QObject* parent)
-    : core::status::StatusReporter(QStringLiteral("auth"), parent)
+    : soa::common::status::StatusReporter(QStringLiteral("auth"), parent)
 {
     QDesktopServices::setUrlHandler(QStringLiteral("soa"), this, "handle_url");
     timeout_timer = new QTimer(this);
@@ -46,7 +46,7 @@ AuthHandler::AuthHandler(QObject* parent)
         fail(QStringLiteral("Discord login timed out. Try again."));
     });
 
-    core::platform::register_launcher_url_scheme();
+    soa::platform::register_launcher_url_scheme();
 }
 
 void AuthHandler::open_login()
@@ -84,7 +84,7 @@ void AuthHandler::open_login()
 void AuthHandler::cancel_login()
 {
     if (!pending && !completion_scheduled
-        && status().state != core::status::State::Working)
+        && status().state != soa::common::status::State::Working)
     {
         return;
     }

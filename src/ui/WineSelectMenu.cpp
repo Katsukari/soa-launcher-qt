@@ -34,20 +34,20 @@
 #include "ui/Styles.hpp"
 #include <spdlog/spdlog.h>
 
-using util::config::Config;
-namespace cw = core::wine;
+using soa::config::Config;
+namespace cw = soa::runtime;
 namespace
 {
     constexpr QSize k_runtime_box_size {700, 520};
 
     QRect runtime_box_rect(const QSize window_size)
     {
-        return util::layout::centered(k_runtime_box_size, window_size, 0, 12);
+        return soa::ui::layout::centered(k_runtime_box_size, window_size, 0, 12);
     }
 
     QRect runtime_local_rect(const QSize window_size, const QRect source)
     {
-        return util::layout::scaled(source, window_size)
+        return soa::ui::layout::scaled(source, window_size)
             .translated(runtime_box_rect(window_size).topLeft());
     }
 
@@ -63,13 +63,13 @@ namespace
             "QScrollBar::handle:vertical:hover { background:#2FB4E0; }"
             "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0; }"
             "QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background:transparent; }")
-            .arg(util::layout::scaled(12, window_size))
-            .arg(util::layout::scaled(6, window_size))
-            .arg(util::layout::scaled(4, window_size))
-            .arg(util::layout::scaled(3, window_size))
-            .arg(util::layout::scaled(1, window_size))
-            .arg(util::layout::scaled(5, window_size))
-            .arg(util::layout::scaled(34, window_size));
+            .arg(soa::ui::layout::scaled(12, window_size))
+            .arg(soa::ui::layout::scaled(6, window_size))
+            .arg(soa::ui::layout::scaled(4, window_size))
+            .arg(soa::ui::layout::scaled(3, window_size))
+            .arg(soa::ui::layout::scaled(1, window_size))
+            .arg(soa::ui::layout::scaled(5, window_size))
+            .arg(soa::ui::layout::scaled(34, window_size));
     }
 
     QString status_style(const QSize window_size)
@@ -77,15 +77,15 @@ namespace
         return QStringLiteral(
             "QLabel { color:#6B5B4D; background:rgba(244,236,227,0.66);"
             " border:1px solid rgba(201,187,170,0.74); border-radius:%1px; padding:%2px %3px; }")
-            .arg(util::layout::scaled(6, window_size))
-            .arg(util::layout::scaled(5, window_size))
-            .arg(util::layout::scaled(10, window_size));
+            .arg(soa::ui::layout::scaled(6, window_size))
+            .arg(soa::ui::layout::scaled(5, window_size))
+            .arg(soa::ui::layout::scaled(10, window_size));
     }
 
     QString empty_style(const QSize window_size)
     {
         return QStringLiteral("QLabel { color:#8A7A6B; padding:%1px; background:transparent; }")
-            .arg(util::layout::scaled(28, window_size));
+            .arg(soa::ui::layout::scaled(28, window_size));
     }
 
     class RuntimeRow final : public QAbstractButton
@@ -154,7 +154,7 @@ namespace
             gradient.setColorAt(1.0, bottom);
             painter.fillPath(shape, gradient);
 
-            QPen edge(border, qMax(1, util::layout::scaled(isChecked() ? 2 : 1, host)));
+            QPen edge(border, qMax(1, soa::ui::layout::scaled(isChecked() ? 2 : 1, host)));
             painter.setPen(edge);
             painter.setBrush(Qt::NoBrush);
             painter.drawPath(shape);
@@ -162,74 +162,74 @@ namespace
             painter.save();
             painter.setClipPath(shape);
             painter.fillRect(QRectF(card.left(), card.top(), card.width(),
-                                    util::layout::scaled(2, host)),
+                                    soa::ui::layout::scaled(2, host)),
                              QColor(255, 255, 255, 160));
             painter.restore();
 
-            const int left = util::layout::scaled(16, host);
-            const int right = util::layout::scaled(48, host);
+            const int left = soa::ui::layout::scaled(16, host);
+            const int right = soa::ui::layout::scaled(48, host);
             const QRect text_area = card.toAlignedRect().adjusted(
-                left, util::layout::scaled(7, host),
-                -right, -util::layout::scaled(7, host));
+                left, soa::ui::layout::scaled(7, host),
+                -right, -soa::ui::layout::scaled(7, host));
 
-            QFont title_font = util::assets::fonts[util::assets::Font::EurostileBold];
-            title_font.setPixelSize(util::layout::scaled(14, host));
+            QFont title_font = soa::ui::assets::fonts[soa::ui::assets::Font::EurostileBold];
+            title_font.setPixelSize(soa::ui::layout::scaled(14, host));
             title_font.setWeight(QFont::Bold);
             painter.setFont(title_font);
-            painter.setPen(isEnabled() ? util::colors::k_text_maroon : QColor(138, 122, 107));
+            painter.setPen(isEnabled() ? soa::ui::colors::k_text_maroon : QColor(138, 122, 107));
             const QRect title_rect(text_area.left(), text_area.top(), text_area.width(),
-                                   util::layout::scaled(23, host));
+                                   soa::ui::layout::scaled(23, host));
             painter.drawText(title_rect, Qt::AlignLeft | Qt::AlignVCenter,
                              painter.fontMetrics().elidedText(runtime_name, Qt::ElideRight,
                                                               title_rect.width()));
 
-            QFont detail_font = util::assets::fonts[util::assets::Font::Inter];
-            detail_font.setPixelSize(util::layout::scaled(12, host));
+            QFont detail_font = soa::ui::assets::fonts[soa::ui::assets::Font::Inter];
+            detail_font.setPixelSize(soa::ui::layout::scaled(12, host));
             detail_font.setWeight(QFont::DemiBold);
             painter.setFont(detail_font);
             painter.setPen(isEnabled() ? QColor(84, 65, 51) : QColor(145, 132, 120));
             const QString summary = QStringLiteral("%1  ·  %2  ·  %3")
                 .arg(runtime_type, runtime_architecture, runtime_details);
             const QRect summary_rect(text_area.left(), title_rect.bottom(), text_area.width(),
-                                     util::layout::scaled(22, host));
+                                     soa::ui::layout::scaled(22, host));
             painter.drawText(summary_rect, Qt::AlignLeft | Qt::AlignVCenter,
                              painter.fontMetrics().elidedText(summary, Qt::ElideRight,
                                                               summary_rect.width()));
 
-            detail_font.setPixelSize(util::layout::scaled(11, host));
+            detail_font.setPixelSize(soa::ui::layout::scaled(11, host));
             detail_font.setWeight(QFont::Normal);
             painter.setFont(detail_font);
             painter.setPen(QColor(126, 110, 94));
             const QRect path_rect(text_area.left(), summary_rect.bottom(), text_area.width(),
-                                  util::layout::scaled(21, host));
+                                  soa::ui::layout::scaled(21, host));
             painter.drawText(path_rect, Qt::AlignLeft | Qt::AlignVCenter,
                              painter.fontMetrics().elidedText(runtime_path, Qt::ElideMiddle,
                                                               path_rect.width()));
 
             const QPoint indicator(
-                qRound(card.right()) - util::layout::scaled(22, host),
+                qRound(card.right()) - soa::ui::layout::scaled(22, host),
                 qRound(card.center().y()));
-            const int indicator_radius = util::layout::scaled(9, host);
+            const int indicator_radius = soa::ui::layout::scaled(9, host);
             painter.setPen(QPen(isChecked() ? QColor(47, 180, 224) : QColor(169, 147, 126),
-                                qMax(1, util::layout::scaled(2, host))));
+                                qMax(1, soa::ui::layout::scaled(2, host))));
             painter.setBrush(isEnabled() ? QColor(255, 252, 248) : QColor(229, 222, 214));
             painter.drawEllipse(indicator, indicator_radius, indicator_radius);
             if (isChecked())
             {
                 painter.setPen(Qt::NoPen);
                 painter.setBrush(QColor(47, 180, 224));
-                painter.drawEllipse(indicator, indicator_radius - util::layout::scaled(3, host),
-                                    indicator_radius - util::layout::scaled(3, host));
-                QPen check_pen(Qt::white, qMax(1, util::layout::scaled(2, host)));
+                painter.drawEllipse(indicator, indicator_radius - soa::ui::layout::scaled(3, host),
+                                    indicator_radius - soa::ui::layout::scaled(3, host));
+                QPen check_pen(Qt::white, qMax(1, soa::ui::layout::scaled(2, host)));
                 check_pen.setCapStyle(Qt::RoundCap);
                 check_pen.setJoinStyle(Qt::RoundJoin);
                 painter.setPen(check_pen);
                 const int x = indicator.x();
                 const int y = indicator.y();
-                painter.drawLine(x - util::layout::scaled(4, host), y,
-                                 x - util::layout::scaled(1, host), y + util::layout::scaled(3, host));
-                painter.drawLine(x - util::layout::scaled(1, host), y + util::layout::scaled(3, host),
-                                 x + util::layout::scaled(5, host), y - util::layout::scaled(4, host));
+                painter.drawLine(x - soa::ui::layout::scaled(4, host), y,
+                                 x - soa::ui::layout::scaled(1, host), y + soa::ui::layout::scaled(3, host));
+                painter.drawLine(x - soa::ui::layout::scaled(1, host), y + soa::ui::layout::scaled(3, host),
+                                 x + soa::ui::layout::scaled(5, host), y - soa::ui::layout::scaled(4, host));
             }
 
 
@@ -258,22 +258,22 @@ namespace
     class AssetTextButton final : public QAbstractButton
     {
     public:
-        AssetTextButton(const util::assets::Button asset, QString source, QWidget* parent)
+        AssetTextButton(const soa::ui::assets::Button asset, QString source, QWidget* parent)
             : QAbstractButton(parent), asset_key(asset), text_source(std::move(source))
         {
             setCursor(Qt::PointingHandCursor);
             setFocusPolicy(Qt::ClickFocus);
             setAutoFillBackground(false);
             setAttribute(Qt::WA_NoSystemBackground, true);
-            connect(&util::i18n::LanguageManager::instance(),
-                    &util::i18n::LanguageManager::language_changed,
+            connect(&soa::i18n::LanguageManager::instance(),
+                    &soa::i18n::LanguageManager::language_changed,
                     this, [this]() { update(); });
         }
 
     protected:
         void paintEvent(QPaintEvent*) override
         {
-            const auto& states = util::assets::translated_buttons[asset_key];
+            const auto& states = soa::ui::assets::translated_buttons[asset_key];
             const QPixmap* pixmap = &states.normal;
             if (!isEnabled())
                 pixmap = &states.normal;
@@ -293,17 +293,17 @@ namespace
                 painter.setOpacity(1.0);
             }
 
-            QFont font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
-            font.setPixelSize(util::layout::scaled(11, window()->size()));
+            QFont font = soa::ui::assets::fonts[soa::ui::assets::Font::EurostileExtraBlack];
+            font.setPixelSize(soa::ui::layout::scaled(11, window()->size()));
             font.setWeight(QFont::Black);
             painter.setFont(font);
             painter.setPen(QColor(255, 255, 255, isEnabled() ? 255 : 220));
-            const QString text = util::i18n::translate(text_source).toUpper();
-            painter.drawText(rect().adjusted(util::layout::scaled(8, window()->size()), 0,
-                                             -util::layout::scaled(8, window()->size()), 0),
+            const QString text = soa::i18n::translate(text_source).toUpper();
+            painter.drawText(rect().adjusted(soa::ui::layout::scaled(8, window()->size()), 0,
+                                             -soa::ui::layout::scaled(8, window()->size()), 0),
                              Qt::AlignCenter,
                              painter.fontMetrics().elidedText(text, Qt::ElideRight,
-                                                              width() - util::layout::scaled(16, window()->size())));
+                                                              width() - soa::ui::layout::scaled(16, window()->size())));
 
 
         }
@@ -321,7 +321,7 @@ namespace
         }
 
     private:
-        util::assets::Button asset_key;
+        soa::ui::assets::Button asset_key;
         QString text_source;
     };
 
@@ -334,16 +334,16 @@ WineSelectMenu::WineSelectMenu(QWidget* parent) : ModalOverlay(parent)
     connect(detector, &QFutureWatcher<QVector<cw::WineInstall>>::finished,
             this, &WineSelectMenu::finish_scan);
     relayout();
-    connect(&util::i18n::LanguageManager::instance(),
-            &util::i18n::LanguageManager::language_changed, this,
+    connect(&soa::i18n::LanguageManager::instance(),
+            &soa::i18n::LanguageManager::language_changed, this,
             [this]() { retranslate_dynamic_text(); });
 }
 
 void WineSelectMenu::build_ui()
 {
-    close_button = util::simple_utils::make_flat_button(this);
+    close_button = soa::ui::simple_utils::make_flat_button(this);
     close_button->setAccessibleName(QStringLiteral("Close runtime selection"));
-    close_button->setIcon(QIcon(util::assets::images[util::assets::Image::CloseSettings]));
+    close_button->setIcon(QIcon(soa::ui::assets::images[soa::ui::assets::Image::CloseSettings]));
     connect(close_button, &QPushButton::clicked, this, [this]() { hide(); emit closed(); });
 
     runtime_status = new QLabel(this);
@@ -358,23 +358,23 @@ void WineSelectMenu::build_ui()
     list->viewport()->setAutoFillBackground(false);
     list->viewport()->setAttribute(Qt::WA_StyledBackground, false);
 
-    const auto make_asset_button = [this](const util::assets::Button asset,
+    const auto make_asset_button = [this](const soa::ui::assets::Button asset,
                                           const QString& source)
     {
         return new AssetTextButton(asset, source, this);
     };
 
     rescan_button = make_asset_button(
-        util::assets::Button::Cancel, QStringLiteral("Rescan"));
+        soa::ui::assets::Button::Cancel, QStringLiteral("Rescan"));
 #if defined(Q_OS_MACOS)
     const QString add_runtime_text = QStringLiteral("Add Wine…");
 #else
     const QString add_runtime_text = QStringLiteral("Add Runtime…");
 #endif
     browse_button = make_asset_button(
-        util::assets::Button::Cancel, add_runtime_text);
+        soa::ui::assets::Button::Cancel, add_runtime_text);
     continue_button = make_asset_button(
-        util::assets::Button::Install, QStringLiteral("Continue"));
+        soa::ui::assets::Button::Install, QStringLiteral("Continue"));
     rescan_button->setAccessibleName(QStringLiteral("Rescan runtimes"));
     browse_button->setAccessibleName(QStringLiteral("Add runtime"));
     continue_button->setAccessibleName(QStringLiteral("Continue with selected runtime"));
@@ -385,7 +385,7 @@ void WineSelectMenu::build_ui()
 
 #if defined(Q_OS_MACOS)
     rosetta_button = make_asset_button(
-        util::assets::Button::Cancel, QStringLiteral("Request Rosetta…"));
+        soa::ui::assets::Button::Cancel, QStringLiteral("Request Rosetta…"));
     rosetta_button->setAccessibleName(QStringLiteral("Request Rosetta installation"));
     connect(rosetta_button, &QAbstractButton::clicked, this, &WineSelectMenu::request_rosetta);
 #endif
@@ -402,9 +402,9 @@ void WineSelectMenu::populate()
     auto* content = new QWidget;
     content->setStyleSheet(QStringLiteral("background:transparent;"));
     auto* lay = new QVBoxLayout(content);
-    const int margin = util::layout::scaled(8, window()->size());
+    const int margin = soa::ui::layout::scaled(8, window()->size());
     lay->setContentsMargins(margin, margin, margin, margin);
-    lay->setSpacing(util::layout::scaled(8, window()->size()));
+    lay->setSpacing(soa::ui::layout::scaled(8, window()->size()));
 
     rows.clear();
     selected = -1;
@@ -414,25 +414,25 @@ void WineSelectMenu::populate()
     {
         const cw::WineInstall& wi = runtimes[i];
 #if defined(Q_OS_MACOS)
-        const QString type = util::i18n::translate("Wine");
+        const QString type = soa::i18n::translate("Wine");
 #else
         const QString type = wi.type == cw::RuntimeType::Proton
-            ? util::i18n::translate("Proton") : util::i18n::translate("Wine");
+            ? soa::i18n::translate("Proton") : soa::i18n::translate("Wine");
 #endif
         QString details = wi.version.isEmpty() ? wi.issue : wi.version;
-        if (details.isEmpty()) details = util::i18n::translate("Capability probe failed");
+        if (details.isEmpty()) details = soa::i18n::translate("Capability probe failed");
         if (wi.requires_rosetta)
         {
             details += wi.rosetta_available
-                ? util::i18n::translate(" · Rosetta ready")
-                : util::i18n::translate(" · Rosetta required");
+                ? soa::i18n::translate(" · Rosetta ready")
+                : soa::i18n::translate(" · Rosetta required");
         }
         const QString architecture = wi.architectures.isEmpty()
-            ? util::i18n::translate("unknown architecture") : wi.architectures;
+            ? soa::i18n::translate("unknown architecture") : wi.architectures;
         auto* row = new RuntimeRow(wi.name, type, architecture, wi.path, details, content);
         row->setEnabled(wi.usable);
-        row->setMinimumHeight(qMax(76, util::layout::scaled(94, window()->size())));
-        row->setAccessibleName(util::i18n::translate("Select runtime: %1").arg(wi.name));
+        row->setMinimumHeight(qMax(76, soa::ui::layout::scaled(94, window()->size())));
+        row->setAccessibleName(soa::i18n::translate("Select runtime: %1").arg(wi.name));
         row->setAccessibleDescription(QStringLiteral("%1 · %2 · %3")
             .arg(type, architecture, details));
         connect(row, &QAbstractButton::clicked, this, [this, i]() { select_row(i); });
@@ -451,17 +451,17 @@ void WineSelectMenu::populate()
 #endif
 #if defined(Q_OS_MACOS)
         const QString emptyText =
-            scanning ? util::i18n::translate("Scanning Wine installations…")
-                     : util::i18n::translate(missingText);
+            scanning ? soa::i18n::translate("Scanning Wine installations…")
+                     : soa::i18n::translate(missingText);
 #else
         const QString emptyText =
-            scanning ? util::i18n::translate("Scanning Wine runtimes…")
-                     : util::i18n::translate(missingText);
+            scanning ? soa::i18n::translate("Scanning Wine runtimes…")
+                     : soa::i18n::translate(missingText);
 #endif
         auto* empty = new QLabel(emptyText, content);
         empty->setStyleSheet(empty_style(window()->size()));
-        QFont empty_font = util::assets::fonts[util::assets::Font::Inter];
-        empty_font.setPixelSize(util::layout::scaled(13, window()->size()));
+        QFont empty_font = soa::ui::assets::fonts[soa::ui::assets::Font::Inter];
+        empty_font.setPixelSize(soa::ui::layout::scaled(13, window()->size()));
         empty_font.setWeight(QFont::Medium);
         empty->setFont(empty_font);
         empty->setAlignment(Qt::AlignCenter);
@@ -476,17 +476,17 @@ void WineSelectMenu::populate()
     const bool rosetta = cw::macos::rosetta_is_available();
     const bool tricks = cw::winetricks_available();
     runtime_status->setText(
-        util::i18n::translate("winetricks: %1 · Rosetta: %2")
-            .arg(tricks ? util::i18n::translate("ready")
-                        : util::i18n::translate("not found"),
-                 rosetta ? util::i18n::translate("ready")
-                         : util::i18n::translate("not detected")));
+        soa::i18n::translate("winetricks: %1 · Rosetta: %2")
+            .arg(tricks ? soa::i18n::translate("ready")
+                        : soa::i18n::translate("not found"),
+                 rosetta ? soa::i18n::translate("ready")
+                         : soa::i18n::translate("not detected")));
     if (rosetta_button) rosetta_button->setVisible(!rosetta);
 #else
     const bool tricks = cw::winetricks_available();
     runtime_status->setText(tricks
-        ? util::i18n::translate("winetricks: ready")
-        : util::i18n::translate(
+        ? soa::i18n::translate("winetricks: ready")
+        : soa::i18n::translate(
               "winetricks not found - required components will be installed manually"));
 #endif
     relayout();
@@ -550,20 +550,20 @@ void WineSelectMenu::browse_runtime()
     QString path;
     if (selection == LauncherDialog::Primary)
         path = QFileDialog::getExistingDirectory(
-            this, util::i18n::translate("Select Wine Folder"));
+            this, soa::i18n::translate("Select Wine Folder"));
     else if (selection == LauncherDialog::Secondary)
         path = QFileDialog::getOpenFileName(
             this,
-            util::i18n::translate("Select Wine App or Executable"),
+            soa::i18n::translate("Select Wine App or Executable"),
             QStringLiteral("/Applications"),
             QStringLiteral("%1 (*.app);;%2 (*)")
-                .arg(util::i18n::translate("Applications"),
-                     util::i18n::translate("All Files")));
+                .arg(soa::i18n::translate("Applications"),
+                     soa::i18n::translate("All Files")));
     else
         return;
 #else
     const QString path = QFileDialog::getOpenFileName(
-        this, util::i18n::translate("Select Wine Binary or Proton Script"));
+        this, soa::i18n::translate("Select Wine Binary or Proton Script"));
 #endif
     if (path.isEmpty()) return;
 
@@ -641,21 +641,21 @@ void WineSelectMenu::paint_content(QPainter& painter)
 {
     const QSize w = window()->size();
     const QRect box = runtime_box_rect(w);
-    painter.drawPixmap(box, util::assets::images[util::assets::Image::BoxSettings]);
+    painter.drawPixmap(box, soa::ui::assets::images[soa::ui::assets::Image::BoxSettings]);
 
-    QFont title_font = util::assets::fonts[util::assets::Font::EurostileBlack];
-    title_font.setPixelSize(util::layout::scaled(27, w));
+    QFont title_font = soa::ui::assets::fonts[soa::ui::assets::Font::EurostileBlack];
+    title_font.setPixelSize(soa::ui::layout::scaled(27, w));
     title_font.setWeight(QFont::Black);
     painter.setFont(title_font);
-    painter.setPen(util::colors::k_text_maroon);
+    painter.setPen(soa::ui::colors::k_text_maroon);
     painter.drawText(runtime_local_rect(w, {30, 34, 640, 38}), Qt::AlignCenter,
-                     util::i18n::translate("SELECT RUNTIME"));
+                     soa::i18n::translate("SELECT RUNTIME"));
 
-    QFont body_font = util::assets::fonts[util::assets::Font::Inter];
-    body_font.setPixelSize(util::layout::scaled(14, w));
+    QFont body_font = soa::ui::assets::fonts[soa::ui::assets::Font::Inter];
+    body_font.setPixelSize(soa::ui::layout::scaled(14, w));
     body_font.setWeight(QFont::Medium);
     painter.setFont(body_font);
-    painter.setPen(util::colors::k_text_body);
+    painter.setPen(soa::ui::colors::k_text_body);
 #if defined(Q_OS_MACOS)
     const QString text = QStringLiteral("Choose the Wine installation used to run the game.");
 #else
@@ -663,7 +663,7 @@ void WineSelectMenu::paint_content(QPainter& painter)
 #endif
     painter.drawText(runtime_local_rect(w, {68, 88, 564, 46}),
                      Qt::AlignHCenter | Qt::AlignVCenter | Qt::TextWordWrap,
-                     util::i18n::translate(text));
+                     soa::i18n::translate(text));
 }
 
 void WineSelectMenu::showEvent(QShowEvent* event)
@@ -677,24 +677,24 @@ void WineSelectMenu::relayout()
 {
     const QSize w = window()->size();
     const QRect box = runtime_box_rect(w);
-    close_button->setIconSize(util::layout::scaled(util::layout::modal_close::k_icon, w));
+    close_button->setIconSize(soa::ui::layout::scaled(soa::ui::layout::modal_close::k_icon, w));
     close_button->setGeometry(
-        runtime_local_rect(w, util::layout::modal_close::rect_in(
+        runtime_local_rect(w, soa::ui::layout::modal_close::rect_in(
                                   {0, 0, k_runtime_box_size.width(),
                                    k_runtime_box_size.height()})));
 
     list->setGeometry(runtime_local_rect(w, {46, 145, 608, 244}));
 
-    QFont status_font = util::assets::fonts[util::assets::Font::Inter];
-    status_font.setPixelSize(util::layout::scaled(12, w));
+    QFont status_font = soa::ui::assets::fonts[soa::ui::assets::Font::Inter];
+    status_font.setPixelSize(soa::ui::layout::scaled(12, w));
     status_font.setWeight(QFont::Medium);
     runtime_status->setFont(status_font);
 
-    const int gap = util::layout::scaled(10, w);
+    const int gap = soa::ui::layout::scaled(10, w);
     const QRect status_row = runtime_local_rect(w, {46, 398, 608, 42});
     if (rosetta_button && !rosetta_button->isHidden())
     {
-        const int rosetta_width = util::layout::scaled(190, w);
+        const int rosetta_width = soa::ui::layout::scaled(190, w);
         runtime_status->setGeometry(status_row.adjusted(0, 0, -rosetta_width - gap, 0));
         rosetta_button->setGeometry(status_row.right() - rosetta_width + 1,
                                     status_row.top(), rosetta_width, status_row.height());
@@ -707,7 +707,7 @@ void WineSelectMenu::relayout()
     }
 
     const QRect buttons = runtime_local_rect(w, {46, 454, 608, 44});
-    const int button_gap = util::layout::scaled(10, w);
+    const int button_gap = soa::ui::layout::scaled(10, w);
     const int button_width = (buttons.width() - 2 * button_gap) / 3;
     rescan_button->setGeometry(buttons.left(), buttons.top(), button_width, buttons.height());
     browse_button->setGeometry(buttons.left() + button_width + button_gap,

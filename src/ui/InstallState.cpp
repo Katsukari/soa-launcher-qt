@@ -15,7 +15,7 @@
 #include "config/Config.hpp"
 #include <spdlog/spdlog.h>
 
-namespace core::state
+namespace soa::ui
 {
     namespace
     {
@@ -23,12 +23,12 @@ namespace core::state
         const QString k_reporter_auth = QStringLiteral("auth");
     }
 
-    using core::network::CourierBridge;
-    using core::network::DownloadStatus;
-    using core::status::State;
-    using core::status::Status;
-    using core::status::StatusBus;
-    using core::status::StatusReporter;
+    using soa::network::CourierBridge;
+    using soa::network::DownloadStatus;
+    using soa::common::status::State;
+    using soa::common::status::Status;
+    using soa::common::status::StatusBus;
+    using soa::common::status::StatusReporter;
 
     InstallState::InstallState(QObject* parent) : QObject(parent)
     {
@@ -44,7 +44,7 @@ namespace core::state
             });
         connect(&CourierBridge::instance(), &CourierBridge::download_status,
                 this, &InstallState::on_courier_status);
-        connect(&util::config::Config::instance(), &util::config::Config::changed,
+        connect(&soa::config::Config::instance(), &soa::config::Config::changed,
                 this, &InstallState::schedule_probe, Qt::QueuedConnection);
     }
 
@@ -60,9 +60,9 @@ namespace core::state
 
     QString InstallState::current_update_key() const
     {
-        const auto& config = util::config::Config::instance();
-        const auto& game = core::game::profile(config.game_version());
-        return core::game::to_string(config.game_version())
+        const auto& config = soa::config::Config::instance();
+        const auto& game = soa::common::game::profile(config.game_version());
+        return soa::common::game::to_string(config.game_version())
             + QLatin1Char('|') + config.game_install_path()
             + QLatin1Char('|') + QString::fromLatin1(game.cdn_base_url);
     }
@@ -100,15 +100,15 @@ namespace core::state
         if (probe_timer)
             probe_timer->stop();
 
-        auto& config = util::config::Config::instance();
+        auto& config = soa::config::Config::instance();
 #if !defined(Q_OS_MACOS)
 
 
 
-        if (core::wine::WineRegistry::identify(config.wine_binary())
-            == core::wine::RuntimeType::Proton)
+        if (soa::runtime::WineRegistry::identify(config.wine_binary())
+            == soa::runtime::RuntimeType::Proton)
         {
-            core::wine::repair_doubled_proton_prefix(config.proton_compat_data_root());
+            soa::runtime::repair_doubled_proton_prefix(config.proton_compat_data_root());
         }
 #endif
         const QString prefix = config.prefix_root();
@@ -119,19 +119,19 @@ namespace core::state
 #if defined(Q_OS_MACOS)
         const bool proton = false;
 #else
-        const bool proton = core::wine::WineRegistry::identify(config.wine_binary())
-            == core::wine::RuntimeType::Proton;
+        const bool proton = soa::runtime::WineRegistry::identify(config.wine_binary())
+            == soa::runtime::RuntimeType::Proton;
 #endif
         const QString runtimeIdentity = proton
             ? config.wine_binary()
-            : core::wine::WineRegistry::resolve_wine_executable(config.wine_binary());
+            : soa::runtime::WineRegistry::resolve_wine_executable(config.wine_binary());
 #if defined(Q_OS_MACOS)
         runtime_chosen = runtime_chosen
             && !runtimeIdentity.isEmpty()
             && QFileInfo(runtimeIdentity).isFile()
             && QFileInfo(runtimeIdentity).isExecutable();
 #endif
-        const auto inspection = core::wine::PrefixInspector::inspect(
+        const auto inspection = soa::runtime::PrefixInspector::inspect(
             prefix,
             runtimeIdentity.isEmpty() ? config.wine_binary() : runtimeIdentity,
             proton);
@@ -171,7 +171,7 @@ namespace core::state
             return;
         }
 
-        auto& config = util::config::Config::instance();
+        auto& config = soa::config::Config::instance();
         const QString installPath = config.game_install_path();
         if (!config.path_inside_prefix(installPath))
         {
@@ -182,7 +182,7 @@ namespace core::state
             recompute();
             return;
         }
-        const auto& game = core::game::profile(config.game_version());
+        const auto& game = soa::common::game::profile(config.game_version());
         if (!update_checker)
         {
             update_checker = courier_create(

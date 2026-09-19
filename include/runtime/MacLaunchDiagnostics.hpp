@@ -9,7 +9,7 @@
 
 #include "common/GameVersion.hpp"
 
-namespace core::wine
+namespace soa::runtime
 {
     class MacLaunchDiagnostics final : public QObject
     {
@@ -45,7 +45,7 @@ namespace core::wine
         ~MacLaunchDiagnostics() override;
 
         void reset();
-        [[nodiscard]] Configuration begin(core::game::GameVersion version, const QString& prefix,
+        [[nodiscard]] Configuration begin(soa::common::game::GameVersion version, const QString& prefix,
                                           const QString& game_directory,
                                           const QString& executable_path,
                                           const QStringList& sensitive_values,

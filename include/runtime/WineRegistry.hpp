@@ -3,7 +3,7 @@
 #include <QString>
 #include <QVector>
 
-namespace core::wine
+namespace soa::runtime
 {
     enum class RuntimeType
     {

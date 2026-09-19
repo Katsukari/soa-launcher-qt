@@ -3,7 +3,7 @@
 
 
 
-namespace util::modal_overlay
+namespace soa::ui
 {
     class ModalOverlay : public QWidget
     {

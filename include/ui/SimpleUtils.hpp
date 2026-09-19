@@ -9,7 +9,7 @@
 
 #include "ui/Assets.hpp"
 
-namespace util::simple_utils
+namespace soa::ui::simple_utils
 {
     void make_label_block(QWidget* parent, QSize window_size, int y,
                           const QString& title, const QString& description);

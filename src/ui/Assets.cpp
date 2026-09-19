@@ -11,7 +11,7 @@ namespace
     bool translated_assets_active {};
 }
 
-namespace util::assets
+namespace soa::ui::assets
 {
     QPixmap load_pixmap(const QString& path)
     {

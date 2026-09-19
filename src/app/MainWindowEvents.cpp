@@ -16,9 +16,9 @@
 #include <QPainterPath>
 #include <QWindow>
 
-using core::game::GameVersion;
-using core::state::Stage;
-using core::state::View;
+using soa::common::game::GameVersion;
+using soa::ui::Stage;
+using soa::ui::View;
 
 #ifndef SOA_LAUNCHER_VERSION
 #define SOA_LAUNCHER_VERSION "0.3.0"
@@ -31,25 +31,25 @@ void MainWindow::paintEvent(QPaintEvent*)
     painter.setRenderHint(QPainter::Antialiasing);
     painter.setRenderHint(QPainter::SmoothPixmapTransform);
 
-    const QRect background_rect = util::layout::region::rect(window_size);
-    const int radius = util::layout::scaled(util::layout::region::k_radius, window_size);
+    const QRect background_rect = soa::ui::layout::region::rect(window_size);
+    const int radius = soa::ui::layout::scaled(soa::ui::layout::region::k_radius, window_size);
     QPainterPath path;
     path.addRoundedRect(background_rect, radius, radius);
     painter.setClipPath(path);
 
-    const util::assets::Image background = game_version == GameVersion::Alicia2
-        ? util::assets::Image::BackgroundAlicia2
-        : util::assets::Image::BackgroundPlaytest;
-    painter.drawPixmap(background_rect, util::assets::images[background]);
+    const soa::ui::assets::Image background = game_version == GameVersion::Alicia2
+        ? soa::ui::assets::Image::BackgroundAlicia2
+        : soa::ui::assets::Image::BackgroundPlaytest;
+    painter.drawPixmap(background_rect, soa::ui::assets::images[background]);
     painter.setClipping(false);
 
     if (!chrome_hidden)
     {
-        const QPixmap left = util::assets::images[util::assets::Image::LeftFrame]
+        const QPixmap left = soa::ui::assets::images[soa::ui::assets::Image::LeftFrame]
             .scaledToHeight(height(), Qt::SmoothTransformation);
         painter.drawPixmap(0, 0, left);
 
-        const QPixmap right = util::assets::images[util::assets::Image::RightFrame]
+        const QPixmap right = soa::ui::assets::images[soa::ui::assets::Image::RightFrame]
             .scaledToHeight(height(), Qt::SmoothTransformation);
         painter.drawPixmap(width() - right.width(), 0, right);
     }
@@ -63,7 +63,7 @@ void MainWindow::mousePressEvent(QMouseEvent* event)
         launcher_menu_controller->set_visible(false);
     }
 
-    const int drag_height = util::layout::scaled(58, size());
+    const int drag_height = soa::ui::layout::scaled(58, size());
     if (event->button() == Qt::LeftButton && event->position().y() <= drag_height
         && windowHandle())
     {
@@ -96,12 +96,12 @@ void MainWindow::closeEvent(QCloseEvent* event)
         || repair_active
         || (launcher_update && launcher_update->busy())
         || (shell && shell->is_busy())
-        || (install_state && (install_state->stage() == core::state::Stage::Downloading
-            || install_state->stage() == core::state::Stage::Updating
-            || install_state->stage() == core::state::Stage::SettingUpPrefix
-            || install_state->stage() == core::state::Stage::CheckingUpdate
-            || install_state->stage() == core::state::Stage::Authenticating
-            || install_state->stage() == core::state::Stage::Launching));
+        || (install_state && (install_state->stage() == soa::ui::Stage::Downloading
+            || install_state->stage() == soa::ui::Stage::Updating
+            || install_state->stage() == soa::ui::Stage::SettingUpPrefix
+            || install_state->stage() == soa::ui::Stage::CheckingUpdate
+            || install_state->stage() == soa::ui::Stage::Authenticating
+            || install_state->stage() == soa::ui::Stage::Launching));
 
     if (!operationActive)
     {

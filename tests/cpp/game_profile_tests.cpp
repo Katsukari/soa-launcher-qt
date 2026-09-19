@@ -27,14 +27,14 @@ class GameProfileTests final : public QObject
 private slots:
     void game_profiles_remain_distinct()
     {
-        const auto& first = core::game::profile(core::game::GameVersion::Playtest);
-        const auto& second = core::game::profile(core::game::GameVersion::Alicia2);
+        const auto& first = soa::common::game::profile(soa::common::game::GameVersion::Playtest);
+        const auto& second = soa::common::game::profile(soa::common::game::GameVersion::Alicia2);
         QVERIFY(QString::fromLatin1(first.default_install_directory)
                 != QString::fromLatin1(second.default_install_directory));
         QVERIFY(QString::fromLatin1(first.video_settings_registry_key)
                 != QString::fromLatin1(second.video_settings_registry_key));
-        QCOMPARE(core::game::to_string(core::game::GameVersion::Playtest), QStringLiteral("1.0"));
-        QCOMPARE(core::game::to_string(core::game::GameVersion::Alicia2), QStringLiteral("2.0"));
+        QCOMPARE(soa::common::game::to_string(soa::common::game::GameVersion::Playtest), QStringLiteral("1.0"));
+        QCOMPARE(soa::common::game::to_string(soa::common::game::GameVersion::Alicia2), QStringLiteral("2.0"));
     }
 
 };

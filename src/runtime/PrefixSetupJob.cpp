@@ -13,9 +13,9 @@
 #include "config/Config.hpp"
 #include <spdlog/spdlog.h>
 
-namespace core::wine
+namespace soa::runtime
 {
-    using util::config::Config;
+    using soa::config::Config;
 
     namespace
     {

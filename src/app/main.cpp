@@ -286,13 +286,13 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    core::log::init();
+    soa::common::log::init();
     LauncherLog* launcher_log = LauncherLog::instance();
     if (restored_appimage_environment)
         SPDLOG_DEBUG("restored host environment after AppImage Qt bootstrap");
     SPDLOG_INFO("Running Story Of Alicia for Linux and macOS");
     SPDLOG_INFO("Version: {}", SOA_LAUNCHER_VERSION);
-    util::assets::load_all();
+    soa::ui::assets::load_all();
     SPDLOG_DEBUG("loaded all assets successfully");
 
     QLocalServer::removeServer(server_key);
@@ -303,11 +303,11 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    auto& language_manager = util::i18n::LanguageManager::instance();
-    QObject::connect(&language_manager, &util::i18n::LanguageManager::language_changed,
+    auto& language_manager = soa::i18n::LanguageManager::instance();
+    QObject::connect(&language_manager, &soa::i18n::LanguageManager::language_changed,
                      &app, [](const QString& code)
     {
-        util::assets::set_translated_button_assets(code != QStringLiteral("en"));
+        soa::ui::assets::set_translated_button_assets(code != QStringLiteral("en"));
     });
 
     MainWindow* window = new MainWindow;

@@ -26,7 +26,7 @@
 
 #include <spdlog/spdlog.h>
 
-namespace util::config
+namespace soa::config
 {
     inline QString absolute_clean_path(const QString& path)
     {
@@ -45,11 +45,11 @@ namespace util::config
     }
 
     inline QString game_path_for_user(const QString& prefix,
-                                      const core::game::GameVersion version,
+                                      const soa::common::game::GameVersion version,
                                       const QString& user)
     {
         const QString folder = QString::fromLatin1(
-            core::game::profile(version).default_install_directory);
+            soa::common::game::profile(version).default_install_directory);
         return QDir(prefix).filePath(
             QStringLiteral("drive_c/users/%1/AppData/Roaming/%2/game")
                 .arg(user, folder));

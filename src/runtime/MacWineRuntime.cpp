@@ -8,7 +8,7 @@
 #include <QStandardPaths>
 #include <QSysInfo>
 
-namespace core::wine::macos
+namespace soa::runtime::macos
 {
     namespace
     {
@@ -129,17 +129,17 @@ namespace core::wine::macos
 
     QString application_support_root()
     {
-        return core::paths::application_support_root();
+        return soa::common::paths::application_support_root();
     }
 
     QString default_prefix_root()
     {
-        return core::paths::default_prefix_root();
+        return soa::common::paths::default_prefix_root();
     }
 
     QString default_log_root()
     {
-        return core::paths::default_log_root();
+        return soa::common::paths::default_log_root();
     }
 
     QString resolve_wine_executable(const QString& selected_path)

@@ -3,12 +3,12 @@
 #include "common/Status.hpp"
 #include "network/Courier.h"
 
-namespace core::network
+namespace soa::network
 {
     struct DownloadStatus
     {
         qulonglong           operation_id {0};
-        status::Status       base;
+        common::status::Status       base;
         courier_phase        phase      {courier_phase_preparing};
         courier_result       result     {courier_result_completed};
         qulonglong           received   {0};

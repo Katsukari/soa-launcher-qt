@@ -1,6 +1,6 @@
 #include "ConfigPrivate.hpp"
 
-namespace util::config
+namespace soa::config
 {
     QString Config::wine_binary() const { return d->values.value(QStringLiteral("wine_binary")).toString(); }
 
@@ -54,8 +54,8 @@ namespace util::config
 #if defined(Q_OS_MACOS)
         return false;
 #else
-        return core::wine::WineRegistry::identify(wine_binary())
-            == core::wine::RuntimeType::Proton;
+        return soa::runtime::WineRegistry::identify(wine_binary())
+            == soa::runtime::RuntimeType::Proton;
 #endif
     }
 
@@ -65,7 +65,7 @@ namespace util::config
         if (configured.isEmpty())
         {
 #if defined(Q_OS_MACOS)
-            configured = core::wine::macos::default_prefix_root();
+            configured = soa::runtime::macos::default_prefix_root();
 #else
             configured = QDir(QDir::homePath()).filePath(QStringLiteral("soa-launcher"));
 #endif
@@ -113,7 +113,7 @@ namespace util::config
             return false;
 
         const QString rootAbsolute = absolute_clean_path(prefix_root());
-        return core::wine::host_path_is_inside_prefix(rootAbsolute, candidate);
+        return soa::runtime::host_path_is_inside_prefix(rootAbsolute, candidate);
     }
 
     void Config::set_wine_binary(const QString& value)
@@ -123,19 +123,19 @@ namespace util::config
 
         const bool oldProton = runtime_is_proton();
         const QString oldPrefix = prefix_root();
-        const QString oldPlaytestPath = game_install_path(core::game::GameVersion::Playtest);
-        const QString oldAlicia2Path = game_install_path(core::game::GameVersion::Alicia2);
+        const QString oldPlaytestPath = game_install_path(soa::common::game::GameVersion::Playtest);
+        const QString oldAlicia2Path = game_install_path(soa::common::game::GameVersion::Alicia2);
         const QString oldPlaytestDefault = derive_game_path(
-            oldPrefix, core::game::GameVersion::Playtest);
+            oldPrefix, soa::common::game::GameVersion::Playtest);
         const QString oldAlicia2Default = derive_game_path(
-            oldPrefix, core::game::GameVersion::Alicia2);
+            oldPrefix, soa::common::game::GameVersion::Alicia2);
 
         d->values[QStringLiteral("wine_binary")] = value;
         rebase_game_install_paths(oldPrefix, oldPlaytestPath, oldAlicia2Path);
 
         if (oldProton != runtime_is_proton())
         {
-            const auto updateDefault = [this](const core::game::GameVersion version,
+            const auto updateDefault = [this](const soa::common::game::GameVersion version,
                                               const QString& oldPath,
                                               const QString& oldDefault)
             {
@@ -144,9 +144,9 @@ namespace util::config
                 d->values[game_install_path_key(version)] =
                     derive_game_path(prefix_root(), version);
             };
-            updateDefault(core::game::GameVersion::Playtest,
+            updateDefault(soa::common::game::GameVersion::Playtest,
                           oldPlaytestPath, oldPlaytestDefault);
-            updateDefault(core::game::GameVersion::Alicia2,
+            updateDefault(soa::common::game::GameVersion::Alicia2,
                           oldAlicia2Path, oldAlicia2Default);
         }
         persist_change();
@@ -254,8 +254,8 @@ namespace util::config
             return;
 
         const QString oldPrefix = prefix_root();
-        const QString oldPlaytestPath = game_install_path(core::game::GameVersion::Playtest);
-        const QString oldAlicia2Path = game_install_path(core::game::GameVersion::Alicia2);
+        const QString oldPlaytestPath = game_install_path(soa::common::game::GameVersion::Playtest);
+        const QString oldAlicia2Path = game_install_path(soa::common::game::GameVersion::Alicia2);
 
         if (proton)
             d->values[QStringLiteral("proton_compat_data_root")] = normalized;

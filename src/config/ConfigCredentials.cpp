@@ -1,6 +1,6 @@
 #include "ConfigPrivate.hpp"
 
-namespace util::config
+namespace soa::config
 {
     bool Config::load_env_fallback()
     {
@@ -52,8 +52,8 @@ namespace util::config
         d->token.clear();
         d->display_name.clear();
 
-        util::credentials::Credentials credentials;
-        if (util::credentials::CredentialStore::load(credentials))
+        soa::credentials::Credentials credentials;
+        if (soa::credentials::CredentialStore::load(credentials))
         {
             d->username = credentials.user;
             d->token = credentials.token;
@@ -99,8 +99,8 @@ namespace util::config
 
     bool Config::clear_saved_credentials()
     {
-        const bool store_cleared = !util::credentials::CredentialStore::available()
-            || util::credentials::CredentialStore::clear();
+        const bool store_cleared = !soa::credentials::CredentialStore::available()
+            || soa::credentials::CredentialStore::clear();
         const bool fallback_cleared = !QFileInfo::exists(env_path()) || QFile::remove(env_path());
         watch_files();
         remember_disk_state();
@@ -114,10 +114,10 @@ namespace util::config
             return clear_saved_credentials();
         }
 
-        const util::credentials::Credentials credentials {
+        const soa::credentials::Credentials credentials {
             d->username, d->token, d->display_name
         };
-        if (util::credentials::CredentialStore::save(credentials))
+        if (soa::credentials::CredentialStore::save(credentials))
         {
             QFile::remove(env_path());
             watch_files();

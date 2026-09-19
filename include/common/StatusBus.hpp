@@ -7,7 +7,7 @@
 
 class QTimer;
 
-namespace core::status
+namespace soa::common::status
 {
     class StatusReporter;
 

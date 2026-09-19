@@ -12,7 +12,7 @@
 #include <Security/Security.h>
 #endif
 
-namespace util::credentials
+namespace soa::credentials
 {
     namespace
     {

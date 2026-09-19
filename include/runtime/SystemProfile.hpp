@@ -2,7 +2,7 @@
 
 #include <QStringList>
 
-namespace core::system
+namespace soa::runtime
 {
     enum class GpuVendor
     {

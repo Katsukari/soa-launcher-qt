@@ -5,7 +5,7 @@
 
 #include <optional>
 
-namespace core::wine
+namespace soa::runtime
 {
     struct WindowsProcessInfo
     {

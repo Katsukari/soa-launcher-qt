@@ -4,7 +4,7 @@
 #include <QSize>
 #include <QString>
 
-namespace ui::rules
+namespace soa::ui::rules
 {
     class RulesDocumentStore final
     {

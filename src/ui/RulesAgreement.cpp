@@ -31,12 +31,12 @@ namespace
 
     QRect box_rect(const QSize window_size)
     {
-        return util::layout::centered(k_box_size, window_size, 0, 4);
+        return soa::ui::layout::centered(k_box_size, window_size, 0, 4);
     }
 
     QRect local_rect(const QSize window_size, const QRect source)
     {
-        return util::layout::scaled(source, window_size).translated(box_rect(window_size).topLeft());
+        return soa::ui::layout::scaled(source, window_size).translated(box_rect(window_size).topLeft());
     }
 
     void fit_button_label(QLabel* label, const int base_size)
@@ -45,8 +45,8 @@ namespace
             return;
         QFont font = label->font();
         int size = base_size;
-        const int available = qMax(1, label->width() - util::layout::scaled(12, label->window()->size()));
-        while (size > qMax(8, util::layout::scaled(10, label->window()->size())))
+        const int available = qMax(1, label->width() - soa::ui::layout::scaled(12, label->window()->size()));
+        while (size > qMax(8, soa::ui::layout::scaled(10, label->window()->size())))
         {
             font.setPixelSize(size);
             if (QFontMetrics(font).horizontalAdvance(label->text()) <= available)
@@ -62,8 +62,8 @@ RulesAgreement::RulesAgreement(QWidget* parent)
     : ModalOverlay(parent)
 {
     setup_controls();
-    connect(&util::i18n::LanguageManager::instance(),
-            &util::i18n::LanguageManager::language_changed,
+    connect(&soa::i18n::LanguageManager::instance(),
+            &soa::i18n::LanguageManager::language_changed,
             this, [this]()
     {
         retranslate_content();
@@ -75,7 +75,7 @@ void RulesAgreement::setup_controls()
 {
     const QSize w = window()->size();
 
-    network = new core::network::SwiftHttpClient(this);
+    network = new soa::network::SwiftHttpClient(this);
     cooldown_timer = new QTimer(this);
     cooldown_timer->setInterval(1000);
 
@@ -91,21 +91,21 @@ void RulesAgreement::setup_controls()
         "QScrollBar::handle:vertical { background:#B0A297; border-radius:%7px; min-height:%8px; }"
         "QScrollBar::handle:vertical:hover { background:#9A8A7E; }"
         "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0px; }")
-        .arg(util::layout::scaled(32, w))
-        .arg(util::layout::scaled(16, w))
-        .arg(util::layout::scaled(48, w))
-        .arg(qMax(9, util::layout::scaled(13, w)))
-        .arg(qMax(4, util::layout::scaled(6, w)))
-        .arg(util::layout::scaled(35, w))
-        .arg(util::layout::scaled(3, w))
-        .arg(util::layout::scaled(28, w)));
+        .arg(soa::ui::layout::scaled(32, w))
+        .arg(soa::ui::layout::scaled(16, w))
+        .arg(soa::ui::layout::scaled(48, w))
+        .arg(qMax(9, soa::ui::layout::scaled(13, w)))
+        .arg(qMax(4, soa::ui::layout::scaled(6, w)))
+        .arg(soa::ui::layout::scaled(35, w))
+        .arg(soa::ui::layout::scaled(3, w))
+        .arg(soa::ui::layout::scaled(28, w)));
 
-    agree_button = util::simple_utils::make_flat_button(this);
-    const QSize agree_size = util::layout::scaled(
-        util::assets::translated_buttons[util::assets::Button::Agree].normal.size(), w);
+    agree_button = soa::ui::simple_utils::make_flat_button(this);
+    const QSize agree_size = soa::ui::layout::scaled(
+        soa::ui::assets::translated_buttons[soa::ui::assets::Button::Agree].normal.size(), w);
     const QRect box = box_rect(w);
     agree_button->setGeometry(box.center().x() - agree_size.width() / 2,
-                              box.bottom() - util::layout::scaled(64, w),
+                              box.bottom() - soa::ui::layout::scaled(64, w),
                               agree_size.width(), agree_size.height());
     agree_button->setIconSize(agree_size);
     agree_button->installEventFilter(this);
@@ -115,8 +115,8 @@ void RulesAgreement::setup_controls()
     agree_button_label->setGeometry(agree_button->rect());
     agree_button_label->setAlignment(Qt::AlignCenter);
     agree_button_label->setAttribute(Qt::WA_TransparentForMouseEvents);
-    QFont agree_font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
-    agree_font.setPixelSize(util::layout::scaled(12, w));
+    QFont agree_font = soa::ui::assets::fonts[soa::ui::assets::Font::EurostileExtraBlack];
+    agree_font.setPixelSize(soa::ui::layout::scaled(12, w));
     agree_font.setWeight(QFont::Black);
     agree_button_label->setFont(agree_font);
     agree_button_label->setStyleSheet(QStringLiteral(
@@ -127,7 +127,7 @@ void RulesAgreement::setup_controls()
     connect(rules_text->verticalScrollBar(), &QScrollBar::valueChanged, this, [this](const int value)
     {
         QScrollBar* bar = rules_text->verticalScrollBar();
-        if (!has_scrolled_to_end && value >= bar->maximum() - util::layout::scaled(60, window()->size()))
+        if (!has_scrolled_to_end && value >= bar->maximum() - soa::ui::layout::scaled(60, window()->size()))
         {
             has_scrolled_to_end = true;
             update_agree_button();
@@ -176,12 +176,12 @@ void RulesAgreement::load_rules()
     if (request_id != 0)
         return;
 
-    const QUrl url(ui::rules::RulesDocumentStore::rules_url());
+    const QUrl url(soa::ui::rules::RulesDocumentStore::rules_url());
     const bool allow_insecure = qEnvironmentVariableIntValue("SOA_ALLOW_INSECURE_RULES_URL") == 1;
     if (!url.isValid()
         || (url.scheme() != QStringLiteral("https") && !allow_insecure))
     {
-        show_load_failure(util::i18n::translate("The rules document URL is invalid or insecure."));
+        show_load_failure(soa::i18n::translate("The rules document URL is invalid or insecure."));
         return;
     }
 
@@ -189,12 +189,12 @@ void RulesAgreement::load_rules()
     load_error.clear();
     if (!document_ready)
     {
-        const int loading_height = util::layout::scaled(330, window()->size());
+        const int loading_height = soa::ui::layout::scaled(330, window()->size());
         rules_text->setHtml(QStringLiteral(
             "<div style='height:%1px; display:flex; align-items:center; justify-content:center; "
             "color:#988776; text-align:center;'>%2</div>")
             .arg(loading_height)
-            .arg(util::i18n::translate("Loading rules...").toHtmlEscaped()));
+            .arg(soa::i18n::translate("Loading rules...").toHtmlEscaped()));
     }
     update_agree_button();
 
@@ -205,7 +205,7 @@ void RulesAgreement::load_rules()
         QByteArray("text/html,application/xhtml+xml"),
         QByteArray("Story-Of-Alicia-Launcher"),
         allow_insecure,
-        [this](const core::network::HttpResponse& response)
+        [this](const soa::network::HttpResponse& response)
         {
             request_id = 0;
             finish_rules_request(response);
@@ -213,11 +213,11 @@ void RulesAgreement::load_rules()
     if (request_id == 0)
     {
         loading = false;
-        show_load_failure(util::i18n::translate("Failed to start the rules request."));
+        show_load_failure(soa::i18n::translate("Failed to start the rules request."));
     }
 }
 
-void RulesAgreement::finish_rules_request(const core::network::HttpResponse& response)
+void RulesAgreement::finish_rules_request(const soa::network::HttpResponse& response)
 {
     loading = false;
     const int status = response.status;
@@ -229,7 +229,7 @@ void RulesAgreement::finish_rules_request(const core::network::HttpResponse& res
     {
         if (!document_ready)
         {
-            const QString cached = ui::rules::RulesDocumentStore::load_cached_document();
+            const QString cached = soa::ui::rules::RulesDocumentStore::load_cached_document();
             if (!cached.isEmpty())
             {
                 document_html = cached;
@@ -242,8 +242,8 @@ void RulesAgreement::finish_rules_request(const core::network::HttpResponse& res
         if (!document_ready)
         {
             show_load_failure(status > 0
-                ? util::i18n::translate("The rules server returned HTTP %1.").arg(status)
-                : util::i18n::translate("Failed to load rules: %1").arg(network_message));
+                ? soa::i18n::translate("The rules server returned HTTP %1.").arg(status)
+                : soa::i18n::translate("Failed to load rules: %1").arg(network_message));
         }
         else
         {
@@ -255,14 +255,14 @@ void RulesAgreement::finish_rules_request(const core::network::HttpResponse& res
     if (source.isEmpty() || source.size() > 4 * 1024 * 1024)
     {
         if (!document_ready)
-            show_load_failure(util::i18n::translate("The rules document was empty or unexpectedly large."));
+            show_load_failure(soa::i18n::translate("The rules document was empty or unexpectedly large."));
         return;
     }
     if (final_host.contains(QStringLiteral("accounts.google.com"))
         || source.toLower().contains("servicelogin"))
     {
         if (!document_ready)
-            show_load_failure(util::i18n::translate("The rules document is not publicly accessible."));
+            show_load_failure(soa::i18n::translate("The rules document is not publicly accessible."));
         return;
     }
     show_document(source, true);
@@ -270,10 +270,10 @@ void RulesAgreement::finish_rules_request(const core::network::HttpResponse& res
 
 void RulesAgreement::show_document(const QByteArray& source, const bool save_cache)
 {
-    const QString prepared = ui::rules::RulesDocumentStore::prepare_document(source, window()->size());
+    const QString prepared = soa::ui::rules::RulesDocumentStore::prepare_document(source, window()->size());
     if (prepared.isEmpty())
     {
-        show_load_failure(util::i18n::translate("The rules document could not be rendered."));
+        show_load_failure(soa::i18n::translate("The rules document could not be rendered."));
         return;
     }
 
@@ -284,7 +284,7 @@ void RulesAgreement::show_document(const QByteArray& source, const bool save_cac
     rules_text->verticalScrollBar()->setValue(0);
     start_cooldown();
 
-    if (save_cache && !ui::rules::RulesDocumentStore::save_cached_document(document_html))
+    if (save_cache && !soa::ui::rules::RulesDocumentStore::save_cached_document(document_html))
         SPDLOG_WARN("rules document cache could not be refreshed");
     update_agree_button();
     SPDLOG_INFO("rules document rendered in launcher");
@@ -295,17 +295,17 @@ void RulesAgreement::show_load_failure(const QString& reason)
     loading = false;
     document_ready = false;
     load_error = reason;
-    const QString link = ui::rules::RulesDocumentStore::rules_url();
+    const QString link = soa::ui::rules::RulesDocumentStore::rules_url();
     const QSize w = window()->size();
     rules_text->setHtml(QStringLiteral(
         "<div style='padding:%1px %2px; text-align:center; color:#8B2E2E;'>"
         "<p><b>%3</b></p><p>%4</p><p><a href='%5'>%6</a></p></div>")
-        .arg(util::layout::scaled(90, w))
-        .arg(util::layout::scaled(28, w))
-        .arg(util::i18n::translate("Failed to load rules").toHtmlEscaped(),
+        .arg(soa::ui::layout::scaled(90, w))
+        .arg(soa::ui::layout::scaled(28, w))
+        .arg(soa::i18n::translate("Failed to load rules").toHtmlEscaped(),
              reason.toHtmlEscaped(),
              link.toHtmlEscaped(),
-             util::i18n::translate("Open the rules in your browser").toHtmlEscaped()));
+             soa::i18n::translate("Open the rules in your browser").toHtmlEscaped()));
     update_agree_button();
     SPDLOG_ERROR("failed to load rules document: {}", reason.toStdString());
 }
@@ -320,7 +320,7 @@ void RulesAgreement::start_cooldown()
 
 void RulesAgreement::update_agree_button()
 {
-    const auto& assets = util::assets::translated_buttons[util::assets::Button::Agree];
+    const auto& assets = soa::ui::assets::translated_buttons[soa::ui::assets::Button::Agree];
     if (loading)
     {
         agree_button->setEnabled(false);
@@ -337,9 +337,9 @@ void RulesAgreement::update_agree_button()
     {
         agree_button->setEnabled(false);
         set_button_pixmap(assets.loading.isNull() ? assets.normal : assets.loading);
-        agree_button_label->setText(util::i18n::translate("PLEASE READ (%1)")
+        agree_button_label->setText(soa::i18n::translate("PLEASE READ (%1)")
                                         .arg(seconds_remaining));
-        fit_button_label(agree_button_label, util::layout::scaled(12, window()->size()));
+        fit_button_label(agree_button_label, soa::ui::layout::scaled(12, window()->size()));
     }
     else
     {
@@ -353,15 +353,15 @@ void RulesAgreement::update_agree_button()
 
 void RulesAgreement::retranslate_content()
 {
-    agree_button->setAccessibleName(util::i18n::translate("Agree with the rules"));
+    agree_button->setAccessibleName(soa::i18n::translate("Agree with the rules"));
     if (loading && !document_ready)
     {
-        const int loading_height = util::layout::scaled(330, window()->size());
+        const int loading_height = soa::ui::layout::scaled(330, window()->size());
         rules_text->setHtml(QStringLiteral(
             "<div style='height:%1px; display:flex; align-items:center; justify-content:center; "
             "color:#988776; text-align:center;'>%2</div>")
             .arg(loading_height)
-            .arg(util::i18n::translate("Loading rules...").toHtmlEscaped()));
+            .arg(soa::i18n::translate("Loading rules...").toHtmlEscaped()));
     }
     else if (!load_error.isEmpty() && !document_ready)
     {
@@ -382,8 +382,8 @@ void RulesAgreement::set_button_pixmap(const QPixmap& pixmap)
 
 void RulesAgreement::set_button_text(const QString& source)
 {
-    agree_button_label->setText(util::i18n::translate(source));
-    fit_button_label(agree_button_label, util::layout::scaled(12, window()->size()));
+    agree_button_label->setText(soa::i18n::translate(source));
+    fit_button_label(agree_button_label, soa::ui::layout::scaled(12, window()->size()));
 }
 
 
@@ -395,7 +395,7 @@ void RulesAgreement::showEvent(QShowEvent* event)
     rules_text->verticalScrollBar()->setValue(0);
     if (document_html.isEmpty())
     {
-        const QString cached = ui::rules::RulesDocumentStore::load_cached_document();
+        const QString cached = soa::ui::rules::RulesDocumentStore::load_cached_document();
         if (!cached.isEmpty())
         {
             document_html = cached;
@@ -414,14 +414,14 @@ void RulesAgreement::showEvent(QShowEvent* event)
 void RulesAgreement::paint_content(QPainter& painter)
 {
     painter.drawPixmap(box_rect(window()->size()),
-                       util::assets::images[util::assets::Image::RulesFrame]);
+                       soa::ui::assets::images[soa::ui::assets::Image::RulesFrame]);
 }
 
 bool RulesAgreement::eventFilter(QObject* object, QEvent* event)
 {
     if (object == agree_button && agree_button->isEnabled())
     {
-        const auto& assets = util::assets::translated_buttons[util::assets::Button::Agree];
+        const auto& assets = soa::ui::assets::translated_buttons[soa::ui::assets::Button::Agree];
         switch (event->type())
         {
             case QEvent::Enter:

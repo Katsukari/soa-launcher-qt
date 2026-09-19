@@ -4,7 +4,7 @@
 #include <QString>
 #include <QStringList>
 
-namespace core::wine::macos
+namespace soa::runtime::macos
 {
     struct RuntimeProbe
     {

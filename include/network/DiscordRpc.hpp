@@ -5,7 +5,7 @@
 #include <QObject>
 #include <QString>
 
-namespace core::discord
+namespace soa::network
 {
     class DiscordRpc final : public QObject
     {

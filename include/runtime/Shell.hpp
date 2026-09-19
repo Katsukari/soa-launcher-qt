@@ -10,13 +10,13 @@
 #include "common/StatusReporter.hpp"
 #include "runtime/ProcessRunner.hpp"
 
-namespace core::wine
+namespace soa::runtime
 {
     class GameSession;
     class PrefixSetupJob;
     class RuntimeLocator;
 
-    class Shell : public status::StatusReporter
+    class Shell : public common::status::StatusReporter
     {
         Q_OBJECT
 
@@ -39,14 +39,14 @@ namespace core::wine
         void detect_existing_game();
 
     signals:
-        void command_finished(const core::wine::command_result& result);
+        void command_finished(const soa::runtime::command_result& result);
         void wine_setup_finished(bool ok);
         void setup_status(const QString& message);
         void user_error(const QString& title, const QString& message);
         void user_notice(const QString& message);
-        void game_starting(core::game::GameVersion version);
-        void game_started(core::game::GameVersion version);
-        void game_exited(core::game::GameVersion version, int exit_code, bool crashed);
+        void game_starting(soa::common::game::GameVersion version);
+        void game_started(soa::common::game::GameVersion version);
+        void game_exited(soa::common::game::GameVersion version, int exit_code, bool crashed);
 
     private:
         void fail_user(const QString& title, const QString& message);

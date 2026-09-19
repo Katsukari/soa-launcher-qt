@@ -11,7 +11,7 @@ class QLabel;
 class QPushButton;
 class QShowEvent;
 
-class PrerequisitesIntro : public util::modal_overlay::ModalOverlay
+class PrerequisitesIntro : public soa::ui::ModalOverlay
 {
     Q_OBJECT
 
@@ -29,8 +29,8 @@ class PrerequisitesIntro : public util::modal_overlay::ModalOverlay
     private:
         struct DetectionResult
         {
-            core::system::SystemProfile profile;
-            QVector<core::wine::WineInstall> runtimes;
+            soa::runtime::SystemProfile profile;
+            QVector<soa::runtime::WineInstall> runtimes;
             bool winetricks_ready {};
             bool umu_ready {};
         };
@@ -41,14 +41,14 @@ class PrerequisitesIntro : public util::modal_overlay::ModalOverlay
         void update_recommendation();
         void apply_recommendation();
 
-        [[nodiscard]] core::wine::RuntimeType recommended_runtime() const;
-        [[nodiscard]] const core::wine::WineInstall* best_runtime(core::wine::RuntimeType type) const;
-        [[nodiscard]] QStringList missing_requirements(core::wine::RuntimeType type) const;
+        [[nodiscard]] soa::runtime::RuntimeType recommended_runtime() const;
+        [[nodiscard]] const soa::runtime::WineInstall* best_runtime(soa::runtime::RuntimeType type) const;
+        [[nodiscard]] QStringList missing_requirements(soa::runtime::RuntimeType type) const;
         [[nodiscard]] bool profile_ready(QString* blocker = nullptr) const;
 
         QFutureWatcher<DetectionResult>* detector {};
-        core::system::SystemProfile system_profile;
-        QVector<core::wine::WineInstall> runtimes;
+        soa::runtime::SystemProfile system_profile;
+        QVector<soa::runtime::WineInstall> runtimes;
 
         QLabel* recommendation_title {};
         QLabel* recommendation_body {};

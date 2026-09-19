@@ -14,7 +14,7 @@
 #include "common/Log.hpp"
 #include <spdlog/spdlog.h>
 
-namespace dl = util::layout::progress_modal;
+namespace dl = soa::ui::layout::progress_modal;
 
 namespace
 {
@@ -26,7 +26,7 @@ namespace
     constexpr double k_pct_done         = 100.0;
 }
 
-PrefixProgress::PrefixProgress(core::wine::Shell* shell_, QWidget* parent)
+PrefixProgress::PrefixProgress(soa::runtime::Shell* shell_, QWidget* parent)
     : ModalOverlay(parent), shell(shell_)
 {
     setup_buttons();
@@ -55,7 +55,7 @@ PrefixProgress::PrefixProgress(core::wine::Shell* shell_, QWidget* parent)
         }
     });
 
-    connect(shell, &core::wine::Shell::setup_status, this, [this](const QString& message)
+    connect(shell, &soa::runtime::Shell::setup_status, this, [this](const QString& message)
     {
         status = message;
 
@@ -78,7 +78,7 @@ PrefixProgress::PrefixProgress(core::wine::Shell* shell_, QWidget* parent)
         update();
     });
 
-    connect(shell, &core::wine::Shell::wine_setup_finished, this, [this](bool ok)
+    connect(shell, &soa::runtime::Shell::wine_setup_finished, this, [this](bool ok)
     {
         done   = ok;
         failed = !ok;
@@ -99,9 +99,9 @@ void PrefixProgress::setup_buttons()
 {
     const QSize w = window()->size();
 
-    close_button = util::simple_utils::make_flat_button(this);
+    close_button = soa::ui::simple_utils::make_flat_button(this);
     close_button->setAccessibleName(QStringLiteral("Cancel prefix setup"));
-    close_button->setIcon(QIcon(util::assets::images[util::assets::Image::CloseSettings]));
+    close_button->setIcon(QIcon(soa::ui::assets::images[soa::ui::assets::Image::CloseSettings]));
     close_button->setIconSize(dl::close_icon(w));
     close_button->setGeometry(dl::close(w));
     connect(close_button, &QPushButton::clicked, this, [this]()
@@ -151,44 +151,44 @@ void PrefixProgress::paint_content(QPainter& painter)
 {
     const QSize w = window()->size();
 
-    painter.drawPixmap(dl::box_rect(w), util::assets::images[util::assets::Image::BoxDownload]);
+    painter.drawPixmap(dl::box_rect(w), soa::ui::assets::images[soa::ui::assets::Image::BoxDownload]);
 
-    QFont title_font = util::assets::fonts[util::assets::Font::EurostileBlack];
-    title_font.setPixelSize(util::layout::scaled(util::layout::text::k_row_title, w));
+    QFont title_font = soa::ui::assets::fonts[soa::ui::assets::Font::EurostileBlack];
+    title_font.setPixelSize(soa::ui::layout::scaled(soa::ui::layout::text::k_row_title, w));
     title_font.setWeight(QFont::Black);
     painter.setFont(title_font);
-    painter.setPen(util::colors::k_text_maroon);
+    painter.setPen(soa::ui::colors::k_text_maroon);
     painter.drawText(dl::title(w), Qt::AlignCenter,
-                     util::i18n::translate("INSTALLING WINE PREFIX"));
+                     soa::i18n::translate("INSTALLING WINE PREFIX"));
 
-    QFont label_font = util::assets::fonts[util::assets::Font::Inter];
-    label_font.setPixelSize(util::layout::scaled(util::layout::text::k_body, w));
+    QFont label_font = soa::ui::assets::fonts[soa::ui::assets::Font::Inter];
+    label_font.setPixelSize(soa::ui::layout::scaled(soa::ui::layout::text::k_body, w));
     label_font.setWeight(QFont::Medium);
     painter.setFont(label_font);
-    painter.setPen(util::colors::k_text_label);
+    painter.setPen(soa::ui::colors::k_text_label);
 
     const QRect info = dl::info_row(w);
     const QString step_text = step > 0
-        ? util::i18n::translate("Step %1 of 3").arg(step)
+        ? soa::i18n::translate("Step %1 of 3").arg(step)
         : QString();
     const int step_width = step_text.isEmpty()
         ? 0
-        : painter.fontMetrics().horizontalAdvance(step_text) + util::layout::scaled(12, w);
+        : painter.fontMetrics().horizontalAdvance(step_text) + soa::ui::layout::scaled(12, w);
     const QRect status_rect = info.adjusted(0, 0, -step_width, 0);
     const QString status_text = painter.fontMetrics().elidedText(
-        util::i18n::translate(status), Qt::ElideRight, qMax(1, status_rect.width()));
+        soa::i18n::translate(status), Qt::ElideRight, qMax(1, status_rect.width()));
     painter.drawText(status_rect, Qt::AlignLeft | Qt::AlignVCenter, status_text);
     if (!step_text.isEmpty())
         painter.drawText(info, Qt::AlignRight | Qt::AlignVCenter, step_text);
 
-    util::progress_bar::draw(painter, dl::bar_rect(w), current_pct / 100.0);
+    soa::ui::progress_bar::draw(painter, dl::bar_rect(w), current_pct / 100.0);
 
-    QFont pct_font = util::assets::fonts[util::assets::Font::Inter];
-    pct_font.setPixelSize(util::layout::scaled(util::layout::text::k_label, w));
+    QFont pct_font = soa::ui::assets::fonts[soa::ui::assets::Font::Inter];
+    pct_font.setPixelSize(soa::ui::layout::scaled(soa::ui::layout::text::k_label, w));
     pct_font.setWeight(QFont::DemiBold);
     painter.setFont(pct_font);
-    painter.setPen(failed ? util::colors::k_warning : util::colors::k_text_maroon);
+    painter.setPen(failed ? soa::ui::colors::k_warning : soa::ui::colors::k_text_maroon);
     painter.drawText(dl::under_row(w), Qt::AlignCenter,
-                     failed ? util::i18n::translate("FAILED")
+                     failed ? soa::i18n::translate("FAILED")
                             : QString("%1%").arg(int(current_pct)));
 }

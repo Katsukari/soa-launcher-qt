@@ -10,7 +10,7 @@
 
 class QTimer;
 
-namespace core::state
+namespace soa::ui
 {
     class InstallState : public QObject
     {
@@ -31,13 +31,13 @@ namespace core::state
 
 
     signals:
-        void stage_changed(core::state::Stage now);
+        void stage_changed(soa::ui::Stage now);
         void error_changed(const QString& message);
         void warning_changed(const QString& message);
 
     private:
-        void on_reporter_changed(const QString& name, const status::Status& status);
-        void on_courier_status(const core::network::DownloadStatus& status);
+        void on_reporter_changed(const QString& name, const common::status::Status& status);
+        void on_courier_status(const soa::network::DownloadStatus& status);
         void set_error(const QString& message);
         void set_warning(const QString& message);
         void recompute();
@@ -61,8 +61,8 @@ namespace core::state
         bool update_check_in_progress {};
         bool update_check_complete {};
 
-        core::status::State wine_state {status::State::Idle};
-        core::status::State auth_state {status::State::Idle};
+        soa::common::status::State wine_state {common::status::State::Idle};
+        soa::common::status::State auth_state {common::status::State::Idle};
         QString wine_phase;
         QString last_error;
         QString last_warning;

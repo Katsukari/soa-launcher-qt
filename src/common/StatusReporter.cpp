@@ -6,7 +6,7 @@
 
 #include <utility>
 
-namespace core::status
+namespace soa::common::status
 {
     StatusReporter::StatusReporter(QString name_, QObject* parent)
         : QObject(parent), name(std::move(name_))

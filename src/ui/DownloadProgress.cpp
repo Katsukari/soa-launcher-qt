@@ -17,11 +17,11 @@
 #include "common/Log.hpp"
 #include <spdlog/spdlog.h>
 
-namespace dl = util::layout::progress_modal;
-using util::config::Config;
-using core::network::CourierBridge;
-using core::network::DownloadStatus;
-using core::status::State;
+namespace dl = soa::ui::layout::progress_modal;
+using soa::config::Config;
+using soa::network::CourierBridge;
+using soa::network::DownloadStatus;
+using soa::common::status::State;
 
 DownloadProgress::DownloadProgress(QWidget* parent)
     : DownloadProgress(Mode::Download, parent)
@@ -108,11 +108,11 @@ void DownloadProgress::setup_buttons()
 {
     const QSize window_size = window()->size();
 
-    close_button = util::simple_utils::make_flat_button(this);
+    close_button = soa::ui::simple_utils::make_flat_button(this);
     close_button->setAccessibleName(mode == Mode::Repair
         ? QStringLiteral("Cancel or close repair")
         : QStringLiteral("Cancel or close download"));
-    close_button->setIcon(QIcon(util::assets::images[util::assets::Image::CloseNormal]));
+    close_button->setIcon(QIcon(soa::ui::assets::images[soa::ui::assets::Image::CloseNormal]));
     close_button->setIconSize(dl::close_icon(window_size));
     close_button->setGeometry(dl::close(window_size));
     connect(close_button, &QPushButton::clicked, this, &DownloadProgress::cancel_download);
@@ -120,7 +120,7 @@ void DownloadProgress::setup_buttons()
 
     retry_button = new QPushButton(QStringLiteral("RETRY"), this);
     retry_button->setCursor(Qt::PointingHandCursor);
-    retry_button->setStyleSheet(util::styles::primary_button(window_size));
+    retry_button->setStyleSheet(soa::ui::styles::primary_button(window_size));
     retry_button->setGeometry(dl::retry_button(window_size));
     retry_button->setAccessibleName(mode == Mode::Repair
         ? QStringLiteral("Retry repair")
@@ -131,7 +131,7 @@ void DownloadProgress::setup_buttons()
 
     details_button = new QPushButton(QStringLiteral("SHOW ERROR"), this);
     details_button->setCursor(Qt::PointingHandCursor);
-    details_button->setStyleSheet(util::styles::neutral_button(window_size));
+    details_button->setStyleSheet(soa::ui::styles::neutral_button(window_size));
     details_button->setGeometry(dl::details_button(window_size));
     details_button->setAccessibleName(QStringLiteral("Show full error"));
     details_button->setVisible(false);
@@ -235,7 +235,7 @@ void DownloadProgress::start_download()
 {
     auto& config = Config::instance();
     const auto version = config.game_version();
-    const auto& game = core::game::profile(version);
+    const auto& game = soa::common::game::profile(version);
     const QString install = config.game_install_path();
 
     if (!config.path_inside_prefix(install))
@@ -274,7 +274,7 @@ void DownloadProgress::start_download()
     if (!downloader)
     {
         SPDLOG_ERROR("download: failed to create courier for game {}",
-                     core::game::to_string(version).toStdString());
+                     soa::common::game::to_string(version).toStdString());
         set_terminal_error(mode == Mode::Repair
             ? QStringLiteral("The repair service could not be created.")
             : QStringLiteral("The downloader could not be created."));
@@ -283,7 +283,7 @@ void DownloadProgress::start_download()
 
     SPDLOG_INFO("{}: starting game {} update from {} to {}",
                 mode == Mode::Repair ? "repair" : "download",
-                core::game::to_string(version).toStdString(),
+                soa::common::game::to_string(version).toStdString(),
                 game.cdn_base_url,
                 install.toStdString());
     active_operation_id = courier_update(downloader, install.toUtf8().constData());
@@ -303,8 +303,8 @@ QString DownloadProgress::operation_context_key() const
 {
     const auto& config = Config::instance();
     const auto version = config.game_version();
-    const auto& game = core::game::profile(version);
-    return core::game::to_string(version)
+    const auto& game = soa::common::game::profile(version);
+    return soa::common::game::to_string(version)
         + QLatin1Char('|') + config.prefix_root()
         + QLatin1Char('|') + config.game_install_path()
         + QLatin1Char('|') + QString::fromLatin1(game.cdn_base_url);
@@ -316,23 +316,23 @@ QString DownloadProgress::human_size(const qulonglong bytes)
     constexpr double mb = 1'000'000.0;
     constexpr double gb = 1'000'000'000.0;
     if (bytes >= gb)
-        return util::i18n::translate("%1 GB").arg(QString::number(bytes / gb, 'f', 1));
+        return soa::i18n::translate("%1 GB").arg(QString::number(bytes / gb, 'f', 1));
     if (bytes >= mb)
-        return util::i18n::translate("%1 MB").arg(QString::number(bytes / mb, 'f', 1));
+        return soa::i18n::translate("%1 MB").arg(QString::number(bytes / mb, 'f', 1));
     if (bytes >= kb)
-        return util::i18n::translate("%1 KB").arg(QString::number(bytes / kb, 'f', 0));
-    return util::i18n::translate("%1 B").arg(QString::number(bytes));
+        return soa::i18n::translate("%1 KB").arg(QString::number(bytes / kb, 'f', 0));
+    return soa::i18n::translate("%1 B").arg(QString::number(bytes));
 }
 
 QString DownloadProgress::human_speed(const qulonglong bytes_per_sec)
 {
     if (bytes_per_sec == 0) return "--";
-    return util::i18n::translate("%1/s").arg(human_size(bytes_per_sec));
+    return soa::i18n::translate("%1/s").arg(human_size(bytes_per_sec));
 }
 
 QString DownloadProgress::human_eta(const qulonglong remaining, const qulonglong throughput)
 {
-    if (throughput == 0) return util::i18n::translate("Estimating...");
+    if (throughput == 0) return soa::i18n::translate("Estimating...");
 
     const qulonglong total_seconds = (remaining + throughput - 1) / throughput;
     const qulonglong hours = total_seconds / 3600;
@@ -341,19 +341,19 @@ QString DownloadProgress::human_eta(const qulonglong remaining, const qulonglong
 
     if (hours > 0)
         return minutes > 0
-            ? util::i18n::translate("%1h %2m").arg(hours).arg(minutes)
-            : util::i18n::translate("%1h").arg(hours);
+            ? soa::i18n::translate("%1h %2m").arg(hours).arg(minutes)
+            : soa::i18n::translate("%1h").arg(hours);
     if (minutes > 0)
         return seconds > 0
-            ? util::i18n::translate("%1m %2s").arg(minutes).arg(seconds)
-            : util::i18n::translate("%1m").arg(minutes);
-    return util::i18n::translate("%1s").arg(seconds);
+            ? soa::i18n::translate("%1m %2s").arg(minutes).arg(seconds)
+            : soa::i18n::translate("%1m").arg(minutes);
+    return soa::i18n::translate("%1s").arg(seconds);
 }
 
 void DownloadProgress::paint_content(QPainter& painter)
 {
     const QSize window_size = window()->size();
-    painter.drawPixmap(dl::box_rect(window_size), util::assets::images[util::assets::Image::BoxDownload]);
+    painter.drawPixmap(dl::box_rect(window_size), soa::ui::assets::images[soa::ui::assets::Image::BoxDownload]);
 
     const bool done = current.base.state == State::Done;
     const bool failed = current.base.state == State::Failed;
@@ -362,32 +362,32 @@ void DownloadProgress::paint_content(QPainter& painter)
     QString title_text;
     if (done)
         title_text = mode == Mode::Repair
-            ? util::i18n::translate("REPAIR COMPLETE")
-            : util::i18n::translate("DOWNLOAD COMPLETE");
+            ? soa::i18n::translate("REPAIR COMPLETE")
+            : soa::i18n::translate("DOWNLOAD COMPLETE");
     else if (failed)
         title_text = mode == Mode::Repair
-            ? util::i18n::translate("REPAIR FAILED")
-            : util::i18n::translate("DOWNLOAD FAILED");
+            ? soa::i18n::translate("REPAIR FAILED")
+            : soa::i18n::translate("DOWNLOAD FAILED");
     else
     {
         switch (current.phase)
         {
             case courier_phase_preparing:
                 title_text = mode == Mode::Repair
-                    ? util::i18n::translate("PREPARING REPAIR")
-                    : util::i18n::translate("PREPARING");
+                    ? soa::i18n::translate("PREPARING REPAIR")
+                    : soa::i18n::translate("PREPARING");
                 break;
             case courier_phase_checking:
                 title_text = files > 0
-                    ? util::i18n::translate("CHECKING FILES (%1/%2)")
+                    ? soa::i18n::translate("CHECKING FILES (%1/%2)")
                         .arg(current.file_index).arg(files)
-                    : util::i18n::translate("CHECKING FILES");
+                    : soa::i18n::translate("CHECKING FILES");
                 break;
             case courier_phase_verifying:
                 title_text = files > 0
-                    ? util::i18n::translate("VERIFYING FILES (%1/%2)")
+                    ? soa::i18n::translate("VERIFYING FILES (%1/%2)")
                         .arg(current.file_index).arg(files)
-                    : util::i18n::translate("VERIFYING FILES");
+                    : soa::i18n::translate("VERIFYING FILES");
                 break;
             case courier_phase_downloading:
             default:
@@ -395,12 +395,12 @@ void DownloadProgress::paint_content(QPainter& painter)
                 const bool resuming = current.base.message.startsWith(
                     QStringLiteral("Resuming"), Qt::CaseInsensitive);
                 const QString action = mode == Mode::Repair
-                    ? (resuming ? util::i18n::translate("RESUMING REPAIR")
-                                : util::i18n::translate("REPAIRING"))
-                    : (resuming ? util::i18n::translate("RESUMING")
-                                : util::i18n::translate("DOWNLOADING"));
+                    ? (resuming ? soa::i18n::translate("RESUMING REPAIR")
+                                : soa::i18n::translate("REPAIRING"))
+                    : (resuming ? soa::i18n::translate("RESUMING")
+                                : soa::i18n::translate("DOWNLOADING"));
                 title_text = files > 0
-                    ? util::i18n::translate("%1 FILES (%2/%3)")
+                    ? soa::i18n::translate("%1 FILES (%2/%3)")
                         .arg(action).arg(current.file_index).arg(files)
                     : action;
                 break;
@@ -408,48 +408,48 @@ void DownloadProgress::paint_content(QPainter& painter)
         }
     }
 
-    QFont title_font = util::assets::fonts[util::assets::Font::EurostileBlack];
-    title_font.setPixelSize(util::layout::scaled(util::layout::text::k_row_title, window_size));
+    QFont title_font = soa::ui::assets::fonts[soa::ui::assets::Font::EurostileBlack];
+    title_font.setPixelSize(soa::ui::layout::scaled(soa::ui::layout::text::k_row_title, window_size));
     title_font.setWeight(QFont::Black);
     painter.setFont(title_font);
-    painter.setPen(util::colors::k_text_maroon);
+    painter.setPen(soa::ui::colors::k_text_maroon);
     painter.drawText(dl::title(window_size), Qt::AlignCenter, title_text);
 
-    QFont label_font = util::assets::fonts[util::assets::Font::Inter];
-    label_font.setPixelSize(util::layout::scaled(util::layout::text::k_body, window_size));
+    QFont label_font = soa::ui::assets::fonts[soa::ui::assets::Font::Inter];
+    label_font.setPixelSize(soa::ui::layout::scaled(soa::ui::layout::text::k_body, window_size));
     label_font.setWeight(QFont::Medium);
     painter.setFont(label_font);
-    painter.setPen(failed ? util::colors::k_warning : util::colors::k_text_label);
+    painter.setPen(failed ? soa::ui::colors::k_warning : soa::ui::colors::k_text_label);
 
     const QRect info = dl::info_row(window_size);
     const qulonglong remaining = current.total > current.received ? current.total - current.received : 0;
     if (failed)
     {
         const QString message = painter.fontMetrics().elidedText(
-            util::i18n::translate(current.base.message), Qt::ElideRight, info.width());
+            soa::i18n::translate(current.base.message), Qt::ElideRight, info.width());
         painter.drawText(info, Qt::AlignCenter, message);
     }
     else if (done)
     {
-        painter.drawText(info, Qt::AlignCenter, util::i18n::translate(current.base.message));
+        painter.drawText(info, Qt::AlignCenter, soa::i18n::translate(current.base.message));
     }
     else if (current.phase == courier_phase_downloading)
     {
         painter.drawText(info, Qt::AlignLeft | Qt::AlignVCenter,
-                         util::i18n::translate("Time remaining: %1").arg(human_eta(remaining, current.speed)));
+                         soa::i18n::translate("Time remaining: %1").arg(human_eta(remaining, current.speed)));
         painter.drawText(info, Qt::AlignRight | Qt::AlignVCenter,
                          human_speed(current.speed));
     }
 
-    util::progress_bar::draw(painter, dl::bar_rect(window_size), current.base.progress);
+    soa::ui::progress_bar::draw(painter, dl::bar_rect(window_size), current.base.progress);
 
-    QFont percent_font = util::assets::fonts[util::assets::Font::NanumExtraBold];
-    percent_font.setPixelSize(util::layout::scaled(util::layout::text::k_label, window_size));
+    QFont percent_font = soa::ui::assets::fonts[soa::ui::assets::Font::NanumExtraBold];
+    percent_font.setPixelSize(soa::ui::layout::scaled(soa::ui::layout::text::k_label, window_size));
     percent_font.setWeight(QFont::ExtraBold);
     painter.setFont(percent_font);
-    painter.setPen(failed ? util::colors::k_warning : util::colors::k_text_maroon);
+    painter.setPen(failed ? soa::ui::colors::k_warning : soa::ui::colors::k_text_maroon);
     const int shown = current.base.progress < 0.0 ? 0 : qRound(current.base.progress * 100.0);
     painter.drawText(dl::under_row(window_size), Qt::AlignCenter,
-                     failed ? util::i18n::translate("Retry continues from saved files")
+                     failed ? soa::i18n::translate("Retry continues from saved files")
                             : QString("%1%").arg(qBound(0, shown, 100)));
 }

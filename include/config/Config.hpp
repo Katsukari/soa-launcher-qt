@@ -10,7 +10,7 @@
 class QFileSystemWatcher;
 class QTimer;
 
-namespace util::config
+namespace soa::config
 {
     class Config : public QObject
     {
@@ -35,7 +35,7 @@ namespace util::config
         QString prefix_root() const;
         QString wine_arch() const;
         QString game_install_path() const;
-        QString game_install_path(core::game::GameVersion version) const;
+        QString game_install_path(soa::common::game::GameVersion version) const;
         bool    use_dxvk() const;
         bool    runtime_selected() const;
         QString wine_args() const;
@@ -52,7 +52,7 @@ namespace util::config
         QString launcher_size() const;
         QString language() const;
 
-        core::game::GameVersion game_version() const;
+        soa::common::game::GameVersion game_version() const;
         QString game_id() const;
         QString game_args() const;
 
@@ -87,7 +87,7 @@ namespace util::config
         void set_launcher_size(const QString& value);
         void set_language(const QString& value);
 
-        void set_game_version(core::game::GameVersion value);
+        void set_game_version(soa::common::game::GameVersion value);
         void set_game_args(const QString& value);
 
         void set_auth(const QString& username, const QString& token,
@@ -143,7 +143,7 @@ namespace util::config
         [[nodiscard]] bool disk_state_changed() const;
 
         QString derive_game_path(const QString& prefix,
-                                 core::game::GameVersion version) const;
+                                 soa::common::game::GameVersion version) const;
         QString normalize_game_path(const QString& path) const;
         QString normalize_wine_prefix(const QString& path) const;
         QString normalize_proton_compat_root(const QString& path) const;
@@ -153,7 +153,7 @@ namespace util::config
         bool runtime_is_proton() const;
         void persist_change();
         void normalize_schema();
-        static QString game_install_path_key(core::game::GameVersion version);
+        static QString game_install_path_key(soa::common::game::GameVersion version);
 
         class Impl;
         Impl* d {};

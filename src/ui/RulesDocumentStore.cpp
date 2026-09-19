@@ -14,7 +14,7 @@
 #define SOA_RULES_DOCUMENT_URL "https://docs.google.com/document/d/1vry3ZuDtzdS_mX1P2udWlb8z2Q9Atr3p1THZdtZ2EHA/export?format=html"
 #endif
 
-namespace ui::rules
+namespace soa::ui::rules
 {
     QString RulesDocumentStore::rules_url()
     {
@@ -92,18 +92,18 @@ namespace ui::rules
             "ul, ol { margin-left:%10px; }"
             "table { border-collapse:collapse; width:100%; }"
             "td { vertical-align:top; padding:%11px %12px; }")
-            .arg(qMax(9, util::layout::scaled(13, window_size)))
-            .arg(qMax(14, util::layout::scaled(22, window_size)))
-            .arg(util::layout::scaled(8, window_size))
-            .arg(qMax(10, util::layout::scaled(15, window_size)))
-            .arg(util::layout::scaled(28, window_size))
-            .arg(qMax(9, util::layout::scaled(14, window_size)))
-            .arg(util::layout::scaled(22, window_size))
-            .arg(util::layout::scaled(44, window_size))
-            .arg(util::layout::scaled(6, window_size))
-            .arg(util::layout::scaled(18, window_size))
-            .arg(util::layout::scaled(2, window_size))
-            .arg(util::layout::scaled(6, window_size));
+            .arg(qMax(9, soa::ui::layout::scaled(13, window_size)))
+            .arg(qMax(14, soa::ui::layout::scaled(22, window_size)))
+            .arg(soa::ui::layout::scaled(8, window_size))
+            .arg(qMax(10, soa::ui::layout::scaled(15, window_size)))
+            .arg(soa::ui::layout::scaled(28, window_size))
+            .arg(qMax(9, soa::ui::layout::scaled(14, window_size)))
+            .arg(soa::ui::layout::scaled(22, window_size))
+            .arg(soa::ui::layout::scaled(44, window_size))
+            .arg(soa::ui::layout::scaled(6, window_size))
+            .arg(soa::ui::layout::scaled(18, window_size))
+            .arg(soa::ui::layout::scaled(2, window_size))
+            .arg(soa::ui::layout::scaled(6, window_size));
         return QStringLiteral("<html><head><style>%1\n%2</style></head><body>%3</body></html>")
             .arg(styles, launcher_styles, body);
     }

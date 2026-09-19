@@ -9,7 +9,7 @@
 class QTimer;
 class QUrl;
 
-class AuthHandler : public core::status::StatusReporter
+class AuthHandler : public soa::common::status::StatusReporter
 {
     Q_OBJECT
 

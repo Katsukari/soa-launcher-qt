@@ -8,8 +8,8 @@
 #include <QMetaObject>
 #include <QString>
 
-using core::status::State;
-using core::network::DownloadStatus;
+using soa::common::status::State;
+using soa::network::DownloadStatus;
 
 namespace
 {
@@ -51,7 +51,7 @@ namespace
     {
         const QString msg = QString::fromUtf8(message ? message : "");
         QMetaObject::invokeMethod(
-            &core::network::CourierBridge::instance(),
+            &soa::network::CourierBridge::instance(),
             [operation_id, phase, msg, percent, received, total, throughput, file_index, file_count]()
             {
                 DownloadStatus ds;
@@ -66,7 +66,7 @@ namespace
                 ds.speed      = static_cast<qulonglong>(throughput);
                 ds.file_index = file_index;
                 ds.file_count = file_count;
-                core::network::CourierBridge::instance().report(ds);
+                soa::network::CourierBridge::instance().report(ds);
             },
             Qt::QueuedConnection);
     }
@@ -75,7 +75,7 @@ namespace
     {
         const QString msg = QString::fromUtf8(message ? message : "");
         QMetaObject::invokeMethod(
-            &core::network::CourierBridge::instance(),
+            &soa::network::CourierBridge::instance(),
             [operation_id, result, msg]()
             {
                 DownloadStatus ds;
@@ -85,13 +85,13 @@ namespace
                     ? State::Failed : State::Done;
                 ds.base.message  = msg;
                 ds.base.progress = ds.base.state == State::Done ? 1.0 : -1.0;
-                core::network::CourierBridge::instance().report(ds);
+                soa::network::CourierBridge::instance().report(ds);
             },
             Qt::QueuedConnection);
     }
 }
 
-namespace core::network
+namespace soa::network
 {
     CourierBridge::CourierBridge() : StatusReporter("courier")
     {

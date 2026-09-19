@@ -10,7 +10,7 @@
 #include <QStringList>
 #include <QUrl>
 
-namespace core::update
+namespace soa::update
 {
     class LauncherUpdateManager final : public QObject
     {

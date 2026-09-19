@@ -4,7 +4,7 @@
 #include <QPoint>
 #include <QtGlobal>
 
-namespace util::layout
+namespace soa::ui::layout
 {
     namespace win
     {

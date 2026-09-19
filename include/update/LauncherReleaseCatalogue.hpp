@@ -6,7 +6,7 @@
 #include <QString>
 #include <QUrl>
 
-namespace core::update
+namespace soa::update
 {
     struct LauncherRelease
     {

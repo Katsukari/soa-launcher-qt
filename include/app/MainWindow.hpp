@@ -8,27 +8,27 @@ class QCloseEvent;
 #include "ui/Stage.hpp"
 #include "ui/View.hpp"
 
-namespace util::modal_overlay
+namespace soa::ui
 {
     class ModalOverlay;
 }
-namespace core::wine
+namespace soa::runtime
 {
     class Shell;
 }
-namespace core::state
+namespace soa::ui
 {
     class InstallState;
 }
-namespace core::integrity
+namespace soa::runtime
 {
     class GameIntegrityWatcher;
 }
-namespace core::update
+namespace soa::update
 {
     class LauncherUpdateManager;
 }
-namespace core::discord
+namespace soa::network
 {
     class DiscordRpc;
 }
@@ -88,15 +88,15 @@ private:
     void setup_wine_select();
     void setup_launcher_updates();
     void continue_after_launcher_update_check();
-    void set_game_version(core::game::GameVersion version);
+    void set_game_version(soa::common::game::GameVersion version);
     void refresh_game_selector();
-    void set_game_switching_enabled(core::state::Stage stage);
-    void on_overlay_opened(util::modal_overlay::ModalOverlay* overlay);
-    void on_overlay_closed(util::modal_overlay::ModalOverlay* overlay);
+    void set_game_switching_enabled(soa::ui::Stage stage);
+    void on_overlay_opened(soa::ui::ModalOverlay* overlay);
+    void on_overlay_closed(soa::ui::ModalOverlay* overlay);
     void update_chrome_visibility();
-    void open_overlay(util::modal_overlay::ModalOverlay* overlay);
-    void close_overlay(util::modal_overlay::ModalOverlay* overlay);
-    void on_stage_changed(core::state::Stage stage);
+    void open_overlay(soa::ui::ModalOverlay* overlay);
+    void close_overlay(soa::ui::ModalOverlay* overlay);
+    void on_stage_changed(soa::ui::Stage stage);
     void open_for_current_stage();
     void show_launcher();
     void run_game_directly();
@@ -131,12 +131,12 @@ private:
     DownloadProgress* repair_progress {};
     WineSelectMenu* wine_select {};
     LauncherUpdate* launcher_update {};
-    core::wine::Shell* shell {};
+    soa::runtime::Shell* shell {};
     AuthHandler* auth {};
-    core::state::InstallState* install_state {};
-    core::integrity::GameIntegrityWatcher* integrity_watcher {};
-    core::update::LauncherUpdateManager* launcher_update_manager {};
-    core::discord::DiscordRpc* discord_rpc {};
-    core::game::GameVersion game_version {core::game::GameVersion::Playtest};
-    core::state::View last_view {core::state::View::Loading};
+    soa::ui::InstallState* install_state {};
+    soa::runtime::GameIntegrityWatcher* integrity_watcher {};
+    soa::update::LauncherUpdateManager* launcher_update_manager {};
+    soa::network::DiscordRpc* discord_rpc {};
+    soa::common::game::GameVersion game_version {soa::common::game::GameVersion::Playtest};
+    soa::ui::View last_view {soa::ui::View::Loading};
 };

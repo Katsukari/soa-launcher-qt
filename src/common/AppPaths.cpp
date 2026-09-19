@@ -3,7 +3,7 @@
 #include <QDir>
 #include <QStandardPaths>
 
-namespace core::paths
+namespace soa::common::paths
 {
     QString application_support_root()
     {

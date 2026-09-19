@@ -14,9 +14,9 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QDir>
-using util::config::Config;
-namespace ls = util::layout::settings;
-namespace aset = util::layout::advanced_settings;
+using soa::config::Config;
+namespace ls = soa::ui::layout::settings;
+namespace aset = soa::ui::layout::advanced_settings;
 
 namespace
 {
@@ -53,24 +53,24 @@ void AdvancedSettings::setup_game_path_option()
 {
     const QSize w = window()->size();
     const int y = aset::row(0, kAdvancedRowCount);
-    util::simple_utils::make_label_block(this, w, y,
+    soa::ui::simple_utils::make_label_block(this, w, y,
                             "GAME INSTALL PATH",
                             "Where the game is installed. Leave blank to use the default location.");
     game_path_field = new QLineEdit(this);
     game_path_field->setText(Config::instance().game_install_path());
-    game_path_field->setStyleSheet(util::styles::field(w));
+    game_path_field->setStyleSheet(soa::ui::styles::field(w));
     game_path_field->setGeometry(ls::field_rect(w, y));
 
     auto* browse = new QPushButton("...", this);
     browse->setCursor(Qt::PointingHandCursor);
-    browse->setStyleSheet(util::styles::neutral_button(w));
+    browse->setStyleSheet(soa::ui::styles::neutral_button(w));
     browse->setGeometry(ls::browse_rect(w, y));
     browse->setAccessibleName(QStringLiteral("Choose game installation folder"));
     connect(browse, &QPushButton::clicked, this, [this]()
     {
         const QString dir = QFileDialog::getExistingDirectory(
             this,
-            util::i18n::translate("Select Game Folder"),
+            soa::i18n::translate("Select Game Folder"),
             Config::instance().prefix_root());
         if (!dir.isEmpty())
         {
@@ -121,19 +121,19 @@ void AdvancedSettings::setup_game_args_option()
 {
     const QSize w = window()->size();
     const int y = aset::row(1, kAdvancedRowCount);
-    util::simple_utils::make_label_block(this, w, y,
+    soa::ui::simple_utils::make_label_block(this, w, y,
                             "GAME LAUNCH ARGUMENTS",
                             "Passed to Alicia.exe. Optional for most players.");
     auto* field = new QLineEdit(this);
-    field->setPlaceholderText(util::i18n::translate("%1 (default)").arg(QStringLiteral("Alicia.exe")));
+    field->setPlaceholderText(soa::i18n::translate("%1 (default)").arg(QStringLiteral("Alicia.exe")));
     field->setAccessibleName(QStringLiteral("Game launch arguments"));
-    field->setStyleSheet(util::styles::field(w));
+    field->setStyleSheet(soa::ui::styles::field(w));
     field->setGeometry(ls::ctrl_pos(w, y).x(), ls::ctrl_pos(w, y).y(),
-                       ls::ctrl_w(w), util::layout::scaled(34, w));
+                       ls::ctrl_w(w), soa::ui::layout::scaled(34, w));
     field->setText(Config::instance().game_args());
     connect(field, &QLineEdit::editingFinished, this, [this, field]()
     {
-        const auto validation = util::launch_arguments::validate(field->text());
+        const auto validation = soa::common::launch_arguments::validate(field->text());
         if (!validation.valid)
         {
             LauncherDialog::warning(
@@ -152,7 +152,7 @@ void AdvancedSettings::setup_macos_compatibility_option()
 #if defined(Q_OS_MACOS)
     const QSize w = window()->size();
     const int y = aset::row(2, kAdvancedRowCount);
-    util::simple_utils::make_label_block(
+    soa::ui::simple_utils::make_label_block(
         this, w, y,
         "COMPATIBILITY PROFILE",
         "Normal is recommended. Fallback profiles isolate targeted graphics or audio behavior.");
@@ -200,7 +200,7 @@ void AdvancedSettings::setup_diagnostics_option()
     const QSize w = window()->size();
     const int y = aset::row(3, kAdvancedRowCount);
 
-    util::simple_utils::make_label_block(
+    soa::ui::simple_utils::make_label_block(
         this, w, y, QString::fromUtf8(kDiagnosticTitle),
 #if defined(Q_OS_MACOS)
         QString::fromUtf8(kDiagnosticMacDescription));
@@ -208,14 +208,14 @@ void AdvancedSettings::setup_diagnostics_option()
         QString::fromUtf8(kDiagnosticLinuxDescription));
 #endif
 
-    auto* diagnostic_slider = util::simple_utils::make_flat_button(this);
+    auto* diagnostic_slider = soa::ui::simple_utils::make_flat_button(this);
     const QRect geometry = ls::slider_rect(w, y);
     diagnostic_slider->setGeometry(geometry);
     diagnostic_slider->setIconSize(geometry.size());
     diagnostic_slider->setAccessibleName(
-        util::i18n::translate(QString::fromUtf8(kDiagnosticAccessibleName)));
+        soa::i18n::translate(QString::fromUtf8(kDiagnosticAccessibleName)));
     diagnostic_slider->setAccessibleDescription(
-        util::i18n::translate(QString::fromUtf8(kDiagnosticAccessibleDescription)));
+        soa::i18n::translate(QString::fromUtf8(kDiagnosticAccessibleDescription)));
     diagnostic_slider->setProperty(
         "soa_i18n_accessible_name_source", QString::fromUtf8(kDiagnosticAccessibleName));
     diagnostic_slider->setProperty(
@@ -226,8 +226,8 @@ void AdvancedSettings::setup_diagnostics_option()
                         size = geometry.size()](const bool enabled)
     {
         const auto& asset = enabled
-            ? util::assets::button(util::assets::Button::SliderOn)
-            : util::assets::button(util::assets::Button::SliderOff);
+            ? soa::ui::assets::button(soa::ui::assets::Button::SliderOn)
+            : soa::ui::assets::button(soa::ui::assets::Button::SliderOff);
         slider->setIcon(QIcon(asset.normal.scaled(
             size, Qt::KeepAspectRatio, Qt::SmoothTransformation)));
     };
@@ -250,22 +250,22 @@ void AdvancedSettings::setup_umu_runner_option()
 #if !defined(Q_OS_MACOS)
     const QSize w = window()->size();
     const int y = aset::row(2, kAdvancedRowCount);
-    util::simple_utils::make_label_block(
+    soa::ui::simple_utils::make_label_block(
         this, w, y,
         "UMU-RUNNER EXECUTABLE",
         "Optional custom umu-run executable used when launching Proton.");
 
     umu_path_field = new QLineEdit(this);
     umu_path_field->setText(Config::instance().umu_binary());
-    umu_path_field->setPlaceholderText(util::i18n::translate("Auto-detect umu-run"));
+    umu_path_field->setPlaceholderText(soa::i18n::translate("Auto-detect umu-run"));
     umu_path_field->setProperty("soa_i18n_placeholder_source", QStringLiteral("Auto-detect umu-run"));
     umu_path_field->setAccessibleName(QStringLiteral("Custom umu-run executable"));
-    umu_path_field->setStyleSheet(util::styles::field(w));
+    umu_path_field->setStyleSheet(soa::ui::styles::field(w));
     umu_path_field->setGeometry(ls::field_rect(w, y));
 
     auto* browse = new QPushButton("...", this);
     browse->setCursor(Qt::PointingHandCursor);
-    browse->setStyleSheet(util::styles::neutral_button(w));
+    browse->setStyleSheet(soa::ui::styles::neutral_button(w));
     browse->setGeometry(ls::browse_rect(w, y));
     browse->setAccessibleName(QStringLiteral("Choose custom umu-run executable"));
 
@@ -306,7 +306,7 @@ void AdvancedSettings::setup_umu_runner_option()
 
         const QString path = QFileDialog::getOpenFileName(
             this,
-            util::i18n::translate("Select UMU-Runner Executable"),
+            soa::i18n::translate("Select UMU-Runner Executable"),
             start);
         if (!path.isEmpty())
             accept_path(path);

@@ -1,7 +1,7 @@
 #pragma once
 #include <spdlog/spdlog.h>
 
-namespace core::log
+namespace soa::common::log
 {
     void init();
 }

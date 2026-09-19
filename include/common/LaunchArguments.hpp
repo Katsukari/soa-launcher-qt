@@ -3,7 +3,7 @@
 #include <QString>
 #include <QStringList>
 
-namespace util::launch_arguments
+namespace soa::common::launch_arguments
 {
     struct ValidationResult
     {

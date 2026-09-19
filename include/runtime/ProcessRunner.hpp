@@ -10,7 +10,7 @@
 
 class QTimer;
 
-namespace core::wine
+namespace soa::runtime
 {
     enum class CommandOutcome
     {

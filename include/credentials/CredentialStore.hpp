@@ -2,7 +2,7 @@
 
 #include <QString>
 
-namespace util::credentials
+namespace soa::credentials
 {
     struct Credentials
     {

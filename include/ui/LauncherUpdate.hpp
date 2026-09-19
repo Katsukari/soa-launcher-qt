@@ -11,7 +11,7 @@ class QPixmap;
 class QPushButton;
 class QComboBox;
 
-class LauncherUpdate final : public util::modal_overlay::ModalOverlay
+class LauncherUpdate final : public soa::ui::ModalOverlay
 {
     Q_OBJECT
 

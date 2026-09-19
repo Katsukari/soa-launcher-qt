@@ -7,9 +7,9 @@
 #include <QString>
 #include <QSet>
 
-namespace core::network
+namespace soa::network
 {
-    class CourierBridge : public status::StatusReporter
+    class CourierBridge : public common::status::StatusReporter
     {
         Q_OBJECT
 

@@ -1,6 +1,6 @@
 #include "ConfigPrivate.hpp"
 
-namespace util::config
+namespace soa::config
 {
     void Config::normalize_schema()
     {
@@ -50,7 +50,7 @@ namespace util::config
             ? profile : QStringLiteral("default");
 
         d->values[QStringLiteral("game_version")] =
-            core::game::to_string(core::game::game_version_from_string(
+            soa::common::game::to_string(soa::common::game::game_version_from_string(
                 d->values.value(QStringLiteral("game_version")).toString()));
         const QString preference = d->values.value(QStringLiteral("setup_runtime_preference")).toString().toLower();
 #if defined(Q_OS_MACOS)
@@ -104,7 +104,7 @@ namespace util::config
         };
 
 #if defined(Q_OS_MACOS)
-        const QString defaultPrefix = core::wine::macos::default_prefix_root();
+        const QString defaultPrefix = soa::runtime::macos::default_prefix_root();
 #else
         const QString defaultPrefix = QDir(QDir::homePath()).filePath(QStringLiteral("soa-launcher"));
 #endif
@@ -171,9 +171,9 @@ namespace util::config
         d->values[QStringLiteral("use_dxvk")] = false;
         if (d->values.value(QStringLiteral("setup_runtime_preference")).toString() == QStringLiteral("proton"))
             d->values[QStringLiteral("setup_runtime_preference")] = QStringLiteral("wine");
-        if (core::wine::WineRegistry::identify(
+        if (soa::runtime::WineRegistry::identify(
                 d->values.value(QStringLiteral("wine_binary")).toString())
-            == core::wine::RuntimeType::Proton)
+            == soa::runtime::RuntimeType::Proton)
         {
             SPDLOG_INFO("config: clearing Linux Proton selection on macOS");
             d->values[QStringLiteral("wine_binary")] = QString();
@@ -194,8 +194,8 @@ namespace util::config
 
         const QString activePrefix = absolute_clean_path(prefix_root());
         const bool proton = runtime_is_proton();
-        for (const auto version : {core::game::GameVersion::Playtest,
-                                   core::game::GameVersion::Alicia2})
+        for (const auto version : {soa::common::game::GameVersion::Playtest,
+                                   soa::common::game::GameVersion::Alicia2})
         {
             const QString key = game_install_path_key(version);
             const QString stored = d->values.value(key).toString().trimmed();

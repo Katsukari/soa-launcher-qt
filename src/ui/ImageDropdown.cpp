@@ -13,7 +13,7 @@
 #include "ui/Layout.hpp"
 #include "i18n/LanguageManager.hpp"
 
-namespace dd = util::layout::dropdown;
+namespace dd = soa::ui::layout::dropdown;
 
 ImageDropdown::ImageDropdown(QStringList options, QWidget* parent)
     : QWidget(parent), items(std::move(options))
@@ -30,12 +30,12 @@ ImageDropdown::ImageDropdown(QStringList options, QWidget* parent)
     setAccessibleName(QStringLiteral("Selection menu"));
     setAccessibleDescription(items.value(current));
     setFixedSize(dd::box(window()->size()));
-    connect(&util::i18n::LanguageManager::instance(),
-            &util::i18n::LanguageManager::language_changed,
+    connect(&soa::i18n::LanguageManager::instance(),
+            &soa::i18n::LanguageManager::language_changed,
             this, [this]()
     {
-        setAccessibleName(util::i18n::translate("Selection menu"));
-        setAccessibleDescription(util::i18n::translate(items.value(current)));
+        setAccessibleName(soa::i18n::translate("Selection menu"));
+        setAccessibleDescription(soa::i18n::translate(items.value(current)));
         update();
     });
 }
@@ -100,7 +100,7 @@ void ImageDropdown::set_index(const int i)
     if (i < 0 || i >= items.size() || i == current)
         return;
     current = i;
-    setAccessibleDescription(util::i18n::translate(items.value(current)));
+    setAccessibleDescription(soa::i18n::translate(items.value(current)));
     update();
     emit changed(current);
 }
@@ -133,7 +133,7 @@ void ImageDropdown::mousePressEvent(QMouseEvent* event)
             if (option_rect(slot).contains(event->pos()))
             {
                 current = i;
-                setAccessibleDescription(util::i18n::translate(items.value(current)));
+                setAccessibleDescription(soa::i18n::translate(items.value(current)));
                 set_open(false);
                 emit changed(current);
                 event->accept();
@@ -228,12 +228,12 @@ void ImageDropdown::paintEvent(QPaintEvent*)
     painter.setRenderHint(QPainter::SmoothPixmapTransform);
     painter.setOpacity(isEnabled() ? 1.0 : 0.48);
 
-    const QPixmap& dropdown_px = util::assets::images[util::assets::Image::MenuDropdown];
+    const QPixmap& dropdown_px = soa::ui::assets::images[soa::ui::assets::Image::MenuDropdown];
     const int lip = dd::pad_bottom(w);
     const int pad = dd::text_pad(w);
 
-    QFont font = util::assets::fonts[util::assets::Font::Inter];
-    font.setPixelSize(util::layout::scaled(util::layout::text::k_label, w));
+    QFont font = soa::ui::assets::fonts[soa::ui::assets::Font::Inter];
+    font.setPixelSize(soa::ui::layout::scaled(soa::ui::layout::text::k_label, w));
     font.setWeight(QFont::Medium);
     painter.setFont(font);
     const QColor text_col {0x4F, 0x17, 0x17};
@@ -249,15 +249,15 @@ void ImageDropdown::paintEvent(QPaintEvent*)
             painter.drawPixmap(rect, dropdown_px);
             if (slot - 1 == hovered_slot)
             {
-                painter.fillRect(rect.adjusted(util::layout::scaled(5, w),
-                                               util::layout::scaled(4, w),
-                                               -util::layout::scaled(5, w),
-                                               -util::layout::scaled(8, w)),
+                painter.fillRect(rect.adjusted(soa::ui::layout::scaled(5, w),
+                                               soa::ui::layout::scaled(4, w),
+                                               -soa::ui::layout::scaled(5, w),
+                                               -soa::ui::layout::scaled(8, w)),
                                  QColor(47, 180, 224, 34));
             }
             painter.setPen(text_col);
             const QRect text_rect = rect.adjusted(pad, 0, -pad, -lip);
-            const QString translated = util::i18n::translate(items[i]);
+            const QString translated = soa::i18n::translate(items[i]);
             painter.drawText(text_rect,
                              Qt::AlignVCenter | Qt::AlignLeft,
                              painter.fontMetrics().elidedText(
@@ -269,14 +269,14 @@ void ImageDropdown::paintEvent(QPaintEvent*)
     painter.drawPixmap(closed, dropdown_px);
     painter.setPen(text_col);
     const QRect closed_text = closed.adjusted(
-        pad, 0, -util::layout::scaled(52, w), -lip);
-    const QString current_text = util::i18n::translate(items.value(current));
+        pad, 0, -soa::ui::layout::scaled(52, w), -lip);
+    const QString current_text = soa::i18n::translate(items.value(current));
     painter.drawText(closed_text,
                      Qt::AlignVCenter | Qt::AlignLeft,
                      painter.fontMetrics().elidedText(
                          current_text, Qt::ElideRight, closed_text.width()));
 
-    painter.setPen(QPen(QColor(0xA8, 0x90, 0x78), util::layout::scaled(2, w)));
+    painter.setPen(QPen(QColor(0xA8, 0x90, 0x78), soa::ui::layout::scaled(2, w)));
     const QPoint center = dd::chevron_center(w) + QPoint(0, closed.top());
     const int arm = dd::chevron_arm(w);
     if (open)

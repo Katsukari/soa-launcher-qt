@@ -4,7 +4,7 @@
 #include <QPixmap>
 #include <unordered_map>
 
-namespace util::assets
+namespace soa::ui::assets
 {
     enum class Image
     {

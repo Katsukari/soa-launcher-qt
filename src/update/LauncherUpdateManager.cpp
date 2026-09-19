@@ -45,7 +45,7 @@
 #define SOA_LAUNCHER_UPDATE_PUBLIC_KEY_HEX ""
 #endif
 
-namespace core::update
+namespace soa::update
 {
     namespace
     {
@@ -91,12 +91,12 @@ namespace core::update
             || platform_bytes == QByteArrayLiteral("macos");
         if (!supported_platform)
         {
-            configuration_error = util::i18n::translate(
+            configuration_error = soa::i18n::translate(
                 "Launcher self-updates are not available on this platform yet.");
         }
         else if (!is_valid_32_byte_hex(public_key_hex))
         {
-            configuration_error = util::i18n::translate(
+            configuration_error = soa::i18n::translate(
                 "This launcher build does not contain a valid update-signing public key.");
         }
         updater = soa_launcher_updater_create(
@@ -138,7 +138,7 @@ namespace core::update
         if (!updater)
         {
             reset_release();
-            emit check_failed(util::i18n::translate(
+            emit check_failed(soa::i18n::translate(
                 "The launcher update service could not be initialized."));
             return;
         }
@@ -153,7 +153,7 @@ namespace core::update
     {
         if (downloading || check_purpose != CheckPurpose::None)
         {
-            emit manual_check_failed(util::i18n::translate(
+            emit manual_check_failed(soa::i18n::translate(
                 "A launcher update operation is already running."));
             return;
         }
@@ -164,7 +164,7 @@ namespace core::update
         }
         if (!updater)
         {
-            emit manual_check_failed(util::i18n::translate(
+            emit manual_check_failed(soa::i18n::translate(
                 "The launcher update service could not be initialized."));
             return;
         }
@@ -322,7 +322,7 @@ namespace core::update
         {
             releases.clear();
             reset_release();
-            const QString reason = util::i18n::translate(
+            const QString reason = soa::i18n::translate(
                 "No valid signed launcher releases could be found.");
             SPDLOG_WARN("launcher release catalogue rejected: {}", reason.toStdString());
             if (manual_check)
@@ -342,7 +342,7 @@ namespace core::update
                 if (!selected)
                 {
                     releases.clear();
-                    const QString reason = util::i18n::translate(
+                    const QString reason = soa::i18n::translate(
                         "No valid signed launcher releases could be found.");
                     SPDLOG_WARN("launcher release selection failed: {}",
                                 reason.toStdString());
@@ -444,45 +444,45 @@ namespace core::update
         switch (error_code)
         {
             case soa_launcher_error_busy:
-                return util::i18n::translate("A launcher update operation is already running.");
+                return soa::i18n::translate("A launcher update operation is already running.");
             case soa_launcher_error_invalid_configuration:
-                return util::i18n::translate("The launcher update configuration is invalid.");
+                return soa::i18n::translate("The launcher update configuration is invalid.");
             case soa_launcher_error_http:
-                return util::i18n::translate("The launcher update server returned HTTP %1.").arg(http_status);
+                return soa::i18n::translate("The launcher update server returned HTTP %1.").arg(http_status);
             case soa_launcher_error_response_too_large:
-                return util::i18n::translate("The launcher update response is unexpectedly large.");
+                return soa::i18n::translate("The launcher update response is unexpectedly large.");
             case soa_launcher_error_invalid_release:
-                return util::i18n::translate("The launcher update server returned an invalid manifest.");
+                return soa::i18n::translate("The launcher update server returned an invalid manifest.");
             case soa_launcher_error_missing_asset:
-                return util::i18n::translate("No compatible launcher package was attached to the release.");
+                return soa::i18n::translate("No compatible launcher package was attached to the release.");
             case soa_launcher_error_unsafe_url:
-                return util::i18n::translate("The launcher release contains an invalid or untrusted package URL.");
+                return soa::i18n::translate("The launcher release contains an invalid or untrusted package URL.");
             case soa_launcher_error_missing_digest:
-                return util::i18n::translate("The launcher release package has no valid SHA-256 digest.");
+                return soa::i18n::translate("The launcher release package has no valid SHA-256 digest.");
             case soa_launcher_error_invalid_size:
-                return util::i18n::translate("The launcher release package has an invalid size.");
+                return soa::i18n::translate("The launcher release package has an invalid size.");
             case soa_launcher_error_destination:
-                return util::i18n::translate("The launcher could not create the update file.");
+                return soa::i18n::translate("The launcher could not create the update file.");
             case soa_launcher_error_write:
-                return util::i18n::translate("The launcher could not write the downloaded update.");
+                return soa::i18n::translate("The launcher could not write the downloaded update.");
             case soa_launcher_error_size_mismatch:
-                return util::i18n::translate("The downloaded launcher update has an unexpected size.");
+                return soa::i18n::translate("The downloaded launcher update has an unexpected size.");
             case soa_launcher_error_digest_mismatch:
-                return util::i18n::translate("The downloaded launcher update failed SHA-256 verification.");
+                return soa::i18n::translate("The downloaded launcher update failed SHA-256 verification.");
             case soa_launcher_error_finalize:
-                return util::i18n::translate("The launcher could not finalize the downloaded update file.");
+                return soa::i18n::translate("The launcher could not finalize the downloaded update file.");
             case soa_launcher_error_cancelled:
-                return util::i18n::translate("The launcher update was cancelled.");
+                return soa::i18n::translate("The launcher update was cancelled.");
             case soa_launcher_error_invalid_signature:
-                return util::i18n::translate(
+                return soa::i18n::translate(
                     "The launcher update signature is invalid or does not match this launcher.");
             case soa_launcher_error_network:
                 return detail.isEmpty()
-                    ? util::i18n::translate("The launcher update network request failed.")
-                    : util::i18n::translate("The launcher update network request failed: %1").arg(detail);
+                    ? soa::i18n::translate("The launcher update network request failed.")
+                    : soa::i18n::translate("The launcher update network request failed: %1").arg(detail);
             default:
                 return detail.isEmpty()
-                    ? util::i18n::translate("The launcher update failed.")
+                    ? soa::i18n::translate("The launcher update failed.")
                     : detail;
         }
     }
@@ -494,7 +494,7 @@ namespace core::update
 #elif defined(Q_OS_LINUX)
         install_linux_appimage();
 #else
-        emit update_failed(util::i18n::translate("Automatic launcher updates are unsupported on this platform."));
+        emit update_failed(soa::i18n::translate("Automatic launcher updates are unsupported on this platform."));
 #endif
     }
 
@@ -502,14 +502,14 @@ namespace core::update
     {
         if (package_kind != QStringLiteral("dmg"))
         {
-            emit update_failed(util::i18n::translate("The macOS launcher update is not a DMG installer."));
+            emit update_failed(soa::i18n::translate("The macOS launcher update is not a DMG installer."));
             return;
         }
         if (!QFileInfo::exists(final_download_path)
             || QFileInfo(final_download_path).suffix().compare(
                 QStringLiteral("dmg"), Qt::CaseInsensitive) != 0)
         {
-            emit update_failed(util::i18n::translate(
+            emit update_failed(soa::i18n::translate(
                 "The downloaded macOS installer could not be found."));
             return;
         }
@@ -523,7 +523,7 @@ namespace core::update
             image_verification->setProperty("soa_completed", true);
             SPDLOG_ERROR("macOS launcher DMG verification failed: {}",
                          image_verification->errorString().toStdString());
-            emit update_failed(util::i18n::translate(
+            emit update_failed(soa::i18n::translate(
                 "The downloaded macOS installer failed disk image verification."));
             image_verification->deleteLater();
         });
@@ -539,7 +539,7 @@ namespace core::update
             {
                 SPDLOG_ERROR("macOS launcher DMG verification failed: {}",
                              image_verification->readAllStandardError().toStdString());
-                emit update_failed(util::i18n::translate(
+                emit update_failed(soa::i18n::translate(
                     "The downloaded macOS installer failed disk image verification."));
             }
             image_verification->deleteLater();
@@ -561,7 +561,7 @@ namespace core::update
             signature_verification->setProperty("soa_completed", true);
             SPDLOG_ERROR("macOS launcher DMG signature verification failed: {}",
                          signature_verification->errorString().toStdString());
-            emit update_failed(util::i18n::translate(
+            emit update_failed(soa::i18n::translate(
                 "The downloaded macOS installer could not be verified by macOS."));
             signature_verification->deleteLater();
         });
@@ -577,7 +577,7 @@ namespace core::update
             {
                 SPDLOG_ERROR("macOS launcher DMG signature verification failed: {}",
                              signature_verification->readAllStandardError().toStdString());
-                emit update_failed(util::i18n::translate(
+                emit update_failed(soa::i18n::translate(
                     "The downloaded macOS installer could not be verified by macOS."));
             }
             signature_verification->deleteLater();
@@ -598,7 +598,7 @@ namespace core::update
     {
         if (!QProcess::startDetached(QStringLiteral("/usr/bin/open"), {final_download_path}))
         {
-            emit update_failed(util::i18n::translate("The launcher could not open the downloaded macOS installer."));
+            emit update_failed(soa::i18n::translate("The launcher could not open the downloaded macOS installer."));
             return;
         }
         emit installer_started(final_download_path);
@@ -608,7 +608,7 @@ namespace core::update
     {
         if (package_kind != QStringLiteral("appimage"))
         {
-            emit update_failed(util::i18n::translate("The Linux launcher update is not an AppImage."));
+            emit update_failed(soa::i18n::translate("The Linux launcher update is not an AppImage."));
             return;
         }
 
@@ -618,7 +618,7 @@ namespace core::update
             | QFileDevice::ReadOther | QFileDevice::ExeOther;
         if (!QFile::setPermissions(final_download_path, executable_permissions))
         {
-            emit update_failed(util::i18n::translate("The launcher could not make the downloaded AppImage executable."));
+            emit update_failed(soa::i18n::translate("The launcher could not make the downloaded AppImage executable."));
             return;
         }
 
@@ -630,7 +630,7 @@ namespace core::update
             || validation.exitCode() != 0
             || validation.readAllStandardOutput().trimmed().isEmpty())
         {
-            emit update_failed(util::i18n::translate("The downloaded launcher update is not a valid AppImage."));
+            emit update_failed(soa::i18n::translate("The downloaded launcher update is not a valid AppImage."));
             return;
         }
 
@@ -643,7 +643,7 @@ namespace core::update
             if (QFileInfo(final_download_path).absoluteFilePath()
                 == QFileInfo(current).absoluteFilePath())
             {
-                emit update_failed(util::i18n::translate(
+                emit update_failed(soa::i18n::translate(
                     "The launcher update download path conflicts with the running AppImage."));
                 return;
             }
@@ -654,21 +654,21 @@ namespace core::update
                 || !QFile::setPermissions(staging, executable_permissions))
             {
                 QFile::remove(staging);
-                emit update_failed(util::i18n::translate("The launcher could not stage the replacement AppImage beside the current launcher."));
+                emit update_failed(soa::i18n::translate("The launcher could not stage the replacement AppImage beside the current launcher."));
                 return;
             }
             QFile::remove(previous);
             if (!QFile::rename(current, previous))
             {
                 QFile::remove(staging);
-                emit update_failed(util::i18n::translate("The current AppImage could not be replaced. Check folder permissions."));
+                emit update_failed(soa::i18n::translate("The current AppImage could not be replaced. Check folder permissions."));
                 return;
             }
             if (!QFile::rename(staging, current))
             {
                 QFile::rename(previous, current);
                 QFile::remove(staging);
-                emit update_failed(util::i18n::translate("The new AppImage could not be installed. The previous launcher was restored."));
+                emit update_failed(soa::i18n::translate("The new AppImage could not be installed. The previous launcher was restored."));
                 return;
             }
             target = current;
@@ -697,7 +697,7 @@ namespace core::update
                                     previous.toStdString());
                 }
             }
-            emit update_failed(util::i18n::translate("The updated AppImage was installed, but the launcher could not schedule its restart."));
+            emit update_failed(soa::i18n::translate("The updated AppImage was installed, but the launcher could not schedule its restart."));
             return;
         }
         if (replaced_current && !QFile::remove(final_download_path))

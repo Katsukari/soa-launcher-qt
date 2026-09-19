@@ -8,7 +8,7 @@ class QAction;
 class QEvent;
 class QTranslator;
 
-namespace util::i18n
+namespace soa::i18n
 {
     struct Language
     {

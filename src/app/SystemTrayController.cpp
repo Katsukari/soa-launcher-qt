@@ -64,9 +64,9 @@ void SystemTrayController::hide()
 void SystemTrayController::retranslate()
 {
     if (open_action)
-        open_action->setText(util::i18n::translate("Open Launcher"));
+        open_action->setText(soa::i18n::translate("Open Launcher"));
     if (run_action)
-        run_action->setText(util::i18n::translate("Run Alicia Directly"));
+        run_action->setText(soa::i18n::translate("Run Alicia Directly"));
     if (quit_action)
-        quit_action->setText(util::i18n::translate("Quit Launcher"));
+        quit_action->setText(soa::i18n::translate("Quit Launcher"));
 }

@@ -2,7 +2,7 @@
 
 #include <QCoreApplication>
 
-namespace core::discord
+namespace soa::network
 {
     namespace
     {

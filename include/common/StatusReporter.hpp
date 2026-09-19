@@ -3,7 +3,7 @@
 #include <QObject>
 #include "common/Status.hpp"
 
-namespace core::status
+namespace soa::common::status
 {
     class StatusReporter : public QObject
     {

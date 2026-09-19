@@ -10,7 +10,7 @@ class QPushButton;
 class QAbstractButton;
 class QShowEvent;
 
-class WineSelectMenu : public util::modal_overlay::ModalOverlay
+class WineSelectMenu : public soa::ui::ModalOverlay
 {
     Q_OBJECT
 public:
@@ -33,8 +33,8 @@ private:
     void confirm();
     void retranslate_dynamic_text();
 
-    QVector<core::wine::WineInstall> runtimes;
-    QFutureWatcher<QVector<core::wine::WineInstall>>* detector {};
+    QVector<soa::runtime::WineInstall> runtimes;
+    QFutureWatcher<QVector<soa::runtime::WineInstall>>* detector {};
     bool scanning {};
     int selected {-1};
     QLabel* runtime_status {};

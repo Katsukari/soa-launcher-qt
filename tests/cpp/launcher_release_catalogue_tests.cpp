@@ -41,21 +41,21 @@ namespace
 
     bool accepts(const QJsonArray& entries)
     {
-        QList<core::update::LauncherRelease> releases;
-        return core::update::parse_launcher_release_catalogue(
+        QList<soa::update::LauncherRelease> releases;
+        return soa::update::parse_launcher_release_catalogue(
             catalogue(entries), QStringLiteral("linux-x86_64"), &releases);
     }
 }
 
 int main()
 {
-    QList<core::update::LauncherRelease> parsed;
+    QList<soa::update::LauncherRelease> parsed;
     const QJsonArray valid_entries{
         release(QStringLiteral("1.0.0")),
         release(QStringLiteral("0.9.0")),
         release(QStringLiteral("0.8.0"))
     };
-    if (!core::update::parse_launcher_release_catalogue(
+    if (!soa::update::parse_launcher_release_catalogue(
             catalogue(valid_entries), QStringLiteral("linux-x86_64"), &parsed)
         || parsed.size() != 3
         || parsed.constFirst().minimum_version != QStringLiteral("0.9.0")
@@ -97,7 +97,7 @@ int main()
             release(QStringLiteral("0.7.0"))}))
         return 8;
 
-    if (core::update::parse_launcher_release_catalogue(
+    if (soa::update::parse_launcher_release_catalogue(
             catalogue(QJsonArray{release(QStringLiteral("1.0.0"))},
                       QStringLiteral("macos")),
             QStringLiteral("linux-x86_64"), &parsed))

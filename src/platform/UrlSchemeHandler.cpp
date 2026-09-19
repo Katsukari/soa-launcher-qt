@@ -21,7 +21,7 @@ namespace
 {
     QString desktop_exec_value(const QString& executable)
     {
-        return util::desktop_entry::quoted_exec_argument(executable) + QStringLiteral(" %u");
+        return soa::common::desktop_entry::quoted_exec_argument(executable) + QStringLiteral(" %u");
     }
 
     QByteArray url_handler_desktop_contents(const QString& executable)
@@ -41,7 +41,7 @@ namespace
     }
 }
 
-namespace core::platform
+namespace soa::platform
 {
     void register_launcher_url_scheme()
     {
@@ -102,7 +102,7 @@ namespace core::platform
 
 #else
 
-namespace core::platform
+namespace soa::platform
 {
     void register_launcher_url_scheme()
     {

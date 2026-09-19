@@ -1,6 +1,6 @@
 #include "ConfigPrivate.hpp"
 
-namespace util::config
+namespace soa::config
 {
     Config& Config::instance()
     {

@@ -3,7 +3,7 @@
 #include <QProcess>
 #include <QRegularExpression>
 
-namespace util::launch_arguments
+namespace soa::common::launch_arguments
 {
     namespace
     {

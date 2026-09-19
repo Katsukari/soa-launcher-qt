@@ -39,9 +39,9 @@
 #define SOA_LAUNCHER_VERSION "0.3.0"
 #endif
 
-using util::config::Config;
-namespace ls = util::layout::settings;
-namespace lset = util::layout::launcher_settings;
+using soa::config::Config;
+namespace ls = soa::ui::layout::settings;
+namespace lset = soa::ui::layout::launcher_settings;
 
 namespace
 {
@@ -57,7 +57,7 @@ namespace
 
     QString desktop_exec(const QString& executable)
     {
-        return util::desktop_entry::quoted_exec_argument(executable);
+        return soa::common::desktop_entry::quoted_exec_argument(executable);
     }
 
     bool configure_linux_startup(const bool enabled, QString& error)
@@ -208,8 +208,8 @@ LauncherSettings::LauncherSettings(QWidget* parent) : QWidget(parent)
     setup_after_game_start_option();
     setup_run_connectivity_test_option();
     setup_launcher_size_option();
-    connect(&util::i18n::LanguageManager::instance(),
-            &util::i18n::LanguageManager::language_changed, this, [this]()
+    connect(&soa::i18n::LanguageManager::instance(),
+            &soa::i18n::LanguageManager::language_changed, this, [this]()
     {
         refresh_connectivity_report();
     });
@@ -219,12 +219,12 @@ void LauncherSettings::setup_launch_on_startup_option()
 {
     const QSize w = window()->size();
     const int y = lset::row(0);
-    util::simple_utils::make_label_block(
+    soa::ui::simple_utils::make_label_block(
         this, w, y,
         "LAUNCH ON STARTUP",
         "Automatically open the launcher when you log in to your computer.");
 
-    startup_button = util::simple_utils::make_flat_button(this);
+    startup_button = soa::ui::simple_utils::make_flat_button(this);
     startup_button->setGeometry(ls::slider_rect(w, y));
     startup_button->setIconSize(startup_button->size());
     startup_button->setAccessibleName(QStringLiteral("Launch on startup"));
@@ -250,9 +250,9 @@ void LauncherSettings::set_startup_button_state(const bool enabled)
 {
     if (!startup_button)
         return;
-    const auto asset = enabled ? util::assets::Button::SliderOn
-                               : util::assets::Button::SliderOff;
-    startup_button->setIcon(QIcon(util::assets::button(asset).normal.scaled(
+    const auto asset = enabled ? soa::ui::assets::Button::SliderOn
+                               : soa::ui::assets::Button::SliderOff;
+    startup_button->setIcon(QIcon(soa::ui::assets::button(asset).normal.scaled(
         startup_button->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
 }
 
@@ -260,7 +260,7 @@ void LauncherSettings::setup_after_game_start_option()
 {
     const QSize w = window()->size();
     const int y = lset::row(1);
-    util::simple_utils::make_label_block(
+    soa::ui::simple_utils::make_label_block(
         this, w, y,
         "AFTER GAME START",
         "Choose what the launcher does after the game starts up.");
@@ -281,24 +281,24 @@ void LauncherSettings::setup_run_connectivity_test_option()
 {
     const QSize w = window()->size();
     const int y = lset::row(2);
-    util::simple_utils::make_label_block(
+    soa::ui::simple_utils::make_label_block(
         this, w, y,
         "CONNECTIVITY CHECK",
         "Diagnose issues connecting to the game and related servers.");
 
-    connectivity_button = util::simple_utils::make_flat_button(this);
+    connectivity_button = soa::ui::simple_utils::make_flat_button(this);
     connectivity_button->setProperty("soa_allow_while_mutation_locked", true);
     const QRect button_rect = ls::run_check(w, y);
     connectivity_button->setGeometry(button_rect);
     connectivity_button->setIconSize(button_rect.size());
     connectivity_button->setIcon(QIcon(
-        util::assets::button(util::assets::Button::RunCheck).normal.scaled(
+        soa::ui::assets::button(soa::ui::assets::Button::RunCheck).normal.scaled(
             button_rect.size(), Qt::KeepAspectRatio, Qt::SmoothTransformation)));
-    QFont connectivity_font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
-    connectivity_font.setPixelSize(util::layout::scaled(11, w));
+    QFont connectivity_font = soa::ui::assets::fonts[soa::ui::assets::Font::EurostileExtraBlack];
+    connectivity_font.setPixelSize(soa::ui::layout::scaled(11, w));
     connectivity_font.setWeight(QFont::Black);
-    util::simple_utils::add_button_text(
-        connectivity_button, util::assets::Button::RunCheck, QStringLiteral("RUN CHECK"), connectivity_font);
+    soa::ui::simple_utils::add_button_text(
+        connectivity_button, soa::ui::assets::Button::RunCheck, QStringLiteral("RUN CHECK"), connectivity_font);
     connectivity_button->setAccessibleName(QStringLiteral("Run connectivity check"));
 
     connectivity_panel = new QFrame(this);
@@ -306,7 +306,7 @@ void LauncherSettings::setup_run_connectivity_test_option()
     connectivity_panel->setGeometry(lset::connectivity_results(w));
     connectivity_panel->setStyleSheet(QStringLiteral(
         "QFrame { background: rgba(255,255,255,0.42); border: 1px solid rgba(201,187,170,0.7); border-radius: %1px; }")
-        .arg(util::layout::scaled(3, w)));
+        .arg(soa::ui::layout::scaled(3, w)));
     connectivity_panel->hide();
 
     connectivity_label = new QLabel(connectivity_panel);
@@ -317,7 +317,7 @@ void LauncherSettings::setup_run_connectivity_test_option()
     connectivity_label->setAccessibleName(QStringLiteral("Connectivity check results"));
     connectivity_label->setStyleSheet(QStringLiteral(
         "QLabel { background: transparent; border: none; color: #5A4636; font-family: 'Inter'; font-size: %1px; }")
-        .arg(qMax(8, util::layout::scaled(12, w))));
+        .arg(qMax(8, soa::ui::layout::scaled(12, w))));
 
     copy_report_button = new QPushButton(QStringLiteral("COPY REPORT"), connectivity_panel);
     copy_report_button->setGeometry(lset::copy_report(w));
@@ -326,20 +326,20 @@ void LauncherSettings::setup_run_connectivity_test_option()
     copy_report_button->setStyleSheet(QStringLiteral(
         "QPushButton { background: transparent; border: none; color: #9E8E7E; font-family: 'Inter'; font-size: %1px; font-weight: 700; }"
         "QPushButton:hover { color: #6F5F50; }")
-        .arg(qMax(8, util::layout::scaled(11, w))));
+        .arg(qMax(8, soa::ui::layout::scaled(11, w))));
     connect(copy_report_button, &QPushButton::clicked, this, [this]()
     {
         if (!QApplication::clipboard())
             return;
         QApplication::clipboard()->setText(connectivity_plain_report);
-        copy_report_button->setText(util::i18n::translate("COPIED"));
+        copy_report_button->setText(soa::i18n::translate("COPIED"));
         QTimer::singleShot(1200, copy_report_button, [this]()
         {
-            copy_report_button->setText(util::i18n::translate("COPY REPORT"));
+            copy_report_button->setText(soa::i18n::translate("COPY REPORT"));
         });
     });
 
-    network_manager = new core::network::SwiftHttpClient(this);
+    network_manager = new soa::network::SwiftHttpClient(this);
     connect(connectivity_button, &QPushButton::clicked,
             this, &LauncherSettings::run_connectivity_check);
 }
@@ -362,7 +362,7 @@ void LauncherSettings::run_connectivity_check()
     connectivity_success.clear();
     pending_connectivity_checks = connectivity_order.size();
     connectivity_button->setEnabled(false);
-    util::simple_utils::set_button_loading(connectivity_button, true);
+    soa::ui::simple_utils::set_button_loading(connectivity_button, true);
     connectivity_panel->show();
     refresh_connectivity_report();
 
@@ -385,7 +385,7 @@ void LauncherSettings::start_dns_check()
     const qulonglong request_id = network_manager->resolve(
         production_host,
         5000,
-        [this](const core::network::DnsResponse& response)
+        [this](const soa::network::DnsResponse& response)
         {
             static const QString expected_ip = QStringLiteral("5.75.155.237");
             const bool resolved = response.result == soa_http_result_completed
@@ -474,7 +474,7 @@ void LauncherSettings::start_http_check(const QString& label, const QUrl& url)
         QByteArray("*/*"),
         user_agent,
         false,
-        [this, label](const core::network::HttpResponse& response)
+        [this, label](const soa::network::HttpResponse& response)
         {
             const bool reached = response.status >= 200 && response.status < 500;
             const bool ok = reached;
@@ -531,12 +531,12 @@ void LauncherSettings::refresh_connectivity_report()
         return QStringLiteral(
             "<td width=\"50%\" style=\"padding:%1px %2px %3px 0;\">"
             "<b>%4:</b> <span style=\"color:%5\">%6</span></td>")
-            .arg(util::layout::scaled(1, w))
-            .arg(util::layout::scaled(10, w))
-            .arg(util::layout::scaled(2, w))
-            .arg(escaped_html(util::i18n::translate(label)))
+            .arg(soa::ui::layout::scaled(1, w))
+            .arg(soa::ui::layout::scaled(10, w))
+            .arg(soa::ui::layout::scaled(2, w))
+            .arg(escaped_html(soa::i18n::translate(label)))
             .arg(color)
-            .arg(escaped_html(util::i18n::translate(detail)));
+            .arg(escaped_html(soa::i18n::translate(detail)));
     };
 
     QString html = QStringLiteral("<table width=\"100%\" cellspacing=\"0\" cellpadding=\"0\">");
@@ -553,7 +553,7 @@ void LauncherSettings::refresh_connectivity_report()
             ? connectivity_details.value(label)
             : QStringLiteral("checking...");
         plain += QStringLiteral("%1: %2\n")
-            .arg(util::i18n::translate(label), util::i18n::translate(detail));
+            .arg(soa::i18n::translate(label), soa::i18n::translate(detail));
     }
 
     connectivity_label->setText(html);
@@ -563,7 +563,7 @@ void LauncherSettings::refresh_connectivity_report()
 void LauncherSettings::finish_connectivity_check()
 {
     connectivity_button->setEnabled(true);
-    util::simple_utils::set_button_loading(connectivity_button, false);
+    soa::ui::simple_utils::set_button_loading(connectivity_button, false);
 }
 
 void LauncherSettings::setup_launcher_size_option()
@@ -571,8 +571,8 @@ void LauncherSettings::setup_launcher_size_option()
     const QSize w = window()->size();
 
     launcher_size_title = new QLabel(QStringLiteral("LAUNCHER SIZE"), this);
-    QFont title_font = util::assets::fonts[util::assets::Font::EurostileBlack];
-    title_font.setPixelSize(util::layout::scaled(util::layout::text::k_row_title, w));
+    QFont title_font = soa::ui::assets::fonts[soa::ui::assets::Font::EurostileBlack];
+    title_font.setPixelSize(soa::ui::layout::scaled(soa::ui::layout::text::k_row_title, w));
     title_font.setWeight(QFont::Black);
     launcher_size_title->setFont(title_font);
     launcher_size_title->setStyleSheet(QStringLiteral("color: #4F1717; background: transparent;"));
@@ -580,8 +580,8 @@ void LauncherSettings::setup_launcher_size_option()
     launcher_size_description = new QLabel(
         QStringLiteral("Choose the window size used the next time the launcher starts."), this);
     launcher_size_description->setWordWrap(true);
-    QFont description_font = util::assets::fonts[util::assets::Font::Inter];
-    description_font.setPixelSize(util::layout::scaled(util::layout::text::k_desc, w));
+    QFont description_font = soa::ui::assets::fonts[soa::ui::assets::Font::Inter];
+    description_font.setPixelSize(soa::ui::layout::scaled(soa::ui::layout::text::k_desc, w));
     description_font.setWeight(QFont::Medium);
     launcher_size_description->setFont(description_font);
     launcher_size_description->setStyleSheet(

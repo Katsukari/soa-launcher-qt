@@ -46,11 +46,11 @@ namespace
     {
         const QVariant source = object->property(source_property_name);
         if (source.isValid())
-            object->setProperty(property_name, util::i18n::detail::translated(source.toString()));
+            object->setProperty(property_name, soa::i18n::detail::translated(source.toString()));
     }
 }
 
-namespace util::i18n
+namespace soa::i18n
 {
     bool LanguageManager::eventFilter(QObject* watched, QEvent* event)
     {

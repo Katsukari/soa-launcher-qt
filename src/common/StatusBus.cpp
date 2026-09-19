@@ -6,7 +6,7 @@
 #include "common/Log.hpp"
 #include <spdlog/spdlog.h>
 
-namespace core::status
+namespace soa::common::status
 {
     namespace
     {

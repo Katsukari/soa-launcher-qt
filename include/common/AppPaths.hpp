@@ -2,7 +2,7 @@
 
 #include <QString>
 
-namespace core::paths
+namespace soa::common::paths
 {
     [[nodiscard]] QString application_support_root();
     [[nodiscard]] QString default_prefix_root();

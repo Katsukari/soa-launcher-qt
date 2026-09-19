@@ -16,7 +16,7 @@
 
 class QTimer;
 
-namespace core::wine
+namespace soa::runtime
 {
     class RuntimeLocator;
 
@@ -43,9 +43,9 @@ namespace core::wine
             std::function<void(const command_result&)> command_finished;
             std::function<void(const QString&, const QString&)> fail_user;
             std::function<void(const QString&)> user_notice;
-            std::function<void(core::game::GameVersion)> game_starting;
-            std::function<void(core::game::GameVersion)> game_started;
-            std::function<void(core::game::GameVersion, int, bool)> game_exited;
+            std::function<void(soa::common::game::GameVersion)> game_starting;
+            std::function<void(soa::common::game::GameVersion)> game_started;
+            std::function<void(soa::common::game::GameVersion, int, bool)> game_exited;
             std::function<void(const QString&, double, bool)> working;
             std::function<void(const QString&)> done;
             std::function<void(const QString&)> failed;
@@ -79,7 +79,7 @@ namespace core::wine
 
         struct PendingLaunch
         {
-            core::game::GameVersion version {core::game::GameVersion::Playtest};
+            soa::common::game::GameVersion version {soa::common::game::GameVersion::Playtest};
             QString user;
             QString token;
             QString game_directory;
@@ -150,7 +150,7 @@ namespace core::wine
         bool probe_context_valid_ {};
         WindowsProcessInfo tracked_game_process_;
         WindowsProcessInfo tracked_host_process_;
-        core::game::GameVersion tracked_version_ {core::game::GameVersion::Playtest};
+        soa::common::game::GameVersion tracked_version_ {soa::common::game::GameVersion::Playtest};
         command_result last_stage_result_;
         command_result wrapper_result_;
         qint64 wrapper_finished_at_ms_ {-1};

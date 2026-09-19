@@ -11,7 +11,7 @@
 #include <QScreen>
 #include <QStringList>
 
-namespace app::detail
+namespace soa::app::detail
 {
     inline LauncherDialog* show_modeless_message(QWidget* parent,
                                                   const LauncherDialog::Tone tone,
@@ -24,9 +24,9 @@ namespace app::detail
 
     inline QSize configured_window_size()
     {
-        const QString configured = util::config::Config::instance().launcher_size();
+        const QString configured = soa::config::Config::instance().launcher_size();
         const QStringList parts = configured.split(QLatin1Char('x'));
-        QSize requested = util::layout::win::k_default;
+        QSize requested = soa::ui::layout::win::k_default;
         if (parts.size() == 2)
         {
             bool width_ok = false;
@@ -58,7 +58,7 @@ namespace app::detail
         QPainter painter(&composed);
         painter.setRenderHint(QPainter::SmoothPixmapTransform);
 
-        const QSize icon_size = util::layout::scaled(icon.size(), window_size);
+        const QSize icon_size = soa::ui::layout::scaled(icon.size(), window_size);
         painter.drawPixmap(icon_offset,
                            icon.scaled(icon_size, Qt::KeepAspectRatio,
                                        Qt::SmoothTransformation));

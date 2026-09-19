@@ -3,17 +3,17 @@
 #include <QPushButton>
 #include "ui/ModalOverlay.hpp"
 
-namespace core::wine
+namespace soa::runtime
 {
     class Shell;
 }
 class DownloadProgress;
 
-class GameInstall : public util::modal_overlay::ModalOverlay
+class GameInstall : public soa::ui::ModalOverlay
 {
     Q_OBJECT
     public:
-        explicit GameInstall(core::wine::Shell* shell, QWidget* parent = nullptr);
+        explicit GameInstall(soa::runtime::Shell* shell, QWidget* parent = nullptr);
         void refresh_game_path();
         signals:
             void closed();
@@ -32,7 +32,7 @@ class GameInstall : public util::modal_overlay::ModalOverlay
         QPushButton* install_button {};
         QPushButton* cancel_button {};
         QPushButton* change_path_button {};
-        core::wine::Shell * shell {};
+        soa::runtime::Shell * shell {};
         bool installing {};
         DownloadProgress * download {};
 };

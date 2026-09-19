@@ -2,7 +2,7 @@
 
 #include <QString>
 
-namespace core::game
+namespace soa::common::game
 {
     enum class GameVersion
     {

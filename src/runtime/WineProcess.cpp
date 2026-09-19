@@ -5,7 +5,7 @@
 #include <QRegularExpression>
 #include <QtGlobal>
 
-namespace core::wine
+namespace soa::runtime
 {
     namespace
     {

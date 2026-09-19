@@ -13,7 +13,7 @@
 
 #include "runtime/MacWineRuntime.hpp"
 
-namespace core::system
+namespace soa::runtime
 {
     namespace
     {
@@ -164,7 +164,7 @@ namespace core::system
 
         bool rosetta_probe()
         {
-            return core::wine::macos::rosetta_is_available();
+            return soa::runtime::macos::rosetta_is_available();
         }
 #endif
     }

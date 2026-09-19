@@ -11,12 +11,12 @@
 class QFileSystemWatcher;
 class QTimer;
 
-namespace core::network
+namespace soa::network
 {
     class SwiftHttpClient;
 }
 
-namespace core::integrity
+namespace soa::runtime
 {
     class GameIntegrityWatcher : public QObject
     {
@@ -29,7 +29,7 @@ namespace core::integrity
         void set_suspended(bool suspended);
 
     signals:
-        void protected_files_changed(core::game::GameVersion version, const QStringList& paths);
+        void protected_files_changed(soa::common::game::GameVersion version, const QStringList& paths);
 
     private:
         struct Context
@@ -47,20 +47,20 @@ namespace core::integrity
         };
 
         void clear_watchers();
-        void load_context(core::game::GameVersion version);
-        void fetch_manifest(core::game::GameVersion version, const QString& root, const QString& build);
-        void apply_manifest(core::game::GameVersion version, const QByteArray& payload);
-        void install_watchers(core::game::GameVersion version);
+        void load_context(soa::common::game::GameVersion version);
+        void fetch_manifest(soa::common::game::GameVersion version, const QString& root, const QString& build);
+        void apply_manifest(soa::common::game::GameVersion version, const QByteArray& payload);
+        void install_watchers(soa::common::game::GameVersion version);
         void inspect_file(const QString& path);
         void inspect_directory(const QString& path);
-        void report_change(core::game::GameVersion version, const QStringList& paths);
+        void report_change(soa::common::game::GameVersion version, const QStringList& paths);
         void reset_after_suspension();
-        static int key(core::game::GameVersion version);
+        static int key(soa::common::game::GameVersion version);
         static QString safe_relative_path(const QString& value);
         static QByteArray hash_file(const QString& path, qsizetype expected_hex_length);
 
         QFileSystemWatcher* watcher {};
-        core::network::SwiftHttpClient* network {};
+        soa::network::SwiftHttpClient* network {};
         QTimer* refresh_timer {};
         QHash<int, Context> contexts;
         QHash<QString, int> file_versions;

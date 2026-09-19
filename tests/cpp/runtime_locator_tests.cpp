@@ -69,8 +69,8 @@ private slots:
         QVERIFY(wine.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner
                                     | QFileDevice::ExeOwner));
 
-        QCOMPARE(core::wine::macos::resolve_wine_executable(runtime), winePath);
-        QCOMPARE(core::wine::macos::runtime_root_for_executable(winePath), runtime);
+        QCOMPARE(soa::runtime::macos::resolve_wine_executable(runtime), winePath);
+        QCOMPARE(soa::runtime::macos::runtime_root_for_executable(winePath), runtime);
     }
 
     void prefers_wine_over_legacy_wine64()
@@ -88,7 +88,7 @@ private slots:
             QVERIFY(file.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner
                                         | QFileDevice::ExeOwner));
         }
-        QCOMPARE(core::wine::macos::resolve_wine_executable(directory.path()),
+        QCOMPARE(soa::runtime::macos::resolve_wine_executable(directory.path()),
                  QDir(bin).filePath(QStringLiteral("wine")));
     }
 
@@ -106,7 +106,7 @@ private slots:
         QVERIFY(wine.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner
                                     | QFileDevice::ExeOwner));
 
-        const auto probe = core::wine::macos::probe_runtime(directory.path());
+        const auto probe = soa::runtime::macos::probe_runtime(directory.path());
         QVERIFY2(probe.usable, qPrintable(probe.failure));
         QCOMPARE(probe.executable, winePath);
         QCOMPARE(probe.version, QStringLiteral("wine-test-11.0"));
@@ -139,10 +139,10 @@ private slots:
 
         const QString prefix = directory.filePath(QStringLiteral("compat/pfx"));
         const QString compat = directory.filePath(QStringLiteral("compat"));
-        core::wine::RuntimeSettings settings {proton, prefix, compat, QStringLiteral("win64"),
+        soa::runtime::RuntimeSettings settings {proton, prefix, compat, QStringLiteral("win64"),
                                                QString(), true};
         const QProcessEnvironment environment =
-            core::wine::RuntimeLocator::make_umu_environment(settings, directory.path());
+            soa::runtime::RuntimeLocator::make_umu_environment(settings, directory.path());
 
 
 
@@ -166,10 +166,10 @@ private slots:
         EnvironmentOverride tmpdir("TMPDIR", invalid_tmp.toUtf8());
 
         const QString prefix = directory.filePath(QStringLiteral("compat/pfx"));
-        core::wine::RuntimeSettings settings {QStringLiteral("proton"), prefix, QString(),
+        soa::runtime::RuntimeSettings settings {QStringLiteral("proton"), prefix, QString(),
                                                QStringLiteral("win64"), QString(), true};
         const QProcessEnvironment environment =
-            core::wine::RuntimeLocator::make_umu_environment(settings, directory.path());
+            soa::runtime::RuntimeLocator::make_umu_environment(settings, directory.path());
 
         QVERIFY(!environment.contains(QStringLiteral("TMPDIR")));
 
@@ -187,13 +187,13 @@ private slots:
         QVERIFY(QFile(QDir(prefix).filePath(QStringLiteral("version"))).open(
             QIODevice::WriteOnly));
 
-        QVERIFY(core::wine::repair_doubled_proton_prefix(directory.path()));
+        QVERIFY(soa::runtime::repair_doubled_proton_prefix(directory.path()));
         QVERIFY(QFileInfo(QDir(prefix).filePath(QStringLiteral("drive_c/windows"))).isDir());
         QVERIFY(!QFileInfo(inner).exists());
         QVERIFY(!QFileInfo(root.filePath(QStringLiteral(".pfx-migrating"))).exists());
 
 
-        QVERIFY(!core::wine::repair_doubled_proton_prefix(directory.path()));
+        QVERIFY(!soa::runtime::repair_doubled_proton_prefix(directory.path()));
     }
 
     void removes_doubled_proton_prefix_stub()
@@ -204,7 +204,7 @@ private slots:
                                   .filePath(QStringLiteral("pfx/pfx"));
         QVERIFY(QDir().mkpath(inner));
 
-        QVERIFY(core::wine::repair_doubled_proton_prefix(directory.path()));
+        QVERIFY(soa::runtime::repair_doubled_proton_prefix(directory.path()));
         QVERIFY(!QFileInfo(inner).exists());
     }
 #endif
@@ -227,7 +227,7 @@ private slots:
                                     | QFileDevice::ExeOwner));
 
         QProcessEnvironment environment;
-        core::wine::macos::apply_runtime_environment(environment, winePath);
+        soa::runtime::macos::apply_runtime_environment(environment, winePath);
         QCOMPARE(environment.value(QStringLiteral("CX_ROOT")), cxRoot);
     }
 #endif

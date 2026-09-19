@@ -3,7 +3,7 @@
 #include <QString>
 #include <QDateTime>
 
-namespace core::status
+namespace soa::common::status
 {
     enum class State
     {

@@ -7,7 +7,7 @@
 #include <QCoreApplication>
 #include <QTranslator>
 
-namespace util::i18n
+namespace soa::i18n
 {
     LanguageManager& LanguageManager::instance()
     {
@@ -25,9 +25,9 @@ namespace util::i18n
         translator = new QTranslator(this);
         if (QCoreApplication::instance())
             QCoreApplication::instance()->installEventFilter(this);
-        connect(&util::config::Config::instance(), &util::config::Config::changed, this, [this]()
+        connect(&soa::config::Config::instance(), &soa::config::Config::changed, this, [this]()
         {
-            const QString configured = normalize_language(util::config::Config::instance().language());
+            const QString configured = normalize_language(soa::config::Config::instance().language());
             if (configured != active_language && !applying)
                 (void)set_language(configured);
         });
@@ -63,7 +63,7 @@ namespace util::i18n
 
     void LanguageManager::apply_configured_language()
     {
-        (void)set_language(util::config::Config::instance().language());
+        (void)set_language(soa::config::Config::instance().language());
     }
 
     bool LanguageManager::set_language(const QString& code)
@@ -96,7 +96,7 @@ namespace util::i18n
         {
             active_language = QStringLiteral("en");
             detail::set_catalog_active(false);
-            util::config::Config::instance().set_language(active_language);
+            soa::config::Config::instance().set_language(active_language);
             retranslate_registered();
             emit language_load_failed(normalized);
             emit language_changed(active_language);
@@ -105,7 +105,7 @@ namespace util::i18n
 
         active_language = normalized;
         detail::set_catalog_active(active_language != QStringLiteral("en"));
-        util::config::Config::instance().set_language(active_language);
+        soa::config::Config::instance().set_language(active_language);
         retranslate_registered();
         emit language_changed(active_language);
         return true;

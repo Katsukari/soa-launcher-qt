@@ -16,7 +16,7 @@
 #include "runtime/MacWineRuntime.hpp"
 #include <spdlog/spdlog.h>
 
-namespace core::wine
+namespace soa::runtime
 {
     QVector<QString>& WineRegistry::extra_search_dirs()
     {

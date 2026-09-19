@@ -8,7 +8,7 @@
 
 class QPushButton;
 
-class DownloadProgress : public util::modal_overlay::ModalOverlay
+class DownloadProgress : public soa::ui::ModalOverlay
 {
     Q_OBJECT
 
@@ -49,7 +49,7 @@ private:
     qulonglong active_operation_id {};
     QString active_operation_key;
     bool cancellation_in_progress {};
-    core::network::DownloadStatus current;
+    soa::network::DownloadStatus current;
 
     QPushButton* close_button {};
     QPushButton* retry_button {};

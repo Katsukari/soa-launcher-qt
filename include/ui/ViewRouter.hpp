@@ -3,7 +3,7 @@
 #include "ui/Stage.hpp"
 #include "ui/View.hpp"
 
-namespace core::state
+namespace soa::ui
 {
     View view_for(Stage stage);
 }

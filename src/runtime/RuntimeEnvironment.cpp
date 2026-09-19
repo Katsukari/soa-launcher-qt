@@ -7,7 +7,7 @@
 
 #include <spdlog/spdlog.h>
 
-namespace core::wine
+namespace soa::runtime
 {
     bool repair_doubled_proton_prefix(const QString& compat_data_root)
     {

@@ -1,33 +1,33 @@
 #include "ConfigPrivate.hpp"
 
-namespace util::config
+namespace soa::config
 {
-    QString Config::game_install_path_key(const core::game::GameVersion version)
+    QString Config::game_install_path_key(const soa::common::game::GameVersion version)
     {
-        return version == core::game::GameVersion::Alicia2
+        return version == soa::common::game::GameVersion::Alicia2
             ? QStringLiteral("game_install_path_2_0")
             : QStringLiteral("game_install_path_1_0");
     }
 
     QString Config::derive_game_path(const QString& prefix,
-                                     const core::game::GameVersion version) const
+                                     const soa::common::game::GameVersion version) const
     {
-        const bool proton = core::wine::WineRegistry::identify(wine_binary())
-            == core::wine::RuntimeType::Proton;
+        const bool proton = soa::runtime::WineRegistry::identify(wine_binary())
+            == soa::runtime::RuntimeType::Proton;
         return game_path_for_user(prefix, version,
                                   proton ? QStringLiteral("steamuser")
                                          : host_wine_user());
     }
 
-    core::game::GameVersion Config::game_version() const
+    soa::common::game::GameVersion Config::game_version() const
     {
-        return core::game::game_version_from_string(
+        return soa::common::game::game_version_from_string(
             d->values.value(QStringLiteral("game_version")).toString());
     }
 
     QString Config::game_id() const
     {
-        return QString::fromLatin1(core::game::profile(game_version()).launch_game_id);
+        return QString::fromLatin1(soa::common::game::profile(game_version()).launch_game_id);
     }
 
     QString Config::game_args() const
@@ -61,16 +61,16 @@ namespace util::config
         return game_install_path(game_version());
     }
 
-    QString Config::game_install_path(const core::game::GameVersion version) const
+    QString Config::game_install_path(const soa::common::game::GameVersion version) const
     {
         const QString stored = d->values.value(game_install_path_key(version)).toString();
         return normalize_game_path(stored.isEmpty() ? derive_game_path(prefix_root(), version) : stored);
     }
 
-    void Config::set_game_version(const core::game::GameVersion value)
+    void Config::set_game_version(const soa::common::game::GameVersion value)
     {
         if (game_version() == value) return;
-        d->values[QStringLiteral("game_version")] = core::game::to_string(value); persist_change();
+        d->values[QStringLiteral("game_version")] = soa::common::game::to_string(value); persist_change();
     }
 
     void Config::set_game_args(const QString& value)
@@ -90,7 +90,7 @@ namespace util::config
             return;
 
         const auto rebase = [this, &oldPrefix, &newPrefix](
-            const core::game::GameVersion version, const QString& oldPath)
+            const soa::common::game::GameVersion version, const QString& oldPath)
         {
             const QString key = game_install_path_key(version);
             const QString candidate = absolute_clean_path(oldPath);
@@ -111,8 +111,8 @@ namespace util::config
                         candidate.toStdString(), rebased.toStdString());
         };
 
-        rebase(core::game::GameVersion::Playtest, old_playtest_path);
-        rebase(core::game::GameVersion::Alicia2, old_alicia2_path);
+        rebase(soa::common::game::GameVersion::Playtest, old_playtest_path);
+        rebase(soa::common::game::GameVersion::Alicia2, old_alicia2_path);
     }
 
     void Config::set_game_install_path(const QString& value)
@@ -141,7 +141,7 @@ namespace util::config
         const QDir directory(game_install_path());
         if (!directory.exists())
             return false;
-        const auto& game = core::game::profile(game_version());
+        const auto& game = soa::common::game::profile(game_version());
         const QFileInfo versionFile(directory.filePath(QString::fromLatin1(game.install_marker_file)));
         const QFileInfo executable(directory.filePath(QString::fromLatin1(game.executable_name)));
         return versionFile.isFile() && versionFile.size() > 0 && executable.isFile();

@@ -27,8 +27,8 @@ class LaunchArgumentTests final : public QObject
 private slots:
     void game_phase_transition_graph_is_explicit()
     {
-        using core::wine::GamePhase;
-        using core::wine::is_valid_game_transition;
+        using soa::runtime::GamePhase;
+        using soa::runtime::is_valid_game_transition;
 
         QVERIFY(is_valid_game_transition(GamePhase::Idle, GamePhase::Preflight));
         QVERIFY(is_valid_game_transition(GamePhase::Preflight, GamePhase::CleaningPrefix));
@@ -48,7 +48,7 @@ private slots:
 
     void accepts_safe_game_arguments()
     {
-        const auto result = util::launch_arguments::validate(
+        const auto result = soa::common::launch_arguments::validate(
             QStringLiteral("-windowed -language \"English UK\""));
         QVERIFY(result.valid);
         QCOMPARE(result.arguments,
@@ -59,7 +59,7 @@ private slots:
 
     void moves_runtime_environment_entries_out_of_game_arguments()
     {
-        const auto result = util::launch_arguments::validate(
+        const auto result = soa::common::launch_arguments::validate(
             QStringLiteral("UMU_CONTAINER_NSENTER=1 -windowed "
                            "DXVK_HUD=fps SOA_LABEL=\"hello world\""));
 
@@ -78,7 +78,7 @@ private slots:
                  QStringLiteral("-id=other"),
                  QStringLiteral("-GameID 99")})
         {
-            const auto result = util::launch_arguments::validate(value);
+            const auto result = soa::common::launch_arguments::validate(value);
             QVERIFY(!result.valid);
             QVERIFY(!result.error.isEmpty());
         }
@@ -86,21 +86,21 @@ private slots:
 
     void rejects_oversized_game_arguments()
     {
-        const auto result = util::launch_arguments::validate(QString(4097, QLatin1Char('a')));
+        const auto result = soa::common::launch_arguments::validate(QString(4097, QLatin1Char('a')));
         QVERIFY(!result.valid);
     }
 
     void escapes_desktop_field_codes()
     {
         QCOMPARE(
-            util::desktop_entry::quoted_exec_argument(QStringLiteral("/tmp/100%/launcher\"app")),
+            soa::common::desktop_entry::quoted_exec_argument(QStringLiteral("/tmp/100%/launcher\"app")),
             QStringLiteral("\"/tmp/100%%/launcher\\\"app\""));
     }
 
     void escapes_desktop_control_characters()
     {
         QCOMPARE(
-            util::desktop_entry::quoted_exec_argument(QStringLiteral("/tmp/a\nb\tapp")),
+            soa::common::desktop_entry::quoted_exec_argument(QStringLiteral("/tmp/a\nb\tapp")),
             QStringLiteral("\"/tmp/a\\nb\\tapp\""));
     }
 

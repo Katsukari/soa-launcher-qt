@@ -6,16 +6,16 @@
 class QTimer;
 class QPushButton;
 
-namespace core::wine
+namespace soa::runtime
 {
     class Shell;
 }
 
-class PrefixProgress : public util::modal_overlay::ModalOverlay
+class PrefixProgress : public soa::ui::ModalOverlay
 {
     Q_OBJECT
     public:
-        explicit PrefixProgress(core::wine::Shell* shell, QWidget* parent = nullptr);
+        explicit PrefixProgress(soa::runtime::Shell* shell, QWidget* parent = nullptr);
 
     protected:
         void paint_content(QPainter& painter) override;
@@ -28,7 +28,7 @@ class PrefixProgress : public util::modal_overlay::ModalOverlay
     private:
         void setup_buttons();
 
-        core::wine::Shell* shell {};
+        soa::runtime::Shell* shell {};
 
         QString status { "Starting..." };
         int     step   {0};

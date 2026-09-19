@@ -1,11 +1,11 @@
 #include "ConfigPrivate.hpp"
 
-namespace util::config
+namespace soa::config
 {
     QString Config::file_path() const
     {
 #if defined(Q_OS_MACOS)
-        return QDir(core::wine::macos::application_support_root())
+        return QDir(soa::runtime::macos::application_support_root())
             .filePath(QStringLiteral("state/config.json"));
 #else
         return QDir(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation))
@@ -16,7 +16,7 @@ namespace util::config
     QString Config::env_path() const
     {
 #if defined(Q_OS_MACOS)
-        return QDir(core::wine::macos::application_support_root())
+        return QDir(soa::runtime::macos::application_support_root())
             .filePath(QStringLiteral("state/.env"));
 #else
         return QDir(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation))

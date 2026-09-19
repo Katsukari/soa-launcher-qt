@@ -7,14 +7,14 @@
 
 class QPushButton;
 
-class RepairFiles : public util::modal_overlay::ModalOverlay
+class RepairFiles : public soa::ui::ModalOverlay
 {
     Q_OBJECT
 
 public:
     explicit RepairFiles(QWidget* parent = nullptr);
     void refresh();
-    void set_game_version(core::game::GameVersion version);
+    void set_game_version(soa::common::game::GameVersion version);
     void set_detected_changes(const QStringList& paths);
 
 signals:
@@ -28,7 +28,7 @@ protected:
 private:
     void setup_buttons();
 
-    core::game::GameVersion game_version {core::game::GameVersion::Playtest};
+    soa::common::game::GameVersion game_version {soa::common::game::GameVersion::Playtest};
     QString install_path;
     QString detected_message;
     QPushButton* close_button {};

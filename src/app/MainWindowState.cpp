@@ -21,10 +21,10 @@
 #include <QIcon>
 #include <QPushButton>
 
-using core::game::GameVersion;
-using core::state::Stage;
-using core::state::View;
-using util::config::Config;
+using soa::common::game::GameVersion;
+using soa::ui::Stage;
+using soa::ui::View;
+using soa::config::Config;
 
 #ifndef SOA_LAUNCHER_VERSION
 #define SOA_LAUNCHER_VERSION "0.3.0"
@@ -57,27 +57,27 @@ void MainWindow::set_game_version(const GameVersion version)
 void MainWindow::refresh_game_selector()
 {
     const QSize window_size = size();
-    const QRect playtest_rect = util::layout::chrome::playtest_button(window_size);
-    const QRect alicia_2_rect = util::layout::chrome::alicia_2_button(window_size);
+    const QRect playtest_rect = soa::ui::layout::chrome::playtest_button(window_size);
+    const QRect alicia_2_rect = soa::ui::layout::chrome::alicia_2_button(window_size);
 
-    const QPixmap& active = util::assets::images[util::assets::Image::VersionFrameActive];
-    const QPixmap& inactive = util::assets::images[util::assets::Image::VersionFrameInactive];
-    const QPixmap& playtest_icon = util::assets::images[util::assets::Image::VersionIconPlaytest];
-    const QPixmap& alicia_2_icon = util::assets::images[util::assets::Image::VersionIconAlicia2];
+    const QPixmap& active = soa::ui::assets::images[soa::ui::assets::Image::VersionFrameActive];
+    const QPixmap& inactive = soa::ui::assets::images[soa::ui::assets::Image::VersionFrameInactive];
+    const QPixmap& playtest_icon = soa::ui::assets::images[soa::ui::assets::Image::VersionIconPlaytest];
+    const QPixmap& alicia_2_icon = soa::ui::assets::images[soa::ui::assets::Image::VersionIconAlicia2];
 
-    const QPixmap playtest_pixmap = app::detail::make_version_button(
+    const QPixmap playtest_pixmap = soa::app::detail::make_version_button(
         window_size,
         playtest_rect,
         game_version == GameVersion::Playtest ? active : inactive,
         playtest_icon,
-        util::layout::chrome::playtest_icon_offset(window_size));
+        soa::ui::layout::chrome::playtest_icon_offset(window_size));
 
-    const QPixmap alicia_2_pixmap = app::detail::make_version_button(
+    const QPixmap alicia_2_pixmap = soa::app::detail::make_version_button(
         window_size,
         alicia_2_rect,
         game_version == GameVersion::Alicia2 ? active : inactive,
         alicia_2_icon,
-        util::layout::chrome::alicia_2_icon_offset(window_size));
+        soa::ui::layout::chrome::alicia_2_icon_offset(window_size));
 
     QIcon playtest_icon_set;
     playtest_icon_set.addPixmap(playtest_pixmap, QIcon::Normal);
@@ -111,7 +111,7 @@ void MainWindow::set_game_switching_enabled(const Stage stage)
 
 void MainWindow::open_for_current_stage()
 {
-    const View view = core::state::view_for(install_state->stage());
+    const View view = soa::ui::view_for(install_state->stage());
 
     if (view == View::Prerequisites) open_overlay(prerequisites_intro);
     else if (view == View::WineSelect) open_overlay(wine_select);
@@ -167,7 +167,7 @@ void MainWindow::on_stage_changed(const Stage stage)
     if (repair_active && repair_progress && repair_progress->isVisible())
         return;
 
-    const View view = core::state::view_for(stage);
+    const View view = soa::ui::view_for(stage);
     if (view == last_view) return;
     last_view = view;
 
@@ -232,7 +232,7 @@ void MainWindow::on_stage_changed(const Stage stage)
 void MainWindow::update_chrome_visibility()
 {
     bool should_hide = false;
-    const auto overlays = findChildren<util::modal_overlay::ModalOverlay*>(
+    const auto overlays = findChildren<soa::ui::ModalOverlay*>(
         QString(), Qt::FindDirectChildrenOnly);
     for (const auto* overlay : overlays)
     {
@@ -250,17 +250,17 @@ void MainWindow::update_chrome_visibility()
     update();
 }
 
-void MainWindow::on_overlay_opened(util::modal_overlay::ModalOverlay*)
+void MainWindow::on_overlay_opened(soa::ui::ModalOverlay*)
 {
     update_chrome_visibility();
 }
 
-void MainWindow::on_overlay_closed(util::modal_overlay::ModalOverlay*)
+void MainWindow::on_overlay_closed(soa::ui::ModalOverlay*)
 {
     update_chrome_visibility();
 }
 
-void MainWindow::open_overlay(util::modal_overlay::ModalOverlay* overlay)
+void MainWindow::open_overlay(soa::ui::ModalOverlay* overlay)
 {
     if (!overlay->isVisible())
     {
@@ -270,7 +270,7 @@ void MainWindow::open_overlay(util::modal_overlay::ModalOverlay* overlay)
     }
 }
 
-void MainWindow::close_overlay(util::modal_overlay::ModalOverlay* overlay)
+void MainWindow::close_overlay(soa::ui::ModalOverlay* overlay)
 {
     if (overlay->isVisible())
     {

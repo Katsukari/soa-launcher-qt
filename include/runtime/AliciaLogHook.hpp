@@ -2,7 +2,7 @@
 
 #include <QString>
 
-namespace core::wine
+namespace soa::runtime
 {
     class AliciaLogHook final
     {

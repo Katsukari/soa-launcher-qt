@@ -1,6 +1,6 @@
 #include "ConfigPrivate.hpp"
 
-namespace util::config
+namespace soa::config
 {
     bool Config::prerequisites_confirmed() const
     {

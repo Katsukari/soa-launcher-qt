@@ -1,6 +1,6 @@
 #include "ui/ViewRouter.hpp"
 
-namespace core::state
+namespace soa::ui
 {
     View view_for(const Stage stage)
     {

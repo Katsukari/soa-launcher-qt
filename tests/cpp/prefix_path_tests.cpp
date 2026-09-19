@@ -41,7 +41,7 @@ private slots:
         file.close();
 
         QString error;
-        QCOMPARE(core::wine::windows_path_for_prefix_file(prefix, executable, &error),
+        QCOMPARE(soa::runtime::windows_path_for_prefix_file(prefix, executable, &error),
                  QStringLiteral("C:\\users\\test\\Story Of Alicia\\Alicia.exe"));
         QVERIFY(error.isEmpty());
     }
@@ -60,7 +60,7 @@ private slots:
         file.close();
 
         QString error;
-        QVERIFY(core::wine::windows_path_for_prefix_file(prefix, executable, &error).isEmpty());
+        QVERIFY(soa::runtime::windows_path_for_prefix_file(prefix, executable, &error).isEmpty());
         QVERIFY(error.contains(QStringLiteral("outside"), Qt::CaseInsensitive));
     }
 
@@ -82,7 +82,7 @@ private slots:
         QVERIFY(QFile::link(outside, linked));
 
         QString error;
-        QVERIFY(core::wine::windows_path_for_prefix_file(prefix, linked, &error).isEmpty());
+        QVERIFY(soa::runtime::windows_path_for_prefix_file(prefix, linked, &error).isEmpty());
         QVERIFY(error.contains(QStringLiteral("outside"), Qt::CaseInsensitive));
     }
 
@@ -101,7 +101,7 @@ private slots:
         const QString gameDirectory = QDir(alias).filePath(
             QStringLiteral("AppData/Roaming/Story Of Alicia/game"));
 
-        QVERIFY(core::wine::host_path_is_inside_prefix(prefix, gameDirectory));
+        QVERIFY(soa::runtime::host_path_is_inside_prefix(prefix, gameDirectory));
     }
 
     void rejects_directory_alias_that_resolves_outside_prefix()
@@ -117,7 +117,7 @@ private slots:
         const QString alias = QDir(users).filePath(QStringLiteral("escape"));
         QVERIFY(QFile::link(outside, alias));
 
-        QVERIFY(!core::wine::host_path_is_inside_prefix(
+        QVERIFY(!soa::runtime::host_path_is_inside_prefix(
             prefix, QDir(alias).filePath(QStringLiteral("game"))));
     }
 

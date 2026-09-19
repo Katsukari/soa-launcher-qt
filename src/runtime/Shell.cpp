@@ -9,7 +9,7 @@
 #include "i18n/LanguageManager.hpp"
 #include <spdlog/spdlog.h>
 
-namespace core::wine
+namespace soa::runtime
 {
     Shell::Shell(QObject* parent)
         : StatusReporter(QStringLiteral("wine"), parent),
@@ -40,12 +40,12 @@ namespace core::wine
         game_callbacks.fail_user = [this](const QString& title, const QString& message)
         { fail_user(title, message); };
         game_callbacks.user_notice = [this](const QString& message) { emit user_notice(message); };
-        game_callbacks.game_starting = [this](const core::game::GameVersion version)
+        game_callbacks.game_starting = [this](const soa::common::game::GameVersion version)
         { emit game_starting(version); };
-        game_callbacks.game_started = [this](const core::game::GameVersion version)
+        game_callbacks.game_started = [this](const soa::common::game::GameVersion version)
         { emit game_started(version); };
         game_callbacks.game_exited =
-            [this](const core::game::GameVersion version, const int exit_code, const bool crashed)
+            [this](const soa::common::game::GameVersion version, const int exit_code, const bool crashed)
         { emit game_exited(version, exit_code, crashed); };
         game_callbacks.working =
             [this](const QString& phase, const double progress, const bool watchdog_exempt)
@@ -89,7 +89,7 @@ namespace core::wine
         request.arguments = arguments;
         request.environment = environment;
         request.timeout_ms = 15 * 60 * 1000;
-        request.sensitive_values = {util::config::Config::instance().token()};
+        request.sensitive_values = {soa::config::Config::instance().token()};
         if (!runner_->start(std::move(request), [this](const command_result& result)
                             { emit command_finished(result); }))
         {
@@ -181,8 +181,8 @@ namespace core::wine
     void Shell::fail_user(const QString& title, const QString& message)
     {
         SPDLOG_ERROR("{}: {}", title.toStdString(), message.toStdString());
-        const QString translated_title = util::i18n::translate(title);
-        const QString translated_message = util::i18n::translate(message);
+        const QString translated_title = soa::i18n::translate(title);
+        const QString translated_message = soa::i18n::translate(message);
         fail(translated_message);
         emit user_error(translated_title, translated_message);
     }

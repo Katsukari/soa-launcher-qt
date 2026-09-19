@@ -9,7 +9,7 @@
 
 #include <utility>
 
-namespace core::update
+namespace soa::update
 {
     namespace
     {

@@ -13,11 +13,11 @@
 class AuthHandler;
 class QCheckBox;
 class LauncherDialog;
-namespace core::wine
+namespace soa::runtime
 {
     class Shell;
 }
-namespace core::state
+namespace soa::ui
 {
     class InstallState;
 }
@@ -27,10 +27,10 @@ class AliciaChooser : public QWidget
     Q_OBJECT
 
 public:
-    explicit AliciaChooser(AuthHandler* auth, core::wine::Shell* shell,
-                           core::state::InstallState* install_state, QWidget* parent = nullptr);
+    explicit AliciaChooser(AuthHandler* auth, soa::runtime::Shell* shell,
+                           soa::ui::InstallState* install_state, QWidget* parent = nullptr);
 
-    void set_game_version(core::game::GameVersion version);
+    void set_game_version(soa::common::game::GameVersion version);
     void paintEvent(QPaintEvent* event) override;
     bool eventFilter(QObject* obj, QEvent* event) override;
 
@@ -48,8 +48,8 @@ private:
         SignedIn
     };
 
-    static State state_for(core::state::Stage stage);
-    void on_stage_changed(core::state::Stage stage);
+    static State state_for(soa::ui::Stage stage);
+    void on_stage_changed(soa::ui::Stage stage);
     void setup_title();
     void setup_settings_button();
     void setup_download_state();
@@ -67,11 +67,11 @@ private:
     void retranslate_dynamic_text();
 
     AuthHandler* auth {};
-    core::wine::Shell* shell {};
-    core::state::InstallState* install_state {};
-    core::game::GameVersion game_version {core::game::GameVersion::Playtest};
+    soa::runtime::Shell* shell {};
+    soa::ui::InstallState* install_state {};
+    soa::common::game::GameVersion game_version {soa::common::game::GameVersion::Playtest};
     State state {State::Download};
-    core::state::Stage current_stage {core::state::Stage::Probing};
+    soa::ui::Stage current_stage {soa::ui::Stage::Probing};
     QLabel* title_label {};
     QPushButton* settings_button {};
     QPushButton* download_button {};

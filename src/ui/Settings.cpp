@@ -77,14 +77,14 @@ namespace
     }
 }
 
-Settings::Settings(core::wine::Shell * shell, QWidget* parent) : ModalOverlay(parent), shell(shell)
+Settings::Settings(soa::runtime::Shell * shell, QWidget* parent) : ModalOverlay(parent), shell(shell)
 {
     set_keeps_chrome(false);
     setup_pages();
     setup_close_button();
     setup_tabs();
-    connect(&util::i18n::LanguageManager::instance(),
-            &util::i18n::LanguageManager::language_changed, this, [this]()
+    connect(&soa::i18n::LanguageManager::instance(),
+            &soa::i18n::LanguageManager::language_changed, this, [this]()
     {
         set_mutation_enabled(mutation_enabled, mutation_reason);
     });
@@ -94,7 +94,7 @@ void Settings::set_mutation_enabled(const bool enabled, const QString& reason)
 {
     mutation_enabled = enabled;
     mutation_reason = reason;
-    const QString translated_reason = util::i18n::translate(reason);
+    const QString translated_reason = soa::i18n::translate(reason);
 
     if (stack)
     {
@@ -108,7 +108,7 @@ void Settings::set_mutation_enabled(const bool enabled, const QString& reason)
 
         stack->setToolTip(QString());
         stack->setAccessibleDescription(enabled
-            ? util::i18n::translate("Settings are editable")
+            ? soa::i18n::translate("Settings are editable")
             : translated_reason);
     }
 
@@ -127,7 +127,7 @@ void Settings::setup_pages()
 {
     const QSize w = size();
     stack = new QStackedWidget(this);
-    stack->setGeometry(util::layout::settings::box_rect(w));
+    stack->setGeometry(soa::ui::layout::settings::box_rect(w));
     stack->setStyleSheet(QStringLiteral("QStackedWidget { background: transparent; }"));
 
     launcher_settings = new LauncherSettings(stack);
@@ -153,10 +153,10 @@ void Settings::setup_close_button()
     close_button->setText("");
     close_button->setStyleSheet("border: none; background: transparent;");
 
-    const auto & close_px = util::assets::images[util::assets::Image::CloseSettings];
+    const auto & close_px = soa::ui::assets::images[soa::ui::assets::Image::CloseSettings];
     close_button->setIcon(QIcon(close_px));
-    close_button->setIconSize(util::layout::settings::close_icon(w));
-    close_button->setGeometry(util::layout::settings::close(w));
+    close_button->setIconSize(soa::ui::layout::settings::close_icon(w));
+    close_button->setGeometry(soa::ui::layout::settings::close(w));
     close_button->setAccessibleName(QStringLiteral("Close settings"));
     close_button->raise();
 
@@ -169,8 +169,8 @@ void Settings::setup_tabs()
 
     auto make_tab = [&](const int i)
     {
-        auto* b = util::simple_utils::make_flat_button(this);
-        b->setGeometry(util::layout::settings::tab_rect(w, i));
+        auto* b = soa::ui::simple_utils::make_flat_button(this);
+        b->setGeometry(soa::ui::layout::settings::tab_rect(w, i));
         tab_buttons[i] = b;
         return b;
     };
@@ -203,12 +203,12 @@ void Settings::update_panel_geometry()
 {
     const QSize w = size();
     const bool expanded = active_tab == 0 && launcher_panel_expanded;
-    stack->setGeometry(util::layout::settings::box_rect(w, expanded));
-    close_button->setGeometry(util::layout::settings::close(w, expanded));
+    stack->setGeometry(soa::ui::layout::settings::box_rect(w, expanded));
+    close_button->setGeometry(soa::ui::layout::settings::close(w, expanded));
     for (int i = 0; i < 3; ++i)
     {
         if (tab_buttons[i])
-            tab_buttons[i]->setGeometry(util::layout::settings::tab_rect(w, i, expanded));
+            tab_buttons[i]->setGeometry(soa::ui::layout::settings::tab_rect(w, i, expanded));
     }
     close_button->raise();
     update();
@@ -218,38 +218,38 @@ void Settings::paint_content(QPainter& painter)
 {
     const QSize w = size();
     const bool expanded = active_tab == 0 && launcher_panel_expanded;
-    const QRect box = util::layout::settings::box_rect(w, expanded);
-    painter.drawPixmap(box, util::assets::images[util::assets::Image::BoxSettings]);
+    const QRect box = soa::ui::layout::settings::box_rect(w, expanded);
+    painter.drawPixmap(box, soa::ui::assets::images[soa::ui::assets::Image::BoxSettings]);
 
     {
-        QFont tf = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
-        tf.setPixelSize(util::layout::scaled(util::layout::text::k_modal_header, w));
+        QFont tf = soa::ui::assets::fonts[soa::ui::assets::Font::EurostileExtraBlack];
+        tf.setPixelSize(soa::ui::layout::scaled(soa::ui::layout::text::k_modal_header, w));
         tf.setWeight(QFont::Black);
         painter.setFont(tf);
-        painter.setPen(util::colors::k_text_maroon);
+        painter.setPen(soa::ui::colors::k_text_maroon);
         const char* runtimeTitle = "WINE SETTINGS";
         const char* title =
             (active_tab == 1) ? runtimeTitle :
             (active_tab == 2) ? "ADVANCED SETTINGS" : "LAUNCHER SETTINGS";
-        painter.drawText(util::layout::settings::page_title(w, expanded), Qt::AlignCenter,
-                         util::i18n::translate(title));
+        painter.drawText(soa::ui::layout::settings::page_title(w, expanded), Qt::AlignCenter,
+                         soa::i18n::translate(title));
     }
 
     constexpr QColor active   {0xFB, 0xF6, 0xF0};
     constexpr QColor inactive {0xD8, 0xCD, 0xC0};
     constexpr QColor textCol  {0x4F, 0x17, 0x17};
 
-    QFont f = util::assets::fonts[util::assets::Font::EurostileBlack];
-    f.setPixelSize(util::layout::scaled(util::layout::text::k_label, w));
+    QFont f = soa::ui::assets::fonts[soa::ui::assets::Font::EurostileBlack];
+    f.setPixelSize(soa::ui::layout::scaled(soa::ui::layout::text::k_label, w));
     f.setWeight(QFont::Black);
     painter.setFont(f);
-    const int radius = util::layout::settings::tab_radius(w);
+    const int radius = soa::ui::layout::settings::tab_radius(w);
 
     for (int i = 0; i < 3; ++i)
     {
         const char* runtimeLabel = "WINE";
         const char* labels[] = {"LAUNCHER", runtimeLabel, "ADVANCED"};
-        const QRect r = util::layout::settings::tab_rect(w, i, expanded);
+        const QRect r = soa::ui::layout::settings::tab_rect(w, i, expanded);
         const bool  on = i == active_tab;
 
 
@@ -267,6 +267,6 @@ void Settings::paint_content(QPainter& painter)
         p.closeSubpath();
         painter.fillPath(p, on ? active : inactive);
         painter.setPen(on ? textCol : textCol.lighter(140));
-        painter.drawText(r, Qt::AlignCenter, util::i18n::translate(labels[i]));
+        painter.drawText(r, Qt::AlignCenter, soa::i18n::translate(labels[i]));
     }
 }

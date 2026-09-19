@@ -1,6 +1,6 @@
 #pragma once
 
-namespace core::platform
+namespace soa::platform
 {
     void register_launcher_url_scheme();
 }

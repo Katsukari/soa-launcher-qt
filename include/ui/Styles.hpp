@@ -6,7 +6,7 @@
 #include <QString>
 #include <QtGlobal>
 
-namespace util::styles
+namespace soa::ui::styles
 {
     inline QString field(const QSize win)
     {

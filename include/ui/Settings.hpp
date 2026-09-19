@@ -11,16 +11,16 @@ class LauncherSettings;
 class WineSettings;
 class AdvancedSettings;
 
-namespace core::wine
+namespace soa::runtime
 {
     class Shell;
 }
 
-class Settings : public util::modal_overlay::ModalOverlay
+class Settings : public soa::ui::ModalOverlay
 {
     Q_OBJECT
     public:
-        explicit Settings(core::wine::Shell* shell, QWidget* parent = nullptr);
+        explicit Settings(soa::runtime::Shell* shell, QWidget* parent = nullptr);
         void set_mutation_enabled(bool enabled, const QString& reason = {});
 
 
@@ -42,5 +42,5 @@ class Settings : public util::modal_overlay::ModalOverlay
         QPushButton* tab_buttons[3] {};
         QStackedWidget* stack {};
         LauncherSettings* launcher_settings {};
-        core::wine::Shell * shell {};
+        soa::runtime::Shell * shell {};
 };

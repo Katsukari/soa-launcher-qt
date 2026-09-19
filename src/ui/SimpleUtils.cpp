@@ -16,7 +16,7 @@
 
 #include <initializer_list>
 
-namespace util::simple_utils
+namespace soa::ui::simple_utils
 {
     void make_label_block(QWidget* parent, const QSize window_size, const int y,
                           const QString& title, const QString& description)

@@ -10,7 +10,7 @@
 
 #include "runtime/ProcessRunner.hpp"
 
-namespace core::wine
+namespace soa::runtime
 {
     class RuntimeLocator;
 

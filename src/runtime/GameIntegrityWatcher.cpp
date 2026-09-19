@@ -17,7 +17,7 @@
 #include <QTimer>
 #include <spdlog/spdlog.h>
 
-namespace core::integrity
+namespace soa::runtime
 {
     namespace
     {
@@ -27,7 +27,7 @@ namespace core::integrity
     GameIntegrityWatcher::GameIntegrityWatcher(QObject* parent)
         : QObject(parent),
           watcher(new QFileSystemWatcher(this)),
-          network(new core::network::SwiftHttpClient(this)),
+          network(new soa::network::SwiftHttpClient(this)),
           refresh_timer(new QTimer(this))
     {
         refresh_timer->setSingleShot(true);
@@ -37,16 +37,16 @@ namespace core::integrity
                 this, &GameIntegrityWatcher::inspect_file);
         connect(watcher, &QFileSystemWatcher::directoryChanged,
                 this, &GameIntegrityWatcher::inspect_directory);
-        connect(&util::config::Config::instance(), &util::config::Config::changed,
+        connect(&soa::config::Config::instance(), &soa::config::Config::changed,
                 this, [this]()
         {
             refresh_timer->start();
         });
     }
 
-    int GameIntegrityWatcher::key(const core::game::GameVersion version)
+    int GameIntegrityWatcher::key(const soa::common::game::GameVersion version)
     {
-        return version == core::game::GameVersion::Alicia2 ? 2 : 1;
+        return version == soa::common::game::GameVersion::Alicia2 ? 2 : 1;
     }
 
     void GameIntegrityWatcher::set_suspended(const bool value)
@@ -92,19 +92,19 @@ namespace core::integrity
 
         clear_watchers();
         contexts.clear();
-        load_context(core::game::GameVersion::Playtest);
-        load_context(core::game::GameVersion::Alicia2);
+        load_context(soa::common::game::GameVersion::Playtest);
+        load_context(soa::common::game::GameVersion::Alicia2);
     }
 
-    void GameIntegrityWatcher::load_context(const core::game::GameVersion version)
+    void GameIntegrityWatcher::load_context(const soa::common::game::GameVersion version)
     {
-        auto& config = util::config::Config::instance();
+        auto& config = soa::config::Config::instance();
         const QString root = config.game_install_path(version);
         if (root.isEmpty() || !config.path_inside_prefix(root))
             return;
 
         const QString marker = QDir(root).filePath(
-            QString::fromLatin1(core::game::profile(version).install_marker_file));
+            QString::fromLatin1(soa::common::game::profile(version).install_marker_file));
         QFile file(marker);
         if (!file.open(QIODevice::ReadOnly))
             return;
@@ -121,11 +121,11 @@ namespace core::integrity
         fetch_manifest(version, context.root, build);
     }
 
-    void GameIntegrityWatcher::fetch_manifest(const core::game::GameVersion version,
+    void GameIntegrityWatcher::fetch_manifest(const soa::common::game::GameVersion version,
                                               const QString& root,
                                               const QString& build)
     {
-        const QString base = QString::fromLatin1(core::game::profile(version).cdn_base_url);
+        const QString base = QString::fromLatin1(soa::common::game::profile(version).cdn_base_url);
         const QUrl url(QStringLiteral("%1/%2/manifest.json").arg(base, build));
         network->get(
             url,
@@ -134,7 +134,7 @@ namespace core::integrity
             QByteArray("application/json"),
             QByteArray("Story-Of-Alicia-Launcher"),
             false,
-            [this, version, root, build](const core::network::HttpResponse& response)
+            [this, version, root, build](const soa::network::HttpResponse& response)
             {
                 const bool ok = response.result == soa_http_result_completed
                     && response.status >= 200
@@ -168,7 +168,7 @@ namespace core::integrity
         return normalized;
     }
 
-    void GameIntegrityWatcher::apply_manifest(const core::game::GameVersion version,
+    void GameIntegrityWatcher::apply_manifest(const soa::common::game::GameVersion version,
                                               const QByteArray& payload)
     {
         auto it = contexts.find(key(version));
@@ -249,7 +249,7 @@ namespace core::integrity
         }));
     }
 
-    void GameIntegrityWatcher::install_watchers(const core::game::GameVersion version)
+    void GameIntegrityWatcher::install_watchers(const soa::common::game::GameVersion version)
     {
         auto it = contexts.find(key(version));
         if (it == contexts.end() || !it->ready)
@@ -357,8 +357,8 @@ namespace core::integrity
 
         const QString relative = QDir(it->root).relativeFilePath(path);
         const QFileInfo info(path);
-        const auto version = context_key == 2 ? core::game::GameVersion::Alicia2
-                                              : core::game::GameVersion::Playtest;
+        const auto version = context_key == 2 ? soa::common::game::GameVersion::Alicia2
+                                              : soa::common::game::GameVersion::Playtest;
         const qint64 expected_size = it->sizes.value(relative, -1);
         if (!info.exists() || (expected_size >= 0 && info.size() != expected_size))
         {
@@ -431,8 +431,8 @@ namespace core::integrity
         const QString build = it->version;
         const auto hashes = it->hashes;
         const auto sizes = it->sizes;
-        const auto version = context_key == 2 ? core::game::GameVersion::Alicia2
-                                              : core::game::GameVersion::Playtest;
+        const auto version = context_key == 2 ? soa::common::game::GameVersion::Alicia2
+                                              : soa::common::game::GameVersion::Playtest;
 
         auto* verification = new QFutureWatcher<QStringList>(this);
         connect(verification, &QFutureWatcher<QStringList>::finished, this,
@@ -510,7 +510,7 @@ namespace core::integrity
         }));
     }
 
-    void GameIntegrityWatcher::report_change(const core::game::GameVersion version,
+    void GameIntegrityWatcher::report_change(const soa::common::game::GameVersion version,
                                              const QStringList& paths)
     {
         auto it = contexts.find(key(version));

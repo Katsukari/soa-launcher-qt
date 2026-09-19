@@ -4,7 +4,7 @@
 
 #include <utility>
 
-namespace core::network
+namespace soa::network
 {
     SwiftHttpClient::SwiftHttpClient(QObject* parent)
         : QObject(parent)

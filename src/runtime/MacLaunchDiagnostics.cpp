@@ -25,9 +25,9 @@
 #include "config/Config.hpp"
 #include <spdlog/spdlog.h>
 
-namespace core::wine
+namespace soa::runtime
 {
-    using util::config::Config;
+    using soa::config::Config;
 
     namespace
     {
@@ -425,7 +425,7 @@ namespace core::wine
     }
 
     MacLaunchDiagnostics::Configuration
-    MacLaunchDiagnostics::begin(const core::game::GameVersion version, const QString& prefix,
+    MacLaunchDiagnostics::begin(const soa::common::game::GameVersion version, const QString& prefix,
                                 const QString& game_directory, const QString& executable_path,
                                 const QStringList& sensitive_values,
                                 SnapshotProvider snapshot_provider)
@@ -464,7 +464,7 @@ namespace core::wine
         const QDateTime now = QDateTime::currentDateTimeUtc();
         d_->session_id = QStringLiteral("run-%1-%2")
             .arg(now.toString(QStringLiteral("yyyyMMdd-HHmmss-zzz")),
-                 safe_label(core::game::to_string(version)));
+                 safe_label(soa::common::game::to_string(version)));
 
         if (!d_->configuration.enabled)
         {
@@ -553,7 +553,7 @@ namespace core::wine
         append_event(QStringLiteral("session_started"),
                      QStringLiteral("profile=%1 game_version=%2 prefix=%3 "
                                     "executable=%4")
-                         .arg(d_->configuration.profile, core::game::to_string(version), prefix,
+                         .arg(d_->configuration.profile, soa::common::game::to_string(version), prefix,
                               executable_path));
         append_event(QStringLiteral("diagnostics_configured"),
                      QStringLiteral("enabled=%1 WINEDEBUG=%2 registry=%3")

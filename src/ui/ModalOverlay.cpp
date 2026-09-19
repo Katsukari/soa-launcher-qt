@@ -11,7 +11,7 @@
 #include <QPainter>
 #include <QPainterPath>
 
-namespace util::modal_overlay
+namespace soa::ui
 {
     namespace
     {
@@ -85,7 +85,7 @@ namespace util::modal_overlay
             .scaledToHeight(height(), Qt::SmoothTransformation);
         painter.drawPixmap(width() - right.width(), 0, right);
 
-        const core::game::GameVersion version = config::Config::instance().game_version();
+        const soa::common::game::GameVersion version = config::Config::instance().game_version();
         const QPixmap& active = assets::images[assets::Image::VersionFrameActive];
         const QPixmap& inactive = assets::images[assets::Image::VersionFrameInactive];
 
@@ -93,7 +93,7 @@ namespace util::modal_overlay
             painter,
             window_size,
             layout::chrome::playtest_button(window_size),
-            version == core::game::GameVersion::Playtest ? active : inactive,
+            version == soa::common::game::GameVersion::Playtest ? active : inactive,
             assets::images[assets::Image::VersionIconPlaytest],
             layout::chrome::playtest_icon_offset(window_size));
 
@@ -101,7 +101,7 @@ namespace util::modal_overlay
             painter,
             window_size,
             layout::chrome::alicia_2_button(window_size),
-            version == core::game::GameVersion::Alicia2 ? active : inactive,
+            version == soa::common::game::GameVersion::Alicia2 ? active : inactive,
             assets::images[assets::Image::VersionIconAlicia2],
             layout::chrome::alicia_2_icon_offset(window_size));
     }

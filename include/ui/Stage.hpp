@@ -1,6 +1,6 @@
 #pragma once
 
-namespace core::state
+namespace soa::ui
 {
     enum class Stage
     {

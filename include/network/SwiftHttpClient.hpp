@@ -9,7 +9,7 @@
 #include <QUrl>
 #include <functional>
 
-namespace core::network
+namespace soa::network
 {
     struct HttpResponse
     {

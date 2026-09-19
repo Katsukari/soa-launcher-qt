@@ -4,7 +4,7 @@
 #include <QtGlobal>
 #include <QStringList>
 
-namespace core::wine
+namespace soa::runtime
 {
     enum class PrefixArchitecture
     {

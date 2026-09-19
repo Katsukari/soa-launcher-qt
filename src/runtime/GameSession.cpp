@@ -25,9 +25,9 @@
 #include "i18n/LanguageManager.hpp"
 #include <spdlog/spdlog.h>
 
-namespace core::wine
+namespace soa::runtime
 {
-    using util::config::Config;
+    using soa::config::Config;
 
     namespace
     {
@@ -365,7 +365,7 @@ namespace core::wine
         }
 
         const auto version = Config::instance().game_version();
-        const auto& profile = core::game::profile(version);
+        const auto& profile = soa::common::game::profile(version);
         const QString game_directory = Config::instance().game_install_path();
         const QString executable =
             QDir(game_directory).filePath(QString::fromLatin1(profile.executable_name));
@@ -647,7 +647,7 @@ namespace core::wine
                                                   const QString& query_output,
                                                   QString& registry_file, bool& needs_import) const
     {
-        const auto& profile = core::game::profile(launch.version);
+        const auto& profile = soa::common::game::profile(launch.version);
         const QString base_flag = QString::fromLatin1(profile.first_launch_registry_value);
         const QString audio_flag = QString::fromLatin1(profile.audio_settings_setup_registry_value);
         const bool query_succeeded = !query_output.isNull();
@@ -1431,7 +1431,7 @@ namespace core::wine
     {
         if (diagnostics_.diagnostic_path().isEmpty())
             return {};
-        return util::i18n::translate("\n\nDiagnostic run: %1")
+        return soa::i18n::translate("\n\nDiagnostic run: %1")
             .arg(QFileInfo(diagnostics_.diagnostic_path()).absolutePath());
     }
 
@@ -1448,7 +1448,7 @@ namespace core::wine
         const int wrapper_exit = wrapper_result_.exit_code;
         const bool wrapper_crashed = wrapper_result_.crashed;
         command_result result = current_session_result();
-        QString user_message = util::i18n::translate(message);
+        QString user_message = soa::i18n::translate(message);
         user_message += diagnostic_suffix();
 
         if (!transition(GamePhase::Finished))
@@ -1488,7 +1488,7 @@ namespace core::wine
         if (phase_ != GamePhase::Running)
             return;
 
-        QString user_message = util::i18n::translate(message);
+        QString user_message = soa::i18n::translate(message);
         user_message += diagnostic_suffix();
         const int last_wrapper_exit = wrapper_result_.exit_code;
         command_result result = current_session_result();
@@ -1661,7 +1661,7 @@ namespace core::wine
             return;
         }
 
-        const auto& profile = core::game::profile(launch_->version);
+        const auto& profile = soa::common::game::profile(launch_->version);
         const QString prefix = Config::instance().prefix_root();
 #if defined(Q_OS_MACOS)
         constexpr bool proton = false;
@@ -1786,7 +1786,7 @@ namespace core::wine
                        << QStringLiteral("-ID") << QStringLiteral("[%1]").arg(launch_->user)
                        << QStringLiteral("-OP") << QStringLiteral("[%1]").arg(launch_->token);
         const auto custom_arguments =
-            util::launch_arguments::validate(Config::instance().game_args());
+            soa::common::launch_arguments::validate(Config::instance().game_args());
         if (!custom_arguments.valid)
         {
             fail_game_launch(

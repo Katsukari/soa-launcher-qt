@@ -2,7 +2,7 @@
 
 #include <QColor>
 
-namespace util::colors
+namespace soa::ui::colors
 {
     inline const QColor k_text_maroon  {0x4F, 0x17, 0x17};
     inline const QColor k_text_body    {0x39, 0x25, 0x18};

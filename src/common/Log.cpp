@@ -14,7 +14,7 @@
 #include <utility>
 #include <vector>
 
-namespace core::log
+namespace soa::common::log
 {
     namespace
     {
@@ -88,7 +88,7 @@ namespace core::log
     void init()
     {
 #if defined(Q_OS_MACOS)
-        const QString dir = core::paths::default_log_root();
+        const QString dir = soa::common::paths::default_log_root();
 #else
         const QString dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
 #endif

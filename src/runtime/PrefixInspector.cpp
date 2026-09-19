@@ -8,7 +8,7 @@
 #include <QRegularExpression>
 #include <QSaveFile>
 
-namespace core::wine
+namespace soa::runtime
 {
     namespace
     {

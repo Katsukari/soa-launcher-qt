@@ -26,11 +26,11 @@ LauncherMenuController::LauncherMenuController(QWidget* host_, QObject* parent)
     menu_button = new QToolButton(host);
     menu_button->setCheckable(true);
     menu_button->setCursor(Qt::PointingHandCursor);
-    menu_button->setGeometry(util::layout::chrome::menu(window_size));
+    menu_button->setGeometry(soa::ui::layout::chrome::menu(window_size));
     menu_button->setText(QStringLiteral("☰"));
     menu_button->setToolButtonStyle(Qt::ToolButtonTextOnly);
-    QFont menu_icon_font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
-    menu_icon_font.setPixelSize(util::layout::scaled(23, window_size));
+    QFont menu_icon_font = soa::ui::assets::fonts[soa::ui::assets::Font::EurostileExtraBlack];
+    menu_icon_font.setPixelSize(soa::ui::layout::scaled(23, window_size));
     menu_icon_font.setWeight(QFont::Black);
     menu_button->setFont(menu_icon_font);
     menu_button->setStyleSheet(QStringLiteral(
@@ -40,11 +40,11 @@ LauncherMenuController::LauncherMenuController(QWidget* host_, QObject* parent)
         "border-color: rgba(79,23,23,125); }"
         "QToolButton:pressed, QToolButton:checked { background: rgba(232,216,206,246); "
         "border-color: rgba(79,23,23,150); }")
-        .arg(util::layout::scaled(6, window_size)));
+        .arg(soa::ui::layout::scaled(6, window_size)));
 
     menu_panel = new QFrame(host);
     menu_panel->setObjectName(QStringLiteral("launcherMenuPanel"));
-    menu_panel->setGeometry(util::layout::scaled(QRect(38, 86, 272, 291), window_size));
+    menu_panel->setGeometry(soa::ui::layout::scaled(QRect(38, 86, 272, 291), window_size));
     menu_panel->setStyleSheet(QStringLiteral(
         "QFrame#launcherMenuPanel { background: rgba(247,240,235,248); "
         "border: 1px solid rgba(79,23,23,85); border-radius: 0px; }"
@@ -55,21 +55,21 @@ LauncherMenuController::LauncherMenuController(QWidget* host_, QObject* parent)
         "border-color: rgba(79,23,23,92); }"
         "QPushButton:pressed { background: rgba(219,198,186,236); "
         "border-color: rgba(79,23,23,125); }")
-        .arg(util::layout::scaled(6, window_size))
-        .arg(util::layout::scaled(17, window_size)));
+        .arg(soa::ui::layout::scaled(6, window_size))
+        .arg(soa::ui::layout::scaled(17, window_size)));
     auto* menu_shadow = new QGraphicsDropShadowEffect(menu_panel);
-    menu_shadow->setBlurRadius(util::layout::scaled(28, window_size));
-    menu_shadow->setOffset(0, util::layout::scaled(6, window_size));
+    menu_shadow->setBlurRadius(soa::ui::layout::scaled(28, window_size));
+    menu_shadow->setOffset(0, soa::ui::layout::scaled(6, window_size));
     menu_shadow->setColor(QColor(43, 28, 19, 88));
     menu_panel->setGraphicsEffect(menu_shadow);
 
-    QFont button_font = util::assets::fonts[util::assets::Font::EurostileBlack];
-    button_font.setPixelSize(util::layout::scaled(15, window_size));
+    QFont button_font = soa::ui::assets::fonts[soa::ui::assets::Font::EurostileBlack];
+    button_font.setPixelSize(soa::ui::layout::scaled(15, window_size));
     button_font.setWeight(QFont::Black);
 
-    const int margin = util::layout::scaled(14, window_size);
-    const int spacing = util::layout::scaled(10, window_size);
-    const int button_height = util::layout::scaled(43, window_size);
+    const int margin = soa::ui::layout::scaled(14, window_size);
+    const int spacing = soa::ui::layout::scaled(10, window_size);
+    const int button_height = soa::ui::layout::scaled(43, window_size);
     const int button_width = menu_panel->width() - margin * 2;
     const auto make_menu_button = [&](const QString& text, const int row)
     {
@@ -95,17 +95,17 @@ LauncherMenuController::LauncherMenuController(QWidget* host_, QObject* parent)
         "border-radius: %7px; }"
         "QMenu::item:selected { background: #EBDCD3; }"
         "QMenu::indicator { width: %8px; height: %8px; }")
-        .arg(util::layout::scaled(6, window_size))
-        .arg(qMax(9, util::layout::scaled(13, window_size)))
-        .arg(util::layout::scaled(170, window_size))
-        .arg(util::layout::scaled(9, window_size))
-        .arg(util::layout::scaled(28, window_size))
-        .arg(util::layout::scaled(12, window_size))
-        .arg(util::layout::scaled(6, window_size))
-        .arg(util::layout::scaled(14, window_size)));
+        .arg(soa::ui::layout::scaled(6, window_size))
+        .arg(qMax(9, soa::ui::layout::scaled(13, window_size)))
+        .arg(soa::ui::layout::scaled(170, window_size))
+        .arg(soa::ui::layout::scaled(9, window_size))
+        .arg(soa::ui::layout::scaled(28, window_size))
+        .arg(soa::ui::layout::scaled(12, window_size))
+        .arg(soa::ui::layout::scaled(6, window_size))
+        .arg(soa::ui::layout::scaled(14, window_size)));
     language_action_group = new QActionGroup(this);
     language_action_group->setExclusive(true);
-    for (const auto& language : util::i18n::LanguageManager::instance().languages())
+    for (const auto& language : soa::i18n::LanguageManager::instance().languages())
     {
         QAction* action = language_menu->addAction(language.native_name);
         action->setCheckable(true);
@@ -113,7 +113,7 @@ LauncherMenuController::LauncherMenuController(QWidget* host_, QObject* parent)
         language_action_group->addAction(action);
         connect(action, &QAction::triggered, this, [this, code = language.code]()
         {
-            (void)util::i18n::LanguageManager::instance().set_language(code);
+            (void)soa::i18n::LanguageManager::instance().set_language(code);
             set_visible(false);
         });
     }
@@ -122,7 +122,7 @@ LauncherMenuController::LauncherMenuController(QWidget* host_, QObject* parent)
     connect(language_button, &QPushButton::clicked, this, [this]()
     {
         const QPoint popup_position = language_button->mapToGlobal(
-            QPoint(language_button->width() + util::layout::scaled(8, host->size()), 0));
+            QPoint(language_button->width() + soa::ui::layout::scaled(8, host->size()), 0));
         language_menu->popup(popup_position);
     });
     connect(show_log_button, &QPushButton::clicked, this, [this]()
@@ -146,8 +146,8 @@ LauncherMenuController::LauncherMenuController(QWidget* host_, QObject* parent)
         set_visible(false);
         emit about_requested();
     });
-    connect(&util::i18n::LanguageManager::instance(),
-            &util::i18n::LanguageManager::language_changed,
+    connect(&soa::i18n::LanguageManager::instance(),
+            &soa::i18n::LanguageManager::language_changed,
             this, [this]()
     {
         refresh_language_actions();
@@ -213,20 +213,20 @@ void LauncherMenuController::set_manage_versions_enabled(const bool enabled)
 void LauncherMenuController::retranslate()
 {
     if (language_button)
-        language_button->setText(util::i18n::translate("Language"));
+        language_button->setText(soa::i18n::translate("Language"));
     if (show_log_button)
-        show_log_button->setText(util::i18n::translate("Show Launcher Log"));
+        show_log_button->setText(soa::i18n::translate("Show Launcher Log"));
     if (manage_versions_button)
-        manage_versions_button->setText(util::i18n::translate("Manage Launcher Versions"));
+        manage_versions_button->setText(soa::i18n::translate("Manage Launcher Versions"));
     if (credits_button)
-        credits_button->setText(util::i18n::translate("Credits"));
+        credits_button->setText(soa::i18n::translate("Credits"));
     if (about_button)
-        about_button->setText(util::i18n::translate("About"));
+        about_button->setText(soa::i18n::translate("About"));
     if (menu_button)
     {
         menu_button->setText(QStringLiteral("☰"));
-        menu_button->setToolTip(util::i18n::translate("Open launcher menu"));
-        menu_button->setAccessibleName(util::i18n::translate("Open launcher menu"));
+        menu_button->setToolTip(soa::i18n::translate("Open launcher menu"));
+        menu_button->setAccessibleName(soa::i18n::translate("Open launcher menu"));
     }
 }
 
@@ -234,7 +234,7 @@ void LauncherMenuController::refresh_language_actions()
 {
     if (!language_action_group)
         return;
-    const QString current = util::i18n::LanguageManager::instance().current_language();
+    const QString current = soa::i18n::LanguageManager::instance().current_language();
     for (QAction* action : language_action_group->actions())
         action->setChecked(action->data().toString() == current);
 }

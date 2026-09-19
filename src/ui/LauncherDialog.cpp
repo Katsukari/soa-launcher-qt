@@ -25,12 +25,12 @@ namespace
     {
         if (widget && widget->parentWidget())
             return widget->parentWidget()->window()->size();
-        return util::layout::win::k_default;
+        return soa::ui::layout::win::k_default;
     }
 
     int ui_scaled(const QWidget* widget, const int value)
     {
-        return util::layout::scaled(value, launcher_reference_size(widget));
+        return soa::ui::layout::scaled(value, launcher_reference_size(widget));
     }
 }
 
@@ -50,8 +50,8 @@ LauncherDialog::LauncherDialog(const Tone tone_, const QString& title,
     setSizeGripEnabled(false);
     setMinimumWidth(ui_scaled(this, 680));
     build_ui();
-    connect(&util::i18n::LanguageManager::instance(),
-            &util::i18n::LanguageManager::language_changed,
+    connect(&soa::i18n::LanguageManager::instance(),
+            &soa::i18n::LanguageManager::language_changed,
             this, [this]() { retranslate(); });
     retranslate();
 }
@@ -114,9 +114,9 @@ void LauncherDialog::build_ui()
 
     tone_badge = new QLabel(panel);
     tone_badge->setAlignment(Qt::AlignCenter);
-    const QSize tone_badge_size = util::layout::scaled(QSize(42, 42), launcher_reference_size(this));
+    const QSize tone_badge_size = soa::ui::layout::scaled(QSize(42, 42), launcher_reference_size(this));
     tone_badge->setFixedSize(tone_badge_size);
-    QFont badge_font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
+    QFont badge_font = soa::ui::assets::fonts[soa::ui::assets::Font::EurostileExtraBlack];
     badge_font.setPixelSize(qMax(10, ui_scaled(this, 20)));
     badge_font.setWeight(QFont::Black);
     tone_badge->setFont(badge_font);
@@ -129,7 +129,7 @@ void LauncherDialog::build_ui()
     title_column->setSpacing(ui_scaled(this, 1));
     auto* category = new QLabel(panel);
     category->setObjectName(QStringLiteral("launcherDialogCategory"));
-    QFont category_font = util::assets::fonts[util::assets::Font::EurostileBlack];
+    QFont category_font = soa::ui::assets::fonts[soa::ui::assets::Font::EurostileBlack];
     category_font.setPixelSize(qMax(8, ui_scaled(this, 11)));
     category_font.setWeight(QFont::Black);
     category->setFont(category_font);
@@ -138,7 +138,7 @@ void LauncherDialog::build_ui()
 
     title_label = new QLabel(panel);
     title_label->setWordWrap(true);
-    QFont title_font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
+    QFont title_font = soa::ui::assets::fonts[soa::ui::assets::Font::EurostileExtraBlack];
     title_font.setPixelSize(qMax(12, ui_scaled(this, 23)));
     title_font.setWeight(QFont::Black);
     title_label->setFont(title_font);
@@ -148,12 +148,12 @@ void LauncherDialog::build_ui()
 
     close_button = new QPushButton(panel);
     close_button->setObjectName(QStringLiteral("launcherDialogClose"));
-    close_button->setFixedSize(util::layout::scaled(util::layout::modal_close::k_hit, launcher_reference_size(this)));
+    close_button->setFixedSize(soa::ui::layout::scaled(soa::ui::layout::modal_close::k_hit, launcher_reference_size(this)));
     close_button->setCursor(Qt::PointingHandCursor);
     close_button->setFlat(true);
     close_button->setAttribute(Qt::WA_TranslucentBackground);
-    close_button->setIcon(QIcon(util::assets::images[util::assets::Image::CloseSettings]));
-    close_button->setIconSize(util::layout::scaled(util::layout::modal_close::k_icon, launcher_reference_size(this)));
+    close_button->setIcon(QIcon(soa::ui::assets::images[soa::ui::assets::Image::CloseSettings]));
+    close_button->setIconSize(soa::ui::layout::scaled(soa::ui::layout::modal_close::k_icon, launcher_reference_size(this)));
     connect(close_button, &QPushButton::clicked, this, &QDialog::reject);
     root->addLayout(top);
 
@@ -162,7 +162,7 @@ void LauncherDialog::build_ui()
     message_label->setWordWrap(true);
     message_label->setAlignment(Qt::AlignLeft | Qt::AlignTop);
     message_label->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    QFont message_font = util::assets::fonts[util::assets::Font::Inter];
+    QFont message_font = soa::ui::assets::fonts[soa::ui::assets::Font::Inter];
     message_font.setPixelSize(qMax(9, ui_scaled(this, 14)));
     message_font.setWeight(QFont::Medium);
     message_label->setFont(message_font);
@@ -179,7 +179,7 @@ void LauncherDialog::build_ui()
     details_label->setTextFormat(Qt::PlainText);
     details_label->setWordWrap(true);
     details_label->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    QFont details_font = util::assets::fonts[util::assets::Font::Inter];
+    QFont details_font = soa::ui::assets::fonts[soa::ui::assets::Font::Inter];
     details_font.setPixelSize(qMax(8, ui_scaled(this, 12)));
     details_font.setWeight(QFont::Medium);
     details_label->setFont(details_font);
@@ -226,13 +226,13 @@ QString LauncherDialog::tone_symbol() const
 
 void LauncherDialog::retranslate()
 {
-    setWindowTitle(util::i18n::translate(title_source));
-    title_label->setText(util::i18n::translate(title_source));
-    message_label->setText(util::i18n::translate(message_source));
-    details_label->setText(util::i18n::translate(details_source));
+    setWindowTitle(soa::i18n::translate(title_source));
+    title_label->setText(soa::i18n::translate(title_source));
+    message_label->setText(soa::i18n::translate(message_source));
+    details_label->setText(soa::i18n::translate(details_source));
     details_card->setVisible(!details_source.isEmpty());
     tone_badge->setText(tone_symbol());
-    close_button->setAccessibleName(util::i18n::translate("Close window"));
+    close_button->setAccessibleName(soa::i18n::translate("Close window"));
 
     QString accent;
     switch (tone)
@@ -252,7 +252,7 @@ void LauncherDialog::retranslate()
     {
         if (label->property("dialogCategoryLabel").toBool())
         {
-            label->setText(util::i18n::translate(tone_label()));
+            label->setText(soa::i18n::translate(tone_label()));
             label->setStyleSheet(QStringLiteral(
                 "color: %1; letter-spacing: 1px;").arg(accent));
         }
@@ -261,7 +261,7 @@ void LauncherDialog::retranslate()
     for (QPushButton* button : std::as_const(action_buttons))
     {
         const QString source = button->property("dialogTextSource").toString();
-        const QString translated = util::i18n::translate(source);
+        const QString translated = soa::i18n::translate(source);
         button->setText(translated);
         button->setAccessibleName(translated);
         button->setToolTip(translated);
@@ -281,7 +281,7 @@ void LauncherDialog::retranslate()
     setFixedSize(required_width, required_height);
     layout()->activate();
     panel->layout()->activate();
-    close_button->setGeometry(util::layout::modal_close::rect_in(panel->rect(), launcher_reference_size(this)));
+    close_button->setGeometry(soa::ui::layout::modal_close::rect_in(panel->rect(), launcher_reference_size(this)));
     close_button->raise();
 }
 
@@ -293,7 +293,7 @@ QPushButton* LauncherDialog::add_action(const Action& action)
     button->setFixedHeight(ui_scaled(this, 42));
     button->setMinimumWidth(ui_scaled(this, 118));
     button->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
-    QFont font = util::assets::fonts[util::assets::Font::EurostileBlack];
+    QFont font = soa::ui::assets::fonts[soa::ui::assets::Font::EurostileBlack];
     font.setPixelSize(qMax(8, ui_scaled(this, 12)));
     font.setWeight(QFont::Black);
     button->setFont(font);

@@ -1,7 +1,7 @@
 #pragma once
 #include <QWidget>
 
-namespace core::wine
+namespace soa::runtime
 {
     class Shell;
 }
@@ -10,7 +10,7 @@ class WineSettings : public QWidget
 {
     Q_OBJECT
 public:
-    explicit WineSettings(core::wine::Shell* shell, QWidget* parent = nullptr);
+    explicit WineSettings(soa::runtime::Shell* shell, QWidget* parent = nullptr);
 
 private:
     void setup_dxvk_option();
@@ -19,5 +19,5 @@ private:
     void setup_tricks_option();
     void setup_wine_args_option();
 
-    core::wine::Shell* shell {};
+    soa::runtime::Shell* shell {};
 };

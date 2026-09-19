@@ -5,11 +5,11 @@
 #include <QFileInfo>
 #include <QStandardPaths>
 
-namespace core::wine
+namespace soa::runtime
 {
     QString winetricks_path()
     {
-        const QString configured = util::config::Config::instance().winetricks_binary();
+        const QString configured = soa::config::Config::instance().winetricks_binary();
         if (!configured.isEmpty())
         {
             if (QFileInfo(configured).isAbsolute())
@@ -24,7 +24,7 @@ namespace core::wine
 
     QString umu_path()
     {
-        const QString configured = util::config::Config::instance().umu_binary();
+        const QString configured = soa::config::Config::instance().umu_binary();
         if (!configured.isEmpty())
         {
             if (QFileInfo(configured).isAbsolute())

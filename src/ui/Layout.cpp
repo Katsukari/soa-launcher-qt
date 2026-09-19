@@ -1,6 +1,6 @@
 #include "ui/Layout.hpp"
 
-namespace util::layout
+namespace soa::ui::layout
 {
     double scale(const QSize win)
     {

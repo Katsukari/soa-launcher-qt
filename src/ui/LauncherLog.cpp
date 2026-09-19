@@ -26,7 +26,7 @@ namespace
             return active->size();
         }
 
-        const QString configured = util::config::Config::instance().launcher_size();
+        const QString configured = soa::config::Config::instance().launcher_size();
         const QStringList parts = configured.split(QLatin1Char('x'));
         if (parts.size() == 2)
         {
@@ -37,7 +37,7 @@ namespace
             if (width_ok && height_ok && width > 0 && height > 0)
                 return {width, height};
         }
-        return util::layout::win::k_default;
+        return soa::ui::layout::win::k_default;
     }
 }
 
@@ -55,7 +55,7 @@ LauncherLog* LauncherLog::instance()
 LauncherLog::LauncherLog(QWidget* parent) : QDialog(parent)
 {
     const QSize reference = launcher_reference_size();
-    resize(util::layout::scaled(QSize(680, 420), reference));
+    resize(soa::ui::layout::scaled(QSize(680, 420), reference));
 
     output = new QPlainTextEdit(this);
     output->setReadOnly(true);
@@ -63,14 +63,14 @@ LauncherLog::LauncherLog(QWidget* parent) : QDialog(parent)
     output->setStyleSheet(QStringLiteral(
         "QPlainTextEdit { background:#1E1B17; color:#D8C9B8;"
         " font-family:'monospace'; font-size:%1px; border:none; }")
-        .arg(qMax(9, util::layout::scaled(12, reference))));
+        .arg(qMax(9, soa::ui::layout::scaled(12, reference))));
 
     clear_button = new QPushButton(this);
     copy_button = new QPushButton(this);
     autoscroll_button = new QPushButton(this);
 
     QFont control_font;
-    control_font.setPixelSize(qMax(9, util::layout::scaled(12, reference)));
+    control_font.setPixelSize(qMax(9, soa::ui::layout::scaled(12, reference)));
     clear_button->setFont(control_font);
     copy_button->setFont(control_font);
     autoscroll_button->setFont(control_font);
@@ -103,14 +103,14 @@ LauncherLog::LauncherLog(QWidget* parent) : QDialog(parent)
             output->verticalScrollBar()->setValue(output->verticalScrollBar()->maximum());
     });
 
-    connect(&util::i18n::LanguageManager::instance(),
-            &util::i18n::LanguageManager::language_changed, this, [this]()
+    connect(&soa::i18n::LanguageManager::instance(),
+            &soa::i18n::LanguageManager::language_changed, this, [this]()
     {
         retranslate();
     });
 
     auto* bar = new QHBoxLayout;
-    bar->setSpacing(util::layout::scaled(8, reference));
+    bar->setSpacing(soa::ui::layout::scaled(8, reference));
     bar->addWidget(clear_button);
     bar->addWidget(copy_button);
     bar->addWidget(autoscroll_button);
@@ -118,9 +118,9 @@ LauncherLog::LauncherLog(QWidget* parent) : QDialog(parent)
     bar->addWidget(verbosity);
 
     auto* root = new QVBoxLayout(this);
-    const int margin = util::layout::scaled(10, reference);
+    const int margin = soa::ui::layout::scaled(10, reference);
     root->setContentsMargins(margin, margin, margin, margin);
-    root->setSpacing(util::layout::scaled(8, reference));
+    root->setSpacing(soa::ui::layout::scaled(8, reference));
     root->addLayout(bar);
     root->addWidget(output);
     retranslate();
@@ -128,7 +128,7 @@ LauncherLog::LauncherLog(QWidget* parent) : QDialog(parent)
 
 void LauncherLog::retranslate()
 {
-    using util::i18n::translate;
+    using soa::i18n::translate;
     setWindowTitle(translate("Launcher Log"));
     clear_button->setText(translate("Clear"));
     copy_button->setText(translate("Copy"));
@@ -146,7 +146,7 @@ void LauncherLog::retranslate()
 void LauncherLog::append_line(int level, const QString& text)
 {
     QString safeText = text;
-    const QString token = util::config::Config::instance().token();
+    const QString token = soa::config::Config::instance().token();
     if (!token.isEmpty())
         safeText.replace(token, QStringLiteral("[REDACTED]"));
 

@@ -1,6 +1,6 @@
 #include "runtime/GameSession.hpp"
 
-namespace core::wine
+namespace soa::runtime
 {
     QString game_phase_name(const GamePhase phase)
     {

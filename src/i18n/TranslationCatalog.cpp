@@ -191,7 +191,7 @@ namespace
     }
 }
 
-namespace util::i18n::detail
+namespace soa::i18n::detail
 {
     void set_catalog_active(const bool active)
     {
@@ -204,7 +204,7 @@ namespace util::i18n::detail
     }
 }
 
-namespace util::i18n
+namespace soa::i18n
 {
     QString translate(const char* source)
     {

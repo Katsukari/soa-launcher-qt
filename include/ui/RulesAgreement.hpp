@@ -12,14 +12,14 @@ class QShowEvent;
 class QTextBrowser;
 class QTimer;
 
-namespace core::network
+namespace soa::network
 {
     class SwiftHttpClient;
     struct HttpResponse;
 }
 class QUrl;
 
-class RulesAgreement final : public util::modal_overlay::ModalOverlay
+class RulesAgreement final : public soa::ui::ModalOverlay
 {
     Q_OBJECT
 
@@ -37,7 +37,7 @@ protected:
 private:
     void setup_controls();
     void load_rules();
-    void finish_rules_request(const core::network::HttpResponse& response);
+    void finish_rules_request(const soa::network::HttpResponse& response);
     void show_document(const QByteArray& source, bool save_cache);
     void show_load_failure(const QString& reason);
     void start_cooldown();
@@ -49,7 +49,7 @@ private:
     QTextBrowser* rules_text {};
     QPushButton* agree_button {};
     QLabel* agree_button_label {};
-    core::network::SwiftHttpClient* network {};
+    soa::network::SwiftHttpClient* network {};
     qulonglong request_id {};
     QTimer* cooldown_timer {};
     QString document_html;

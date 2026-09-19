@@ -29,10 +29,10 @@
 #include <QPushButton>
 #include <QTimer>
 
-using core::game::GameVersion;
-using core::state::Stage;
-using core::state::View;
-using util::config::Config;
+using soa::common::game::GameVersion;
+using soa::ui::Stage;
+using soa::ui::View;
+using soa::config::Config;
 
 #ifndef SOA_LAUNCHER_VERSION
 #define SOA_LAUNCHER_VERSION "0.3.0"
@@ -42,20 +42,20 @@ void MainWindow::setup_window_buttons()
 {
     const QSize window_size = size();
 
-    close_button = util::simple_utils::make_flat_button(this);
-    close_button->setIcon(QIcon(util::assets::images[util::assets::Image::CloseIcon]));
-    close_button->setIconSize(util::layout::chrome::close_icon(window_size));
-    close_button->setGeometry(util::layout::chrome::close(window_size));
+    close_button = soa::ui::simple_utils::make_flat_button(this);
+    close_button->setIcon(QIcon(soa::ui::assets::images[soa::ui::assets::Image::CloseIcon]));
+    close_button->setIconSize(soa::ui::layout::chrome::close_icon(window_size));
+    close_button->setGeometry(soa::ui::layout::chrome::close(window_size));
     close_button->setAccessibleName(QStringLiteral("Close launcher"));
     connect(close_button, &QPushButton::clicked, this, [this]()
     {
         close();
     });
 
-    minimize_button = util::simple_utils::make_flat_button(this);
-    minimize_button->setIcon(QIcon(util::assets::images[util::assets::Image::Minimize]));
-    minimize_button->setIconSize(util::layout::chrome::minimize_icon(window_size));
-    minimize_button->setGeometry(util::layout::chrome::minimize(window_size));
+    minimize_button = soa::ui::simple_utils::make_flat_button(this);
+    minimize_button->setIcon(QIcon(soa::ui::assets::images[soa::ui::assets::Image::Minimize]));
+    minimize_button->setIconSize(soa::ui::layout::chrome::minimize_icon(window_size));
+    minimize_button->setGeometry(soa::ui::layout::chrome::minimize(window_size));
     minimize_button->setAccessibleName(QStringLiteral("Minimize launcher"));
     connect(minimize_button, &QPushButton::clicked, this, [this]()
     {
@@ -70,21 +70,21 @@ void MainWindow::setup_version_label()
     version_art_label = new QLabel(this);
     version_art_label->setAttribute(Qt::WA_TransparentForMouseEvents);
     version_art_label->setAlignment(Qt::AlignRight | Qt::AlignBottom);
-    const QRect art_rect = util::layout::chrome::version_art(window_size);
+    const QRect art_rect = soa::ui::layout::chrome::version_art(window_size);
     version_art_label->setGeometry(art_rect);
-    version_art_label->setPixmap(util::assets::images[util::assets::Image::VersionIconKatsu]
+    version_art_label->setPixmap(soa::ui::assets::images[soa::ui::assets::Image::VersionIconKatsu]
         .scaled(art_rect.size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
 
     version_label = new QLabel(this);
     version_label->setAttribute(Qt::WA_TransparentForMouseEvents);
-    QFont font = util::assets::fonts[util::assets::Font::EurostileExtraBlack];
-    font.setPixelSize(util::layout::scaled(util::layout::text::k_version, window_size));
+    QFont font = soa::ui::assets::fonts[soa::ui::assets::Font::EurostileExtraBlack];
+    font.setPixelSize(soa::ui::layout::scaled(soa::ui::layout::text::k_version, window_size));
     font.setWeight(QFont::Black);
     font.setLetterSpacing(QFont::PercentageSpacing, 108);
     version_label->setFont(font);
     version_label->setStyleSheet("color: #747B82; background: transparent;");
     version_label->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-    version_label->setGeometry(util::layout::chrome::version(window_size));
+    version_label->setGeometry(soa::ui::layout::chrome::version(window_size));
     version_label->raise();
     retranslate_dynamic_text();
 }
@@ -155,7 +155,7 @@ void MainWindow::setup_repair_files()
     {
         if (shell && shell->is_busy())
         {
-            app::detail::show_modeless_message(
+            soa::app::detail::show_modeless_message(
                 this, LauncherDialog::Tone::Warning, QStringLiteral("Repair Unavailable"),
                 QStringLiteral(
                     "Alicia or another runtime operation is active. Finish it before "
@@ -206,9 +206,9 @@ void MainWindow::setup_repair_files()
 
 void MainWindow::setup_integrity_watcher()
 {
-    integrity_watcher = new core::integrity::GameIntegrityWatcher(this);
-    connect(integrity_watcher, &core::integrity::GameIntegrityWatcher::protected_files_changed,
-            this, [this](const core::game::GameVersion version, const QStringList& paths)
+    integrity_watcher = new soa::runtime::GameIntegrityWatcher(this);
+    connect(integrity_watcher, &soa::runtime::GameIntegrityWatcher::protected_files_changed,
+            this, [this](const soa::common::game::GameVersion version, const QStringList& paths)
     {
         if (repair_active || (repair_files && repair_files->isVisible())
             || (repair_progress && repair_progress->isVisible()))
@@ -240,7 +240,7 @@ void MainWindow::setup_alicia_chooser()
     const QSize window_size = size();
     alicia_chooser = new AliciaChooser(auth, shell, install_state, this);
     alicia_chooser->set_game_version(game_version);
-    alicia_chooser->move(util::layout::alicia_chooser::pos(window_size));
+    alicia_chooser->move(soa::ui::layout::alicia_chooser::pos(window_size));
 
     connect(alicia_chooser, &AliciaChooser::settings_requested, this, [this]()
     {
@@ -260,9 +260,9 @@ void MainWindow::setup_alicia_chooser()
             this,
             LauncherDialog::Tone::Warning,
             QStringLiteral("Reset Launcher Config"),
-            util::i18n::translate(
+            soa::i18n::translate(
                 "This resets launcher settings, the setup/rules confirmations, and signs you out.\n\n")
-                + util::i18n::translate(preservedData),
+                + soa::i18n::translate(preservedData),
             QStringLiteral("Reset Launcher"),
             QStringLiteral("Cancel"),
             true);
@@ -284,19 +284,19 @@ void MainWindow::setup_game_selector()
 {
     const QSize window_size = size();
 
-    playtest_button = util::simple_utils::make_flat_button(this);
+    playtest_button = soa::ui::simple_utils::make_flat_button(this);
     playtest_button->setCursor(Qt::PointingHandCursor);
     playtest_button->setAccessibleName("Story of Alicia Playtest");
-    playtest_button->setGeometry(util::layout::chrome::playtest_button(window_size));
+    playtest_button->setGeometry(soa::ui::layout::chrome::playtest_button(window_size));
     connect(playtest_button, &QPushButton::clicked, this, [this]()
     {
         set_game_version(GameVersion::Playtest);
     });
 
-    alicia_2_button = util::simple_utils::make_flat_button(this);
+    alicia_2_button = soa::ui::simple_utils::make_flat_button(this);
     alicia_2_button->setCursor(Qt::PointingHandCursor);
     alicia_2_button->setAccessibleName("Story of Alicia 2.0");
-    alicia_2_button->setGeometry(util::layout::chrome::alicia_2_button(window_size));
+    alicia_2_button->setGeometry(soa::ui::layout::chrome::alicia_2_button(window_size));
     connect(alicia_2_button, &QPushButton::clicked, this, [this]()
     {
         set_game_version(GameVersion::Alicia2);
@@ -346,19 +346,19 @@ void MainWindow::setup_wine_select()
 
 void MainWindow::setup_launcher_updates()
 {
-    launcher_update_manager = new core::update::LauncherUpdateManager(this);
+    launcher_update_manager = new soa::update::LauncherUpdateManager(this);
     launcher_update = new LauncherUpdate(this);
     launcher_update->hide();
 
     connect(launcher_update_manager,
-            &core::update::LauncherUpdateManager::check_started,
+            &soa::update::LauncherUpdateManager::check_started,
             this, [this]()
     {
         if (launcher_menu_controller)
             launcher_menu_controller->set_manage_versions_enabled(false);
     });
     connect(launcher_update_manager,
-            &core::update::LauncherUpdateManager::no_update_available,
+            &soa::update::LauncherUpdateManager::no_update_available,
             this, [this]()
     {
         if (launcher_menu_controller)
@@ -366,7 +366,7 @@ void MainWindow::setup_launcher_updates()
         continue_after_launcher_update_check();
     });
     connect(launcher_update_manager,
-            &core::update::LauncherUpdateManager::check_failed,
+            &soa::update::LauncherUpdateManager::check_failed,
             this, [this](const QString&)
     {
         if (launcher_menu_controller)
@@ -374,7 +374,7 @@ void MainWindow::setup_launcher_updates()
         continue_after_launcher_update_check();
     });
     connect(launcher_update_manager,
-            &core::update::LauncherUpdateManager::manual_check_failed,
+            &soa::update::LauncherUpdateManager::manual_check_failed,
             this, [this](const QString& reason)
     {
         if (launcher_menu_controller)
@@ -386,13 +386,13 @@ void MainWindow::setup_launcher_updates()
             QStringLiteral("No launcher files were changed."));
     });
     connect(launcher_update_manager,
-            &core::update::LauncherUpdateManager::update_found,
+            &soa::update::LauncherUpdateManager::update_found,
             this, [this]()
     {
         if (launcher_menu_controller)
             launcher_menu_controller->set_manage_versions_enabled(true);
         launcher_update->set_versions(
-            core::update::LauncherUpdateManager::current_version(),
+            soa::update::LauncherUpdateManager::current_version(),
             launcher_update_manager->available_versions(), false);
         launcher_update->set_release(
             launcher_update_manager->available_version(),
@@ -401,13 +401,13 @@ void MainWindow::setup_launcher_updates()
         open_overlay(launcher_update);
     });
     connect(launcher_update_manager,
-            &core::update::LauncherUpdateManager::catalogue_ready,
+            &soa::update::LauncherUpdateManager::catalogue_ready,
             this, [this]()
     {
         if (launcher_menu_controller)
             launcher_menu_controller->set_manage_versions_enabled(true);
         launcher_update->set_versions(
-            core::update::LauncherUpdateManager::current_version(),
+            soa::update::LauncherUpdateManager::current_version(),
             launcher_update_manager->available_versions(), true);
         launcher_update->set_release(
             launcher_update_manager->available_version(), false,
@@ -423,20 +423,20 @@ void MainWindow::setup_launcher_updates()
     });
     connect(launcher_update, &LauncherUpdate::update_requested,
             launcher_update_manager,
-            &core::update::LauncherUpdateManager::download_and_install);
+            &soa::update::LauncherUpdateManager::download_and_install);
     connect(launcher_update, &LauncherUpdate::version_selected,
-            launcher_update_manager, &core::update::LauncherUpdateManager::select_version);
+            launcher_update_manager, &soa::update::LauncherUpdateManager::select_version);
     connect(launcher_update_manager,
-            &core::update::LauncherUpdateManager::download_started,
+            &soa::update::LauncherUpdateManager::download_started,
             this, [this]()
     {
         launcher_update->set_downloading(true);
     });
     connect(launcher_update_manager,
-            &core::update::LauncherUpdateManager::download_progress,
+            &soa::update::LauncherUpdateManager::download_progress,
             launcher_update, &LauncherUpdate::set_progress);
     connect(launcher_update_manager,
-            &core::update::LauncherUpdateManager::update_failed,
+            &soa::update::LauncherUpdateManager::update_failed,
             this, [this](const QString& reason)
     {
         launcher_update->set_downloading(false);
@@ -447,7 +447,7 @@ void MainWindow::setup_launcher_updates()
             QStringLiteral("The existing launcher was not removed. Check the launcher log and try again."));
     });
     connect(launcher_update_manager,
-            &core::update::LauncherUpdateManager::installer_started,
+            &soa::update::LauncherUpdateManager::installer_started,
             this, [this](const QString&)
     {
         launcher_update->set_starting_installer();
