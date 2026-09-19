@@ -174,7 +174,7 @@ final class DiscordRpcService: @unchecked Sendable
         }
         guard let activity = try? JSONSerialization.jsonObject(with: pendingPayload) else { return }
         guard sendActivity(activity) else {
-            disconnectAndRetry("Discord RPC write failed; retrying.")
+            disconnectAndRetry("Discord RPC write failed - retrying.")
             return
         }
         lastSentAt = now
@@ -236,12 +236,12 @@ final class DiscordRpcService: @unchecked Sendable
                 continue
             }
             if count == 0 {
-                disconnectAndRetry("Discord RPC disconnected; retrying.")
+                disconnectAndRetry("Discord RPC disconnected - retrying.")
                 return
             }
             if errno == EAGAIN || errno == EWOULDBLOCK { return }
             if errno == EINTR { continue }
-            disconnectAndRetry("Discord RPC read failed; retrying.")
+            disconnectAndRetry("Discord RPC read failed - retrying.")
             return
         }
     }

@@ -6,7 +6,7 @@ namespace core::discord
 {
     namespace
     {
-        constexpr auto k_application_id = "1431526738881548369";
+        constexpr auto k_application_id = "1543559591449731122";
     }
 
     DiscordRpc::DiscordRpc(QObject* parent)
