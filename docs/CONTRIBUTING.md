@@ -12,19 +12,11 @@ By submitting a contribution for inclusion in this repository, you agree that:
 
 - you have the right to submit the contribution.
 - you retain copyright in your contribution.
-- your contribution may be distributed, modified, and otherwise used under the GNU General Public License version 3.
-- the additional terms in `ADDITIONAL_TERMS.md` apply to your contribution.
-- also that you are not submitting material whose license or ownership prevents it from being distributed under these terms.
+- you license your contribution under the GNU General Public License version 3.
+- the additional terms in `ADDITIONAL_TERMS.md` apply to your contribution
+- and you are not submitting material whose license or ownership prevents it from being distributed under these terms.
 
 Submitting a contribution does not transfer ownership of your copyright to the Story of Alicia project or to the repository maintainers.
-
-Once distributed under these terms, recipients receive the rights granted by the GNU General Public License version 3.
-
-## Third-party code
-
-Do not submit third-party code, assets, or other material unless its license is compatible with the project and the relevant license and attribution information is preserved.
-
-Third-party material should be clearly identified and must not be represented as original Story of Alicia work.
 
 ## Project layout
 
