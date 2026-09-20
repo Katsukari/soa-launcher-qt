@@ -12,6 +12,8 @@ The official **Story of Alicia** launcher for Linux and macOS.
 
 ![Launcher screenshot](/docs/soa-launcher-screenshot.png)
 
+> **AI development disclosure:** AI was used as a development tool alongside human direction, testing, review, and decision-making
+
 The launcher can:
 
 - Install and update the game
@@ -23,8 +25,6 @@ The launcher can:
 - Start the game and collect useful diagnostics when something goes wrong
 
 The launcher is designed to work for regular players without requiring knowledge of Wine, Proton, prefixes, or command-line tools.
-
-> **AI development disclosure:** AI was used as a development tool alongside human direction, testing, review, and decision-making
 
 ## Supported platforms
 
