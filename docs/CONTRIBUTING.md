@@ -1,7 +1,5 @@
 # Contributing to the Story of Alicia Launcher
 
-# Contributing
-
 Thank you for contributing to the Story of Alicia Launcher.
 
 ## Licensing
