@@ -96,7 +96,7 @@ You do not need to install both Wine and Proton. Package names vary between Linu
 
 ### macOS
 
-**1. Install Rosetta 2 (Apple Silicon only).** Game Porting Toolkit runs the game
+**1. Install Rosetta 2 (Apple Silicon only) via the terminal.** Game Porting Toolkit runs the game
 as x86_64 code, so it will not work without it. The launcher itself is universal
 and does not need Rosetta, but the game will not start without it.
 
@@ -104,7 +104,7 @@ and does not need Rosetta, but the game will not start without it.
 softwareupdate --install-rosetta --agree-to-license
 ```
 
-**2. Install Homebrew and `winetricks`.** macOS does not ship `winetricks`, and
+**2. Install Homebrew and `winetricks` via the terminal.** macOS does not ship `winetricks`, and
 [Homebrew](https://brew.sh/) is the simplest way to get it:
 
 ```sh
@@ -115,7 +115,9 @@ brew install winetricks
 **3. Install Game Porting Toolkit.** Use the
 [distribution maintained by Gcenx](https://github.com/Gcenx/game-porting-toolkit/releases).
 This runtime is what actually runs Alicia on macOS, and it is not bundled with
-the launcher, so it has to be installed separately.
+the launcher, so it has to be installed separately. 
+
+Double clicking the tar.xz opens it with Archive Utility which extracts the app. Afterwards drag the application to /Applications for runtime auto-detection in the launcher. The app can potentially be blocked from running due to macOS complaining that it can't verify that it's not harmful; go to privacy settings, scroll down and then select ''run anyway''.
 
 Follow the requirements and installation notes for the specific Game Porting Toolkit release you download.
 
@@ -124,17 +126,19 @@ Follow the requirements and installation notes for the specific Game Porting Too
 ### Linux
 
 1. Download the AppImage.
-2. Allow it to run:
+2. Allow it to run via the terminal:
 
    ```sh
-   chmod +x Story_Of_Alicia-x86_64.AppImage
+   chmod +x <path to Story_Of_Alicia-<version>-x86_64.appimage>
    ```
+You can drag the appimage in the terminal, it'll put the full path in automatically.
 
-3. Open it:
+3. Open it via the terminal:
 
    ```sh
-   ./Story_Of_Alicia-x86_64.AppImage
+   <path to Story_Of_Alicia-<version>-x86_64.appimage>
    ```
+Or double click the appimage
 
 Linux users can choose between Wine, Proton through UMU, or a custom runtime from the launcher.
 
@@ -145,6 +149,9 @@ Linux users can choose between Wine, Proton through UMU, or a custom runtime fro
 3. Open it and move the launcher to Applications.
 4. Open the launcher.
 
+## Known issues
+If you encounter an error/problem, check [known issues](Known_Issues.md) first if your issue is already known and if it has a solution.
+
 ## Documentation
 
 - [`BUILDING.md`](docs/BUILDING.md) - building the launcher from source
@@ -153,13 +160,19 @@ Linux users can choose between Wine, Proton through UMU, or a custom runtime fro
 - [`PLATFORM_LINUX.md`](docs/PLATFORM_LINUX.md) - Linux behavior and packaging
 - [`PLATFORM_MACOS.md`](docs/PLATFORM_MACOS.md) - macOS behavior and packaging
 
-## License and assets
+## License
 
-The launcher source code is distributed under the license in [`LICENSE`](LICENSE).
+The Story of Alicia Launcher is licensed under the
+[GNU General Public License version 3](LICENSE).
 
-Artwork, logos, fonts, game files, and modified textless versions of existing artwork remain owned by their respective copyright holders and are not automatically covered by the launcher's source-code license.
+Additional attribution terms permitted under GPLv3 Section 7 apply.
+See [ADDITIONAL_TERMS.md](ADDITIONAL_TERMS.md).
 
-Licenses for the bundled fonts are in [`assets/fonts/`](assets/fonts). I'm still looking into these licences.
+Story of Alicia branding and project assets are subject to the terms
+described in [BRANDING.md](BRANDING.md).
+
+Contributions are subject to the terms described in
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Acknowledgements
 
