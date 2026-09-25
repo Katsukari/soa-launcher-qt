@@ -1031,7 +1031,7 @@ Ontbreekt: %1. %2, start dan de launcher opnieuw op.</translation>
     <message>
         <location filename="../src/ui/DownloadProgress.cpp" line="171"/>
         <source>Cancel the current repair? Verified and partial files will be kept so a later retry can continue.</source>
-        <translation type="unfinished">De huidige reparatie annuleren? Geverifieerde en gedeeltelijke bestanden worden bewaard zodat een latere poging door kan gaan.</translation>
+        <translation>De huidige reparatie annuleren? Geverifieerde en gedeeltelijke bestanden worden bewaard zodat een latere poging door kan gaan.</translation>
     </message>
     <message>
         <location filename="../src/ui/DownloadProgress.cpp" line="87"/>
@@ -1089,7 +1089,7 @@ Ontbreekt: %1. %2, start dan de launcher opnieuw op.</translation>
     <message>
         <location filename="../src/ui/DownloadProgress.cpp" line="366"/>
         <source>DOWNLOAD COMPLETE</source>
-        <translation>DOWNLOAD COMPLEET</translation>
+        <translation>DOWNLOAD VOLTOOID</translation>
     </message>
     <message>
         <location filename="../src/ui/DownloadProgress.cpp" line="146"/>
@@ -1119,242 +1119,243 @@ Ontbreekt: %1. %2, start dan de launcher opnieuw op.</translation>
     <message>
         <location filename="../src/ui/GameInstall.cpp" line="229"/>
         <source>GAME INSTALLATION PATH</source>
-        <translation type="unfinished"></translation>
+        <translation>SPEL INSTALLATIE PAD</translation>
     </message>
     <message>
         <location filename="../src/ui/GameInstall.cpp" line="94"/>
         <location filename="../src/ui/WineInstall.cpp" line="95"/>
         <source>INSTALL</source>
-        <translation type="unfinished"></translation>
+        <translation>INSTALLEREN</translation>
     </message>
     <message>
         <location filename="../src/ui/GameInstall.cpp" line="95"/>
         <source>Install game</source>
-        <translation type="unfinished"></translation>
+        <translation>Spel installeren</translation>
     </message>
     <message>
         <location filename="../src/ui/DownloadProgress.cpp" line="176"/>
         <location filename="../src/ui/PrefixProgress.cpp" line="118"/>
         <source>Keep Running</source>
-        <translation type="unfinished"></translation>
+        <translation>Blijf Draaien</translation>
     </message>
     <message>
         <location filename="../src/ui/RepairFiles.cpp" line="183"/>
         <source>Missing or damaged files will be downloaded again. Valid files and resumable partial downloads are kept, so the repair does not restart the whole game.</source>
-        <translation type="unfinished"></translation>
+        <translation>Vermiste of beschadigde bestanden worden opnieuw gedownload. Geldige bestanden en hervatbare gedeeltelijke downloads zijn behouden, zodat de reparatie niet de hele game opnieuw start.</translation>
     </message>
     <message>
         <location filename="../src/ui/DownloadProgress.cpp" line="378"/>
         <source>PREPARING</source>
-        <translation type="unfinished"></translation>
+        <translation>VOORBEREIDEN..</translation>
     </message>
     <message>
         <location filename="../src/ui/DownloadProgress.cpp" line="255"/>
         <location filename="../src/ui/LauncherUpdate.cpp" line="268"/>
         <source>Preparing download...</source>
-        <translation type="unfinished"></translation>
+        <translation>Download voorbereiden..</translation>
     </message>
     <message>
         <location filename="../src/ui/DownloadProgress.cpp" line="377"/>
         <source>PREPARING REPAIR</source>
-        <translation type="unfinished"></translation>
+        <translation>REPARATIE VOORBEREIDEN</translation>
     </message>
     <message>
         <location filename="../src/ui/DownloadProgress.cpp" line="254"/>
         <source>Preparing repair...</source>
-        <translation type="unfinished"></translation>
+        <translation>Reparatie voorbereiden...</translation>
     </message>
     <message>
         <location filename="../src/ui/DownloadProgress.cpp" line="365"/>
         <source>REPAIR COMPLETE</source>
-        <translation type="unfinished"></translation>
+        <translation>REPARATIE VOLTOOID</translation>
     </message>
     <message>
         <location filename="../src/ui/DownloadProgress.cpp" line="145"/>
         <source>Repair Error Details</source>
-        <translation type="unfinished"></translation>
+        <translation>Reparatie Error Details</translation>
     </message>
     <message>
         <location filename="../src/ui/DownloadProgress.cpp" line="369"/>
         <source>REPAIR FAILED</source>
-        <translation type="unfinished"></translation>
+        <translation>REPARATIE GEFAALD</translation>
     </message>
     <message>
         <location filename="../src/ui/RepairFiles.cpp" line="122"/>
         <source>REPAIR FILES</source>
-        <translation type="unfinished"></translation>
+        <translation>BESTANDEN REPAREREN</translation>
     </message>
     <message>
         <location filename="../src/ui/DownloadProgress.cpp" line="399"/>
         <source>REPAIRING</source>
-        <translation type="unfinished"></translation>
+        <translation>REPAREREN</translation>
     </message>
     <message>
         <location filename="../src/ui/DownloadProgress.cpp" line="400"/>
         <source>RESUMING</source>
-        <translation type="unfinished"></translation>
+        <translation>HERVATTEN</translation>
     </message>
     <message>
         <location filename="../src/ui/DownloadProgress.cpp" line="396"/>
         <source>Resuming</source>
-        <translation type="unfinished"></translation>
+        <translation>Hervatten</translation>
     </message>
     <message>
         <location filename="../src/ui/DownloadProgress.cpp" line="398"/>
         <source>RESUMING REPAIR</source>
-        <translation type="unfinished"></translation>
+        <translation>REPARATIE HERVATTEN</translation>
     </message>
     <message>
         <location filename="../src/ui/DownloadProgress.cpp" line="453"/>
         <source>Retry continues from saved files</source>
-        <translation type="unfinished"></translation>
+        <translation>Opnieuw Proberen gaat door vanaf opgeslagen bestanden.</translation>
     </message>
     <message>
         <location filename="../src/ui/DownloadProgress.cpp" line="148"/>
         <source>Retry continues from the files that were already verified or downloaded.</source>
-        <translation type="unfinished"></translation>
+        <translation>Opnieuw Proberen gaat door vanaf bestanden dat al waren geverifieerd of gedownload.</translation>
     </message>
     <message>
         <location filename="../src/ui/DownloadProgress.cpp" line="127"/>
         <source>Retry download</source>
-        <translation type="unfinished"></translation>
+        <translation>Download opnieuw proberen</translation>
     </message>
     <message>
         <location filename="../src/ui/DownloadProgress.cpp" line="126"/>
         <source>Retry repair</source>
-        <translation type="unfinished"></translation>
+        <translation>Reparatie opnieuw proberen</translation>
     </message>
     <message>
         <location filename="../src/ui/GameInstall.cpp" line="116"/>
         <source>Select Game Install Location</source>
-        <translation type="unfinished"></translation>
+        <translation>Selecteer Spel Installatie Locatie</translation>
     </message>
     <message>
         <location filename="../src/ui/DownloadProgress.cpp" line="132"/>
         <source>SHOW ERROR</source>
-        <translation type="unfinished"></translation>
+        <translation>WEERGEEF ERROR</translation>
     </message>
     <message>
         <location filename="../src/ui/DownloadProgress.cpp" line="136"/>
         <source>Show full error</source>
-        <translation type="unfinished"></translation>
+        <translation>Weergeef volledige error</translation>
     </message>
     <message>
         <location filename="../src/ui/InstallState.cpp" line="179"/>
         <location filename="../src/ui/InstallState.cpp" line="180"/>
         <source>The configured game folder is outside the active Wine prefix.</source>
-        <translation type="unfinished"></translation>
+        <translation>De geconfigureerde spel map is buiten de actieve Wine prefix</translation>
     </message>
     <message>
         <location filename="../src/ui/DownloadProgress.cpp" line="294"/>
         <source>The download could not be started.</source>
-        <translation type="unfinished"></translation>
+        <translation>De download kon niet worden gestart.</translation>
     </message>
     <message>
         <location filename="../src/ui/DownloadProgress.cpp" line="280"/>
         <source>The downloader could not be created.</source>
-        <translation type="unfinished"></translation>
+        <translation>De downloader kon niet worden gecreëerd.</translation>
     </message>
     <message>
         <location filename="../src/ui/InstallState.cpp" line="265"/>
         <source>The game download failed.</source>
-        <translation type="unfinished"></translation>
+        <translation>De download van het spel is gefaald.</translation>
     </message>
     <message>
         <location filename="../src/ui/GameInstall.cpp" line="262"/>
         <location filename="../src/ui/GameInstall.cpp" line="263"/>
         <source>The game must be installed inside the Wine prefix.</source>
-        <translation type="unfinished"></translation>
+        <translation>Het spel moet worden geinstalleerd in de Wine prefix.</translation>
     </message>
     <message>
         <location filename="../src/ui/GameInstall.cpp" line="214"/>
         <location filename="../src/ui/GameInstall.cpp" line="215"/>
         <source>The game will be downloaded into the selected directory inside your Wine prefix. You can keep the default path or choose a custom one.</source>
-        <translation type="unfinished"></translation>
+        <translation>Het spel wordt gedownload in de geselecteerde map in je Wine prefix. Je kan het standaard pad behouden of zelf één kiezen.</translation>
     </message>
     <message>
         <location filename="../src/i18n/TranslationCatalog.cpp" line="136"/>
         <location filename="../src/ui/InstallState.cpp" line="267"/>
         <location filename="../src/ui/InstallState.cpp" line="268"/>
         <source>The last game transfer failed. Retry will verify existing files and continue: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>De laatste spel overdracht was gefaald. Opnieuw Proberen zal bestaande bestanden verifiëren en doorgaan: %1</translation>
     </message>
     <message>
         <location filename="../src/ui/InstallState.cpp" line="238"/>
         <location filename="../src/ui/InstallState.cpp" line="239"/>
         <source>The launcher could not check for game updates. You can still launch the installed version.</source>
-        <translation type="unfinished"></translation>
+        <translation>De launcher kon niet controleren voor spel updates. Je kan nogsteeds de geinstalleerde versie opstarten.</translation>
     </message>
     <message>
         <location filename="../src/i18n/TranslationCatalog.cpp" line="139"/>
         <location filename="../src/ui/RepairFiles.cpp" line="72"/>
         <source>The launcher detected %1 protected file changes.</source>
-        <translation type="unfinished"></translation>
+        <translation>De launcher heeft % wijzigingen in beveiligde bestanden gedetecteerd.</translation>
     </message>
     <message>
         <location filename="../src/i18n/TranslationCatalog.cpp" line="140"/>
         <location filename="../src/ui/RepairFiles.cpp" line="67"/>
         <source>The launcher detected a protected file change: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>De launcher heeft een wijziging gedetecteerd in beveiligde bestanden: %1</translation>
     </message>
     <message>
         <location filename="../src/i18n/TranslationCatalog.cpp" line="143"/>
         <location filename="../src/ui/RepairFiles.cpp" line="155"/>
         <source>The launcher will verify every %1 file against the current CDN manifest.</source>
-        <translation type="unfinished"></translation>
+        <translation>De launcher zal elk %1 bestand verifieren tegen de huidige CDN manifest.</translation>
     </message>
     <message>
         <location filename="../src/ui/DownloadProgress.cpp" line="293"/>
         <source>The repair could not be started.</source>
-        <translation type="unfinished"></translation>
+        <translation>De reparatie kon niet worden gestart.</translation>
     </message>
     <message>
         <location filename="../src/ui/DownloadProgress.cpp" line="279"/>
         <source>The repair service could not be created.</source>
-        <translation type="unfinished"></translation>
+        <translation>De reparatie service kon niet worden gecreëerd.</translation>
     </message>
     <message>
         <location filename="../src/ui/InstallState.cpp" line="325"/>
         <source>The requested launcher operation failed.</source>
-        <translation type="unfinished"></translation>
+        <translatorcomment>was/is?</translatorcomment>
+        <translation>De aangevraagde launcher operatie was gefaald.</translation>
     </message>
     <message>
         <location filename="../src/ui/DownloadProgress.cpp" line="243"/>
         <location filename="../src/ui/DownloadProgress.cpp" line="244"/>
         <source>The selected game folder is outside the Wine prefix. Choose a safe install folder first.</source>
-        <translation type="unfinished"></translation>
+        <translation>De geselecteerde spel map is buiten de Wine prefix. Kies een veilige installatie map eerst.</translation>
     </message>
     <message>
         <location filename="../src/i18n/TranslationCatalog.cpp" line="146"/>
         <location filename="../src/ui/DownloadProgress.cpp" line="439"/>
         <source>Time remaining: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>Resterende tijd: %1</translation>
     </message>
     <message>
         <location filename="../src/ui/RepairFiles.cpp" line="123"/>
         <source>Verify and repair files</source>
-        <translation type="unfinished"></translation>
+        <translation>Verifieer en repareer bestanden</translation>
     </message>
     <message>
         <location filename="../src/ui/RepairFiles.cpp" line="145"/>
         <source>VERIFY AND REPAIR GAME</source>
-        <translation type="unfinished"></translation>
+        <translation>VERIFIEER EN REPAREER HET SPEL</translation>
     </message>
     <message>
         <location filename="../src/ui/DownloadProgress.cpp" line="390"/>
         <source>VERIFYING FILES</source>
-        <translation type="unfinished"></translation>
+        <translation>BESTANDEN VERIFIËREN</translation>
     </message>
     <message>
         <location filename="../src/i18n/TranslationCatalog.cpp" line="147"/>
         <location filename="../src/ui/DownloadProgress.cpp" line="388"/>
         <source>VERIFYING FILES (%1/%2)</source>
-        <translation type="unfinished"></translation>
+        <translation>BESTANDEN VERIFIËREN (%1/%2)</translation>
     </message>
     <message>
         <location filename="../src/ui/GameInstall.cpp" line="249"/>
         <source>~ 2 GB of free disk space required.</source>
-        <translation type="unfinished"></translation>
+        <translation>~ 2 GB beschikbare schijf ruimte is verplicht.</translation>
     </message>
 </context>
 <context>
